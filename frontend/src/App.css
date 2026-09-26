@@ -1,0 +1,66 @@
+:root {
+    --midnight-bg: #0F172A;
+    --midnight-surface: #1E293B;
+    --midnight-accent: #06B6D4;
+    --midnight-text: #F8FAFC;
+    --midnight-muted: #94A3B8;
+    --midnight-border: #334155;
+}
+
+body {
+    background-color: var(--midnight-bg);
+    color: var(--midnight-text);
+}
+
+/* Custom UI Components */
+.chat-sidebar {
+    background-color: var(--midnight-surface);
+    border-right: 1px solid var(--midnight-border);
+}
+
+.chat-header {
+    background-color: var(--midnight-surface);
+    border-bottom: 1px solid var(--midnight-border);
+}
+
+.chat-window {
+    background-color: var(--midnight-bg);
+}
+
+.chat-input-area {
+    background-color: var(--midnight-surface);
+    border-top: 1px solid var(--midnight-border);
+}
+
+.channel-item {
+    color: var(--midnight-muted);
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.channel-item:hover,
+.channel-item.active {
+    background-color: var(--midnight-bg);
+    color: var(--midnight-accent);
+    font-weight: 600;
+}
+
+.btn-devsup {
+    background-color: var(--midnight-accent);
+    border: none;
+    color: #0F172A;
+    font-weight: 600;
+}
+
+.btn-devsup:hover {
+    background-color: #0891b2;
+    color: #fff;
+}
+
+/* Override Bootstrap's input focus ring to match our accent */
+.form-control:focus {
+    background-color: var(--midnight-bg);
+    color: var(--midnight-text);
+    border-color: var(--midnight-accent);
+    box-shadow: 0 0 0 0.25rem rgba(6, 182, 212, 0.25);
+}
