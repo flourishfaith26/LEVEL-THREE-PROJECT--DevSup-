@@ -19,6 +19,10 @@ const conversationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  allowAnyMemberToAdd: {
+    type: Boolean,
+    default: false
+  },
   avatarUrl: {
     type: String,
     default: ''

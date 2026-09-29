@@ -646,7 +646,7 @@ export const ProfilePane = ({ onBack, currentUser, onUpdateProfile, getAccessTok
                                 autoFocus
                             />
                         ) : (
-                            <span style={{ fontSize: '1.1rem', color: 'var(--colors-textMain)', fontWeight: '500' }}>{currentUser?.about || 'Available'}</span>
+                            <span style={{ fontSize: '1.1rem', color: 'var(--colors-textMain)', fontWeight: '500' }}>{currentUser?.about}</span>
                         )}
                         <div style={{ cursor: 'pointer', color: 'var(--colors-textMuted)', padding: '8px', marginLeft: '12px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                             {isEditingAbout ? (
@@ -657,6 +657,24 @@ export const ProfilePane = ({ onBack, currentUser, onUpdateProfile, getAccessTok
                         </div>
                     </div>
                 </SectionCard>
+
+                <SectionCard style={{ width: '100%', padding: '20px' }}>
+                    <div style={{ color: 'var(--colors-accent)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: '600' }}>Share Profile Link</div>
+                    <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '16px', lineHeight: '1.4' }}>
+                        Share this link with your friends so they can easily start a direct chat with you on DevSup!
+                    </div>
+                    <div 
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', backgroundColor: 'var(--colors-accent)', color: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={() => {
+                            const link = `${window.location.origin}/dashboard?chatWith=${currentUser?._id}`;
+                            navigator.clipboard.writeText(link);
+                            alert('Profile link copied to clipboard!');
+                        }}
+                    >
+                        Copy My Link
+                    </div>
+                </SectionCard>
+
                 <SectionCard style={{ width: '100%', padding: '20px' }}>
                     <div style={{ color: 'var(--colors-accent)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', fontWeight: '600' }}>GitHub Profile</div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

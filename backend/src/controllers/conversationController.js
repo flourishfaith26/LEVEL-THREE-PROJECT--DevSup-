@@ -30,7 +30,7 @@ export const createConversation = async (req, res) => {
     if (type === 'direct' && participantIds.length === 2) {
       const existingConvo = await Conversation.findOne({
         type: 'direct',
-        participants: { $all: participantIds }
+        participants: { $all: participantIds, $size: 2 }
       }).populate('participants', 'displayName avatarUrl onlineStatus techDiscipline');
       
       if (existingConvo) return res.status(200).json(existingConvo);
@@ -71,15 +71,27 @@ export const createConversation = async (req, res) => {
 export const updateConversation = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, avatarUrl, description } = req.body;
+    const { name, avatarUrl, description, allowAnyMemberToAdd } = req.body;
     
-    // Check if the user is an admin or participant (for simplicity, we assume if they can hit this, they are participants)
     const conversation = await Conversation.findById(id);
     if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
     
     if (name !== undefined) conversation.name = name;
     if (avatarUrl !== undefined) conversation.avatarUrl = avatarUrl;
     if (description !== undefined) conversation.description = description;
+    
+    if (allowAnyMemberToAdd !== undefined) {
+      // Check if user is admin
+      const auth0Id = req.auth?.payload?.sub;
+      if (auth0Id) {
+        const currentUser = await User.findOne({ auth0Id });
+        if (currentUser && conversation.admins.includes(currentUser._id)) {
+          conversation.allowAnyMemberToAdd = allowAnyMemberToAdd;
+        } else {
+          return res.status(403).json({ message: 'Only admins can change member adding permissions' });
+        }
+      }
+    }
     
     await conversation.save();
     
@@ -89,5 +101,44 @@ export const updateConversation = async (req, res) => {
     res.status(200).json(populatedConversation);
   } catch (error) {
     res.status(500).json({ message: 'Error updating conversation', error: error.message });
+  }
+};
+
+export const addMembersToConversation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newMemberIds } = req.body;
+    
+    if (!newMemberIds || !Array.isArray(newMemberIds) || newMemberIds.length === 0) {
+      return res.status(400).json({ message: 'Invalid member IDs' });
+    }
+
+    const conversation = await Conversation.findById(id);
+    if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
+    if (conversation.type !== 'group') return res.status(400).json({ message: 'Cannot add members to a direct chat' });
+
+    const auth0Id = req.auth?.payload?.sub;
+    if (auth0Id) {
+      const currentUser = await User.findOne({ auth0Id });
+      const isAdmin = currentUser && conversation.admins.includes(currentUser._id);
+      if (!isAdmin && !conversation.allowAnyMemberToAdd) {
+        return res.status(403).json({ message: 'Only admins can add members to this group' });
+      }
+    }
+
+    // Add new members without duplicates
+    const currentParticipantIds = conversation.participants.map(p => p.toString());
+    const uniqueNewIds = newMemberIds.filter(id => !currentParticipantIds.includes(id.toString()));
+    
+    conversation.participants.push(...uniqueNewIds);
+    await conversation.save();
+
+    const populatedConversation = await Conversation.findById(id)
+        .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline')
+        .populate('lastMessage');
+        
+    res.status(200).json(populatedConversation);
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding members', error: error.message });
   }
 };

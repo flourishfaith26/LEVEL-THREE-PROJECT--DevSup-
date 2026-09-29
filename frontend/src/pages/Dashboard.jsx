@@ -6,9 +6,10 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import hljs from 'highlight.js';
 import { styled, keyframes } from '../stitches.config.js';
 import { detectEcosystemLink } from '../utils/urlParser.js';
+import { getDailyUserColor } from '../utils/colorUtils.js';
 import Whiteboard from '../components/Whiteboard';
 import CallOverlay from '../components/CallOverlay';
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDashed, Bell, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ThumbsDown, Trash2, Globe, Briefcase, Link as LinkIcon } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDashed, Bell, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ThumbsDown, Trash2, Globe, Briefcase, Link as LinkIcon, UserPlus } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import StoryViewer from '../components/StoryViewer';
 import StatusUploadModal from '../components/StatusUploadModal';
@@ -119,7 +120,6 @@ const Avatar = styled('img', {
     width: '36px',
     height: '36px',
     borderRadius: '$round',
-    border: '2px solid $accent',
     objectFit: 'cover',
 });
 
@@ -195,6 +195,7 @@ const Sidebar = styled('aside', {
     display: 'flex',
     flexDirection: 'column',
     padding: '$3',
+    flexShrink: 0,
     '@media (min-width: 1400px)': {
         width: '350px',
     },
@@ -260,15 +261,14 @@ const ChannelItem = styled('div', {
     alignItems: 'center',
     gap: '10px',
     '&:hover': {
-        backgroundColor: '$bg',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
         color: '$textMain',
     },
     variants: {
         active: {
             true: {
-                backgroundColor: '$bg',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
                 color: '$accent',
-                fontWeight: 'bold',
             }
         }
     }
@@ -279,6 +279,7 @@ const ChatArea = styled('main', {
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: '$bg',
+    minWidth: 0,
     '@media (max-width: 768px)': {
         width: '100%',
     },
@@ -1029,7 +1030,7 @@ export default function Dashboard() {
     const [storyViewerInitialUserIndex, setStoryViewerInitialUserIndex] = useState(null);
 
     // Group statuses by user
-    const groupedStatuses = Object.values(statuses.reduce((acc, status) => {
+    const groupedStatuses = Object.values(statuses.filter(s => (Date.now() - new Date(s.createdAt).getTime()) < 24 * 60 * 60 * 1000).reduce((acc, status) => {
         const uploaderId = status.uploader._id;
         if (!acc[uploaderId]) acc[uploaderId] = { user: status.uploader, statuses: [] };
         acc[uploaderId].statuses.push(status);
@@ -1198,6 +1199,10 @@ export default function Dashboard() {
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAddMembersModalOpen, setIsAddMembersModalOpen] = useState(false);
+    const [addMembersSearchQuery, setAddMembersSearchQuery] = useState('');
+    const [selectedMembersToAdd, setSelectedMembersToAdd] = useState([]);
+    const [userSearchQuery, setUserSearchQuery] = useState('');
     const [forwardMessageData, setForwardMessageData] = useState(null);
     const [allUsers, setAllUsers] = useState([]);
     const [convType, setConvType] = useState('direct');
@@ -1219,7 +1224,7 @@ export default function Dashboard() {
     const messagesEndRef = useRef(null);
     const touchHoldTimer = useRef(null);
     const touchStartCoords = useRef({ x: 0, y: 0 });
-    const BACKEND_URL = 'http://localhost:5000';
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1282,6 +1287,37 @@ export default function Dashboard() {
                     setActiveConversationId(initialConversations[0]._id);
                 }
 
+                // Handle Shared Profile Links (?chatWith=USER_ID)
+                const urlParams = new URLSearchParams(window.location.search);
+                const chatWithId = urlParams.get('chatWith');
+                if (chatWithId && chatWithId !== mongoUser._id) {
+                    try {
+                        const createRes = await fetch(`${BACKEND_URL}/api/conversations`, {
+                            method: 'POST',
+                            headers: apiHeaders,
+                            body: JSON.stringify({
+                                type: 'direct',
+                                participantIds: [mongoUser._id, chatWithId]
+                            })
+                        });
+                        if (createRes.ok) {
+                            const newConv = await createRes.json();
+                            setConversations(prev => {
+                                const exists = prev.find(c => c._id === newConv._id);
+                                if (!exists) return [newConv, ...prev];
+                                return prev;
+                            });
+                            setActiveConversationId(newConv._id);
+                            
+                            // Clean up URL
+                            const newUrl = window.location.origin + window.location.pathname;
+                            window.history.replaceState({}, document.title, newUrl);
+                        }
+                    } catch (err) {
+                        console.error('Failed to start chat from share link', err);
+                    }
+                }
+
                 // Fetch call logs
                 try {
                     const callRes = await fetch(`${BACKEND_URL}/api/calls`, { headers: apiHeaders });
@@ -1305,6 +1341,21 @@ export default function Dashboard() {
                     setMessages((prev) => {
                         if (prev.some(msg => msg._id === incomingMessage._id)) return prev;
                         return [...prev, incomingMessage];
+                    });
+
+                    setConversations((prev) => {
+                        const convIndex = prev.findIndex(c => c._id === incomingMessage.conversationId);
+                        if (convIndex === -1) return prev;
+                        
+                        const newConvs = [...prev];
+                        const updatedConv = { 
+                            ...newConvs[convIndex], 
+                            lastMessage: incomingMessage, 
+                            updatedAt: new Date().toISOString() 
+                        };
+                        newConvs.splice(convIndex, 1);
+                        newConvs.unshift(updatedConv);
+                        return newConvs;
                     });
                 });
 
@@ -1414,6 +1465,19 @@ export default function Dashboard() {
         if (selectedUsers.length === 0) return;
         if (convType === 'group' && !convName.trim()) return;
 
+        if (convType === 'direct') {
+            const existing = conversations.find(c => 
+                c.type === 'direct' && 
+                c.participants.some(p => p._id === selectedUsers[0])
+            );
+            if (existing) {
+                setActiveConversationId(existing._id);
+                setIsModalOpen(false);
+                setSelectedUsers([]);
+                return;
+            }
+        }
+
         try {
             const token = await getAccessTokenSilently();
             const res = await fetch(`${BACKEND_URL}/api/conversations`, {
@@ -1445,8 +1509,37 @@ export default function Dashboard() {
             setConvAvatarUrl('');
             setSelectedUsers([]);
             setConvType('direct');
+            setUserSearchQuery('');
         } catch (error) {
             console.error('Failed to create conversation:', error);
+        }
+    };
+
+    const handleAddMembersToGroup = async () => {
+        if (selectedMembersToAdd.length === 0 || !activeConversationId) return;
+
+        try {
+            const token = await getAccessTokenSilently();
+            const res = await fetch(`${BACKEND_URL}/api/conversations/${activeConversationId}/members`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    newMemberIds: selectedMembersToAdd
+                })
+            });
+
+            if (res.ok) {
+                const updatedConv = await res.json();
+                setConversations(prev => prev.map(c => c._id === updatedConv._id ? updatedConv : c));
+                setIsAddMembersModalOpen(false);
+                setSelectedMembersToAdd([]);
+                setAddMembersSearchQuery('');
+            }
+        } catch (error) {
+            console.error('Failed to add members:', error);
         }
     };
 
@@ -1651,6 +1744,10 @@ export default function Dashboard() {
     // 5. Handle File Uploads to Cloudinary
     const handleImageUpload = async (file, setter) => {
         if (!file) return;
+        
+        const previewUrl = URL.createObjectURL(file);
+        setter(previewUrl);
+
         const formData = new FormData();
         formData.append('file', file);
         try {
@@ -1671,6 +1768,11 @@ export default function Dashboard() {
 
     const handleUpdateGroupAvatar = async (file) => {
         if (!file || !activeConversation || activeConversation.type !== 'group') return;
+
+        const previewUrl = URL.createObjectURL(file);
+        setConversations(prev => prev.map(c => 
+            c._id === activeConversation._id ? { ...c, avatarUrl: previewUrl } : c
+        ));
 
         const formData = new FormData();
         formData.append('file', file);
@@ -1952,17 +2054,19 @@ export default function Dashboard() {
                         {conversations.length === 0 ? (
                             <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>No conversations yet.</div>
                         ) : (
-                            conversations.map(conv => {
+                            [...conversations].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(conv => {
                                 const isGroup = conv.type === 'group';
                                 const otherParticipant = !isGroup ? conv.participants?.find(p => p._id !== mongoUserId) : null;
                                 const isOtherUserOnline = otherParticipant && activeUsers.includes(otherParticipant._id);
+                                const userStatusIndex = otherParticipant ? groupedStatuses.findIndex(g => g.user._id === otherParticipant._id) : -1;
+                                const hasStatus = userStatusIndex !== -1;
 
                                 return (
                                     <ChannelItem
                                         key={conv._id}
                                         active={activeConversationId === conv._id}
                                         onClick={() => setActiveConversationId(conv._id)}
-                                        style={{ padding: '12px 16px', borderBottom: '1px solid var(--colors-border)', borderRadius: 0, gap: '12px', alignItems: 'center', margin: 0 }}
+                                        style={{ padding: '8px 12px', borderBottom: '1px solid var(--colors-border)', borderRadius: 0, gap: '12px', alignItems: 'center', margin: 0 }}
                                         onMouseEnter={(e) => {
                                             const btn = e.currentTarget.querySelector('.conv-delete-btn');
                                             if (btn) btn.style.opacity = 1;
@@ -1972,33 +2076,43 @@ export default function Dashboard() {
                                             if (btn) btn.style.opacity = 0;
                                         }}
                                     >
-                                        <AvatarWrapper style={{ flexShrink: 0 }}>
+                                        <AvatarWrapper 
+                                            style={{ flexShrink: 0, padding: hasStatus ? '2px' : '0', border: hasStatus ? '2px solid var(--colors-accent)' : 'none', cursor: hasStatus ? 'pointer' : 'default' }}
+                                            onClick={(e) => {
+                                                if (hasStatus) {
+                                                    e.stopPropagation();
+                                                    setStoryViewerInitialUserIndex(userStatusIndex);
+                                                }
+                                            }}
+                                        >
                                             <Avatar
                                                 src={isGroup
                                                     ? (conv.avatarUrl || `https://ui-avatars.com/api/?name=${conv.name}&background=06B6D4&color=fff`)
                                                     : (otherParticipant?.avatarUrl || `https://ui-avatars.com/api/?name=${otherParticipant?.displayName || 'User'}&background=06B6D4&color=fff`)}
-                                                style={{ width: '48px', height: '48px', border: 'none' }}
+                                                style={{ width: '40px', height: '40px', border: 'none' }}
                                             />
                                             {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
                                         </AvatarWrapper>
 
                                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                                <span style={{ fontSize: '1.05rem', fontWeight: activeConversationId === conv._id ? 'bold' : 'normal', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                <span style={{ fontSize: '1.05rem', fontWeight: 'normal', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                     {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
                                                 </span>
                                                 {conv.lastMessage && (
-                                                    <span style={{ fontSize: '0.75rem', color: activeConversationId === conv._id ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', flexShrink: 0 }}>
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--colors-textMuted)', flexShrink: 0 }}>
                                                         {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 )}
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.85rem', color: activeConversationId === conv._id ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {conv.lastMessage
-                                                        ? ((conv.lastMessage.sender === mongoUserId ? 'You: ' : '') +
-                                                            (conv.lastMessage.content?.includes('res.cloudinary') ? (conv.lastMessage.content.includes('video') ? '🎥 Video' : '📷 Photo') : conv.lastMessage.content))
-                                                        : 'No messages yet'}
+                                                <span style={{ fontSize: '0.85rem', color: 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {conv.unreadCount > 0 ? (
+                                                        conv.lastMessage
+                                                            ? ((conv.lastMessage.sender === mongoUserId ? 'You: ' : '') +
+                                                                (conv.lastMessage.content?.includes('res.cloudinary') ? (conv.lastMessage.content.includes('video') ? '🎥 Video' : '📷 Photo') : conv.lastMessage.content))
+                                                            : 'No messages yet'
+                                                    ) : null}
                                                 </span>
                                                 <IconButton
                                                     className="conv-delete-btn"
@@ -2032,12 +2146,12 @@ export default function Dashboard() {
                         {conversations.filter(c => c.type === 'group').length === 0 ? (
                             <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>No communities yet.</div>
                         ) : (
-                            conversations.filter(c => c.type === 'group').map(conv => (
+                            [...conversations].filter(c => c.type === 'group').sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(conv => (
                                 <ChannelItem
                                     key={conv._id}
                                     active={activeConversationId === conv._id}
                                     onClick={() => { setActiveConversationId(conv._id); setCommunityTab('chat'); }}
-                                    style={{ padding: '12px 16px', borderBottom: '1px solid var(--colors-border)', borderRadius: 0, gap: '12px', alignItems: 'center', margin: 0 }}
+                                    style={{ padding: '8px 12px', borderBottom: '1px solid var(--colors-border)', borderRadius: 0, gap: '12px', alignItems: 'center', margin: 0 }}
                                     onMouseEnter={(e) => {
                                         const btn = e.currentTarget.querySelector('.conv-delete-btn');
                                         if (btn) btn.style.opacity = 1;
@@ -2050,27 +2164,29 @@ export default function Dashboard() {
                                     <AvatarWrapper style={{ flexShrink: 0 }}>
                                         <Avatar
                                             src={conv.avatarUrl || `https://ui-avatars.com/api/?name=${conv.name}&background=06B6D4&color=fff`}
-                                            style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none' }}
+                                            style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none' }}
                                         />
                                     </AvatarWrapper>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                            <span style={{ fontSize: '1.05rem', fontWeight: activeConversationId === conv._id ? 'bold' : 'normal', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <span style={{ fontSize: '1.05rem', fontWeight: 'normal', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                 {conv.name}
                                             </span>
                                             {conv.lastMessage && (
-                                                <span style={{ fontSize: '0.75rem', color: activeConversationId === conv._id ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', flexShrink: 0 }}>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--colors-textMuted)', flexShrink: 0 }}>
                                                     {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
                                             )}
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '0.85rem', color: activeConversationId === conv._id ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {conv.lastMessage
-                                                    ? ((conv.lastMessage.sender === mongoUserId ? 'You: ' : '') +
-                                                        (conv.lastMessage.content?.includes('res.cloudinary') ? (conv.lastMessage.content.includes('video') ? '🎥 Video' : '📷 Photo') : conv.lastMessage.content))
-                                                    : 'No messages yet'}
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {conv.unreadCount > 0 ? (
+                                                    conv.lastMessage
+                                                        ? ((conv.lastMessage.sender === mongoUserId ? 'You: ' : '') +
+                                                            (conv.lastMessage.content?.includes('res.cloudinary') ? (conv.lastMessage.content.includes('video') ? '🎥 Video' : '📷 Photo') : conv.lastMessage.content))
+                                                        : 'No messages yet'
+                                                ) : null}
                                             </span>
                                             <IconButton
                                                 className="conv-delete-btn"
@@ -2209,6 +2325,44 @@ export default function Dashboard() {
                             <HelpPane onBack={() => setActiveSettingTab(null)} />
                         ) : null}
                     </div>
+                ) : activeTab === 'status' ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative' }}>
+                        <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                        <div style={{ 
+                            width: '140px', height: '140px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0.05) 100%)', 
+                            border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px', 
+                            boxShadow: '0 0 40px rgba(6,182,212,0.15), inset 0 0 20px rgba(6,182,212,0.1)', position: 'relative', zIndex: 1
+                        }}>
+                            <CircleDashed size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} />
+                        </div>
+                        <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.5rem', marginBottom: '16px', fontWeight: '500', letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>DevSup Status</h2>
+                        <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.1rem', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6', position: 'relative', zIndex: 1 }}>
+                            Share ephemeral updates with your developer community. Statuses automatically disappear after 24 hours.
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '40px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', position: 'relative', zIndex: 1 }}>
+                            <Lock size={14} />
+                            <span>Your updates are secure and private</span>
+                        </div>
+                    </div>
+                ) : activeTab === 'calls' ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative' }}>
+                        <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                        <div style={{ 
+                            width: '140px', height: '140px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0.05) 100%)', 
+                            border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px', 
+                            boxShadow: '0 0 40px rgba(6,182,212,0.15), inset 0 0 20px rgba(6,182,212,0.1)', position: 'relative', zIndex: 1
+                        }}>
+                            <Phone size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} />
+                        </div>
+                        <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.5rem', marginBottom: '16px', fontWeight: '500', letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>DevSup Calls</h2>
+                        <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.1rem', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6', position: 'relative', zIndex: 1 }}>
+                            Connect instantly with crystal-clear voice and video. Start a call from any of your chats.
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '40px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', position: 'relative', zIndex: 1 }}>
+                            <Lock size={14} />
+                            <span>End-to-end encrypted calls</span>
+                        </div>
+                    </div>
                 ) : activeConversation ? (
                         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
                             <ChatHeader style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px' }}>
@@ -2225,7 +2379,7 @@ export default function Dashboard() {
                                             <AvatarWrapper>
                                                 <Avatar
                                                     src={activeConversation.type === 'group'
-                                                        ? `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff`
+                                                        ? (activeConversation.avatarUrl || `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff`)
                                                         : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.avatarUrl || `https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff`)}
                                                     style={{ width: '40px', height: '40px' }}
                                                 />
@@ -2259,6 +2413,11 @@ export default function Dashboard() {
                                                 outline: 'none'
                                             }}
                                         />
+                                    )}
+                                    {activeConversation.type === 'group' && (activeConversation.admins?.includes(mongoUserId) || activeConversation.allowAnyMemberToAdd) && (
+                                        <IconButton onClick={() => setIsAddMembersModalOpen(true)} title="Add Members">
+                                            <UserPlus size={20} />
+                                        </IconButton>
                                     )}
                                     <IconButton onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'video' })} title="Video Call">
                                         <Video size={20} />
@@ -2384,7 +2543,12 @@ export default function Dashboard() {
                                                                 onTouchCancel={handleTouchEnd}
                                                             >
                                                                 {showSenderName && (
-                                                                    <SenderName style={isMediaMessage ? { padding: '6px 8px 0 8px' } : {}}>{msg.sender?.displayName || 'Unknown User'}</SenderName>
+                                                                    <SenderName style={{
+                                                                        color: activeConversation?.type === 'group' ? getDailyUserColor(msg.sender?._id) : undefined,
+                                                                        ...(isMediaMessage ? { padding: '6px 8px 0 8px' } : {})
+                                                                    }}>
+                                                                        {msg.sender?.displayName || 'Unknown User'}
+                                                                    </SenderName>
                                                                 )}
 
                                                                 <div style={{ wordBreak: 'break-word', marginTop: showSenderName && !isMediaMessage ? '2px' : '0', maxWidth: isImageWithCaption ? '300px' : 'none' }}>
@@ -2590,7 +2754,7 @@ export default function Dashboard() {
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px', backgroundColor: 'var(--colors-surface)' }}>
-                            <label style={{ cursor: activeConversation.type === 'group' ? 'pointer' : 'default', position: 'relative', display: 'inline-block' }}>
+                            <label htmlFor={`group-avatar-upload-${activeConversation._id}`} style={{ cursor: activeConversation.type === 'group' ? 'pointer' : 'default', position: 'relative', display: 'inline-block' }}>
                                 <Avatar
                                     src={activeConversation.type === 'group'
                                         ? (activeConversation.avatarUrl || `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff&size=200`)
@@ -2599,10 +2763,14 @@ export default function Dashboard() {
                                 />
                                 {activeConversation.type === 'group' && (
                                     <input
+                                        id={`group-avatar-upload-${activeConversation._id}`}
                                         type="file"
                                         accept="image/*"
                                         style={{ display: 'none' }}
-                                        onChange={(e) => handleUpdateGroupAvatar(e.target.files[0])}
+                                        onChange={(e) => {
+                                            handleUpdateGroupAvatar(e.target.files[0]);
+                                            e.target.value = null;
+                                        }}
                                     />
                                 )}
                             </label>
@@ -2709,6 +2877,43 @@ export default function Dashboard() {
 
                         <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
 
+                        {activeConversation.type === 'group' && activeConversation.admins?.includes(mongoUserId) && (
+                            <>
+                                <div style={{ padding: '24px 16px', backgroundColor: 'var(--colors-surface)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    <div style={{ color: 'var(--colors-accent)', fontSize: '0.9rem', fontWeight: 'bold', textTransform: 'uppercase' }}>Group Settings</div>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '1rem', color: 'var(--colors-textMain)' }}>Allow Members to Add Others</span>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>If disabled, only admins can add new members.</span>
+                                        </div>
+                                        <div 
+                                            style={{ width: '40px', height: '24px', borderRadius: '12px', backgroundColor: activeConversation.allowAnyMemberToAdd ? 'var(--colors-accent)' : 'var(--colors-border)', position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s' }}
+                                            onClick={async () => {
+                                                try {
+                                                    const token = await getAccessTokenSilently();
+                                                    const res = await fetch(`${BACKEND_URL}/api/conversations/${activeConversation._id}`, {
+                                                        method: 'PUT',
+                                                        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ allowAnyMemberToAdd: !activeConversation.allowAnyMemberToAdd })
+                                                    });
+                                                    if(res.ok) {
+                                                        const updated = await res.json();
+                                                        setConversations(prev => prev.map(c => c._id === updated._id ? updated : c));
+                                                        if (activeConversationId === updated._id) setActiveConversationId(updated._id);
+                                                    }
+                                                } catch (e) {
+                                                    console.error('Failed to update group settings', e);
+                                                }
+                                            }}
+                                        >
+                                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'white', position: 'absolute', top: '2px', left: activeConversation.allowAnyMemberToAdd ? '18px' : '2px', transition: 'left 0.2s' }} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
+                            </>
+                        )}
+
                         {activeConversation.type === 'group' ? (
                             <div style={{ padding: '16px', backgroundColor: 'var(--colors-surface)' }}>
                                 <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '16px' }}>{activeConversation.participants?.length || 0} participants</div>
@@ -2765,7 +2970,7 @@ export default function Dashboard() {
                     <ModalContent onClick={e => e.stopPropagation()}>
                         <ModalTitle style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
                             {activeTab === 'communities' ? 'Create Community' : 'New Conversation'}
-                            <IconButton onClick={() => setIsModalOpen(false)}>✕</IconButton>
+                            <IconButton onClick={() => { setIsModalOpen(false); setUserSearchQuery(''); }}>✕</IconButton>
                         </ModalTitle>
 
                         {activeTab !== 'communities' && (
@@ -2817,7 +3022,10 @@ export default function Dashboard() {
                                         <input
                                             type="file"
                                             accept="image/*"
-                                            onChange={(e) => handleImageUpload(e.target.files[0], setConvAvatarUrl)}
+                                            onChange={(e) => {
+                                                handleImageUpload(e.target.files[0], setConvAvatarUrl);
+                                                e.target.value = null;
+                                            }}
                                             style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}
                                         />
                                     </div>
@@ -2826,12 +3034,27 @@ export default function Dashboard() {
                         )}
 
                         <FormGroup>
-                            <Label>Select User(s)</Label>
+                            <Label>Select User(s) {convType === 'group' ? <span style={{fontSize: '0.8rem', color: 'var(--colors-accent)'}}>(Your Contacts)</span> : ''}</Label>
+                            <ModalInput
+                                placeholder="Search by name..."
+                                value={userSearchQuery}
+                                onChange={e => setUserSearchQuery(e.target.value)}
+                                style={{ padding: '10px 12px', borderRadius: '8px', marginBottom: '8px' }}
+                            />
                             <UserList style={{ border: '1px solid var(--colors-border)', borderRadius: '8px', backgroundColor: 'var(--colors-bg)', overflow: 'hidden' }}>
-                                {allUsers.length === 0 ? (
-                                    <div style={{ padding: '16px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center' }}>No other users found.</div>
-                                ) : (
-                                    allUsers.map(u => (
+                                {(() => {
+                                    let displayedUsers = allUsers;
+                                    if (convType === 'group') {
+                                        const contactIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
+                                        displayedUsers = allUsers.filter(u => contactIds.includes(u._id));
+                                    }
+                                    const filtered = displayedUsers.filter(u => u.displayName?.toLowerCase().includes(userSearchQuery.toLowerCase()));
+                                    
+                                    if (filtered.length === 0) {
+                                        return <div style={{ padding: '16px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center' }}>{convType === 'group' ? 'No contacts found. Start a direct chat first!' : 'No users found.'}</div>;
+                                    }
+                                    
+                                    return filtered.map(u => (
                                         <UserListItem
                                             key={u._id}
                                             selected={selectedUsers.includes(u._id)}
@@ -2849,8 +3072,8 @@ export default function Dashboard() {
                                                 </div>
                                             )}
                                         </UserListItem>
-                                    ))
-                                )}
+                                    ));
+                                })()}
                             </UserList>
                         </FormGroup>
 
@@ -2862,6 +3085,75 @@ export default function Dashboard() {
                             style={{ padding: '14px', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', marginTop: '8px' }}
                         >
                             {activeTab === 'communities' ? 'Create Community' : 'Start Chat'}
+                        </Button>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
+
+            {/* Add Members Modal */}
+            {isAddMembersModalOpen && activeConversation?.type === 'group' && (
+                <ModalOverlay onClick={() => setIsAddMembersModalOpen(false)}>
+                    <ModalContent onClick={e => e.stopPropagation()}>
+                        <ModalTitle>
+                            Add Members
+                            <IconButton onClick={() => setIsAddMembersModalOpen(false)}>✕</IconButton>
+                        </ModalTitle>
+
+                        <FormGroup>
+                            <Label>Select Contacts to Add</Label>
+                            <ModalInput
+                                placeholder="Search contacts..."
+                                value={addMembersSearchQuery}
+                                onChange={e => setAddMembersSearchQuery(e.target.value)}
+                                style={{ padding: '10px 12px', borderRadius: '8px', marginBottom: '8px' }}
+                            />
+                            <UserList style={{ border: '1px solid var(--colors-border)', borderRadius: '8px', backgroundColor: 'var(--colors-bg)', overflow: 'hidden' }}>
+                                {(() => {
+                                    const contactIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
+                                    const existingMemberIds = activeConversation.participants?.map(p => p._id) || [];
+                                    
+                                    const availableContacts = allUsers.filter(u => contactIds.includes(u._id) && !existingMemberIds.includes(u._id));
+                                    const filtered = availableContacts.filter(u => u.displayName?.toLowerCase().includes(addMembersSearchQuery.toLowerCase()));
+                                    
+                                    if (filtered.length === 0) {
+                                        return <div style={{ padding: '16px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center' }}>No available contacts to add.</div>;
+                                    }
+                                    
+                                    return filtered.map(u => (
+                                        <UserListItem
+                                            key={u._id}
+                                            selected={selectedMembersToAdd.includes(u._id)}
+                                            onClick={() => {
+                                                setSelectedMembersToAdd(prev => 
+                                                    prev.includes(u._id) ? prev.filter(id => id !== u._id) : [...prev, u._id]
+                                                );
+                                            }}
+                                            style={{ padding: '12px 16px', borderBottom: '1px solid var(--colors-border)' }}
+                                        >
+                                            <AvatarWrapper>
+                                                <Avatar src={u.avatarUrl} style={{ width: '32px', height: '32px' }} />
+                                                {activeUsers.includes(u._id) && <OnlineDot style={{ width: '8px', height: '8px', bottom: '0px', right: '0px' }} />}
+                                            </AvatarWrapper>
+                                            <span style={{ color: 'var(--colors-textMain)', fontSize: '0.95rem', fontWeight: '500' }}>{u.displayName}</span>
+                                            {selectedMembersToAdd.includes(u._id) && (
+                                                <div style={{ marginLeft: 'auto', color: 'var(--colors-accent)' }}>
+                                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path></svg>
+                                                </div>
+                                            )}
+                                        </UserListItem>
+                                    ));
+                                })()}
+                            </UserList>
+                        </FormGroup>
+
+                        <Button
+                            variant="primary"
+                            fullWidth
+                            onClick={handleAddMembersToGroup}
+                            disabled={selectedMembersToAdd.length === 0}
+                            style={{ padding: '14px', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', marginTop: '8px' }}
+                        >
+                            Add to Group
                         </Button>
                     </ModalContent>
                 </ModalOverlay>
@@ -2879,7 +3171,7 @@ export default function Dashboard() {
                             {conversations.length === 0 ? (
                                 <div style={{ color: 'var(--colors-textMuted)', textAlign: 'center', padding: '16px' }}>No active conversations found.</div>
                             ) : (
-                                conversations.map(c => {
+                                [...conversations].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(c => {
                                     const isGroup = c.type === 'group';
                                     const otherParticipant = !isGroup ? c.participants?.find(p => p._id !== mongoUserId) : null;
 
@@ -3071,27 +3363,47 @@ export default function Dashboard() {
 
             {/* Logout Confirmation Modal */}
             {isLogoutModalOpen && (
-                <ModalOverlay onClick={() => setIsLogoutModalOpen(false)} style={{ zIndex: 9999 }}>
-                    <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '380px', padding: '32px 24px', alignItems: 'center', gap: '16px' }}>
-                        <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', marginBottom: '8px' }}>
-                            <LogOut size={32} style={{ marginLeft: '4px' }} />
+                <ModalOverlay onClick={() => setIsLogoutModalOpen(false)} style={{ zIndex: 9999, backdropFilter: 'blur(8px)', backgroundColor: 'rgba(11, 15, 25, 0.8)' }}>
+                    <ModalContent onClick={e => e.stopPropagation()} style={{ 
+                        maxWidth: '420px', 
+                        padding: '40px 32px', 
+                        alignItems: 'center', 
+                        gap: '16px',
+                        background: 'linear-gradient(180deg, var(--colors-surface) 0%, rgba(17, 24, 39, 0.95) 100%)',
+                        border: '1px solid rgba(6, 182, 212, 0.2)',
+                        boxShadow: '0 25px 50px -12px rgba(6, 182, 212, 0.25), 0 0 0 1px rgba(6, 182, 212, 0.1)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}>
+                        <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', background: 'var(--colors-accent)', filter: 'blur(100px)', opacity: 0.15, borderRadius: '50%' }} />
+
+                        <div style={{ 
+                            width: '80px', height: '80px', borderRadius: '50%', 
+                            background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(6, 182, 212, 0.05) 100%)', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--colors-accent)', 
+                            marginBottom: '8px',
+                            border: '1px solid rgba(6, 182, 212, 0.3)',
+                            boxShadow: '0 0 30px rgba(6, 182, 212, 0.2), inset 0 0 15px rgba(6, 182, 212, 0.1)',
+                            position: 'relative', zIndex: 1
+                        }}>
+                            <img src="/favicon.svg" alt="DevSup Logo" style={{ width: '40px', height: '40px', filter: 'drop-shadow(0 0 8px rgba(6, 182, 212, 0.5))' }} />
                         </div>
-                        <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--colors-textMain)', margin: 0 }}>Ready to leave?</h2>
-                        <p style={{ color: 'var(--colors-textMuted)', fontSize: '0.95rem', textAlign: 'center', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-                            Are you sure you want to log out of DevSup? You will need to sign in again to access your workspaces.
+                        <h2 style={{ fontSize: '1.8rem', fontWeight: '500', color: 'var(--colors-textMain)', margin: 0, letterSpacing: '-0.5px', position: 'relative', zIndex: 1 }}>Log out of DevSup?</h2>
+                        <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.05rem', textAlign: 'center', margin: '0 0 24px 0', lineHeight: 1.6, position: 'relative', zIndex: 1 }}>
+                            See you later!
                         </p>
-                        <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                        <div style={{ display: 'flex', gap: '16px', width: '100%', position: 'relative', zIndex: 1 }}>
                             <Button 
                                 variant="outline" 
                                 onClick={() => setIsLogoutModalOpen(false)}
-                                style={{ flex: 1, padding: '12px', borderRadius: '10px', fontWeight: '600' }}
+                                style={{ flex: 1, padding: '14px', borderRadius: '12px', fontWeight: '500', fontSize: '1rem', border: '1px solid var(--colors-border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--colors-textMain)' }}
                             >
                                 Cancel
                             </Button>
                             <Button 
                                 variant="primary" 
                                 onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
-                                style={{ flex: 1, padding: '12px', borderRadius: '10px', backgroundColor: '#ef4444', color: '#fff', border: 'none', fontWeight: '600' }}
+                                style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--colors-accent) 0%, #0891b2 100%)', color: '#fff', border: 'none', fontWeight: '500', fontSize: '1rem', boxShadow: '0 4px 14px rgba(6, 182, 212, 0.4)' }}
                             >
                                 Log Out
                             </Button>
