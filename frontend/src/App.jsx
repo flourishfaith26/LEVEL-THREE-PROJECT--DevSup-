@@ -4,6 +4,7 @@ import { styled } from './stitches.config.js';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import ProfileSetup from './pages/ProfileSetup';
+import AuthPage from './pages/AuthPage';
 
 // Custom Stitches loading container
 const LoadingContainer = styled('div', {
@@ -35,6 +36,10 @@ function App() {
         <Route 
           path="/" 
           element={!isAuthenticated ? <Home /> : <Navigate to="/dashboard" replace />} 
+        />
+        <Route 
+          path="/login" 
+          element={!isAuthenticated ? <AuthPage /> : <Navigate to="/dashboard" replace />} 
         />
         <Route 
           path="/dashboard" 

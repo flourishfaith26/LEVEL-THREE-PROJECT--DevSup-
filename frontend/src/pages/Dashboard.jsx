@@ -129,7 +129,7 @@ const OnlineDot = styled('div', {
     right: '-2px',
     width: '12px',
     height: '12px',
-    backgroundColor: '#10B981', 
+    backgroundColor: '#10B981',
     borderRadius: '$round',
     border: '2px solid $surface',
 });
@@ -326,7 +326,7 @@ const MessageList = styled('div', {
     overflowY: 'auto',
     color: '$textMuted',
     position: 'relative',
-    backgroundColor: 'var(--wallpaper-bg-color, #0b141a)', 
+    backgroundColor: 'var(--wallpaper-bg-color, #0b141a)',
     backgroundImage: `
         linear-gradient(rgba(0, 0, 0, var(--wallpaper-darken, 0)), rgba(0, 0, 0, var(--wallpaper-darken, 0))),
         var(--wallpaper-url, url("/chat-bg.jpg")),
@@ -533,7 +533,7 @@ const UserListItem = styled('div', {
     '&:last-child': { borderBottom: 'none' },
     variants: {
         selected: {
-            true: { backgroundColor: 'rgba(6, 182, 212, 0.1)' } 
+            true: { backgroundColor: 'rgba(6, 182, 212, 0.1)' }
         }
     }
 });
@@ -562,7 +562,7 @@ const AttachButton = styled('button', {
     flexShrink: 0,
     marginBottom: '3px',
     transition: 'all 0.2s',
-    '&:hover': { 
+    '&:hover': {
         backgroundColor: '$bg',
         color: '$textMain',
     },
@@ -634,8 +634,8 @@ const SendIcon = () => (
 const CustomMicIcon = ({ size = 24 }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" fill="currentColor" />
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" x2="12" y1="19" y2="22"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+        <line x1="12" x2="12" y1="19" y2="22" />
     </svg>
 );
 
@@ -785,7 +785,7 @@ const VoiceRecordingIndicator = ({ time }) => {
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--colors-danger)', animation: `${pulseAnimation} 1.5s infinite` }} />
                 <span style={{ fontWeight: '500', fontVariantNumeric: 'tabular-nums', fontSize: '0.9rem', color: '#94A3B8' }}>{formatTime(time)}</span>
             </div>
-            
+
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '24px', opacity: 0.7 }}>
                 {Array.from({ length: 40 }).map((_, i) => (
                     <WaveBar key={i} delay={i % 5} />
@@ -854,7 +854,7 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl }) => {
                     </div>
                 </div>
             )}
-            
+
             <button
                 onClick={togglePlay}
                 style={{
@@ -875,7 +875,7 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl }) => {
             </button>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', paddingTop: '4px' }}>
-                <AudioSlider 
+                <AudioSlider
                     type="range"
                     min="0"
                     max="100"
@@ -985,10 +985,10 @@ const TechBadge = styled('span', {
     letterSpacing: '0.05em',
     variants: {
         discipline: {
-            Frontend: { backgroundColor: 'rgba(6, 182, 212, 0.1)', color: '#06B6D4' }, 
-            Backend: { backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }, 
-            UIUX: { backgroundColor: 'rgba(244, 63, 94, 0.1)', color: '#F43F5E' },     
-            Fullstack: { backgroundColor: 'rgba(139, 92, 246, 0.1)', color: '#8B5CF6' } 
+            Frontend: { backgroundColor: 'rgba(6, 182, 212, 0.1)', color: '#06B6D4' },
+            Backend: { backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10B981' },
+            UIUX: { backgroundColor: 'rgba(244, 63, 94, 0.1)', color: '#F43F5E' },
+            Fullstack: { backgroundColor: 'rgba(139, 92, 246, 0.1)', color: '#8B5CF6' }
         }
     },
     defaultVariants: {
@@ -1022,12 +1022,12 @@ export default function Dashboard() {
     const [conversations, setConversations] = useState([]);
     const [activeConversationId, setActiveConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
-    
+
     // Status State
     const [statuses, setStatuses] = useState([]);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [storyViewerInitialUserIndex, setStoryViewerInitialUserIndex] = useState(null);
-    
+
     // Group statuses by user
     const groupedStatuses = Object.values(statuses.reduce((acc, status) => {
         const uploaderId = status.uploader._id;
@@ -1072,7 +1072,7 @@ export default function Dashboard() {
     const handleDeleteStatus = async (statusId) => {
         // Optimistic update for instant UI response
         setStatuses(prev => prev.filter(s => s._id !== statusId));
-        
+
         try {
             const token = await getAccessTokenSilently();
             await fetch(`${BACKEND_URL}/api/status/${statusId}`, {
@@ -1124,7 +1124,7 @@ export default function Dashboard() {
     const [callConfig, setCallConfig] = useState({ active: false, isReceiving: false, callerData: null, callType: 'video' });
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    
+
     const [callLogs, setCallLogs] = useState([]);
 
     const formatCallLog = (log, currentUserId) => {
@@ -1195,19 +1195,22 @@ export default function Dashboard() {
     const [recordingTime, setRecordingTime] = useState(0);
     const recordingIntervalRef = useRef(null);
     const [communityTab, setCommunityTab] = useState('chat');
-    
+
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [forwardMessageData, setForwardMessageData] = useState(null);
     const [allUsers, setAllUsers] = useState([]);
     const [convType, setConvType] = useState('direct');
     const [convName, setConvName] = useState('');
+    const [convDescription, setConvDescription] = useState('');
+    const [convAvatarUrl, setConvAvatarUrl] = useState('');
     const [selectedUsers, setSelectedUsers] = useState([]);
+    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
     // Edit/Delete State
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editInputContent, setEditInputContent] = useState('');
-    
+
     // Context Menu State
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, message: null, callLog: null });
 
@@ -1253,7 +1256,7 @@ export default function Dashboard() {
                     throw new Error('Unauthorized');
                 }
                 const mongoUser = await syncResponse.json();
-                
+
                 if (!isActive) return;
                 setMongoUserId(mongoUser._id);
                 setCurrentUserData(mongoUser);
@@ -1271,7 +1274,7 @@ export default function Dashboard() {
                     headers: apiHeaders
                 });
                 const initialConversations = await convResponse.json();
-                
+
                 if (!isActive) return;
 
                 if (initialConversations.length > 0) {
@@ -1286,12 +1289,12 @@ export default function Dashboard() {
                         const logs = await callRes.json();
                         setCallLogs(logs.map(log => formatCallLog(log, mongoUser._id)));
                     }
-                } catch(e) { console.error('Failed to fetch call logs:', e); }
+                } catch (e) { console.error('Failed to fetch call logs:', e); }
 
                 newSocket = io(BACKEND_URL);
 
                 newSocket.on('connect', () => {
-                    newSocket.emit('user_connected', mongoUser._id); 
+                    newSocket.emit('user_connected', mongoUser._id);
                 });
 
                 newSocket.on('presence_update', (onlineUserIds) => {
@@ -1339,11 +1342,11 @@ export default function Dashboard() {
             } catch (error) {
                 console.error('Integration failure:', error);
                 if (
-                    error.message === 'Unauthorized' || 
-                    error.error === 'consent_required' || 
-                    error.error === 'login_required' || 
-                    String(error).includes('Consent required') || 
-                    String(error).includes('Login required') || 
+                    error.message === 'Unauthorized' ||
+                    error.error === 'consent_required' ||
+                    error.error === 'login_required' ||
+                    String(error).includes('Consent required') ||
+                    String(error).includes('Login required') ||
                     String(error).includes('Unexpected token') ||
                     String(error).includes('SyntaxError')
                 ) {
@@ -1401,7 +1404,7 @@ export default function Dashboard() {
         if (convType === 'direct') {
             setSelectedUsers([userId]);
         } else {
-            setSelectedUsers(prev => 
+            setSelectedUsers(prev =>
                 prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
             );
         }
@@ -1422,20 +1425,24 @@ export default function Dashboard() {
                 body: JSON.stringify({
                     type: convType,
                     name: convType === 'group' ? convName : undefined,
+                    description: convType === 'group' ? convDescription : undefined,
+                    avatarUrl: convType === 'group' ? convAvatarUrl : undefined,
                     participantIds: [mongoUserId, ...selectedUsers]
                 })
             });
-            
+
             const newConv = await res.json();
-            
+
             setConversations(prev => {
                 if (prev.some(c => c._id === newConv._id)) return prev;
                 return [newConv, ...prev];
             });
-            
+
             setActiveConversationId(newConv._id);
             setIsModalOpen(false);
             setConvName('');
+            setConvDescription('');
+            setConvAvatarUrl('');
             setSelectedUsers([]);
             setConvType('direct');
         } catch (error) {
@@ -1446,7 +1453,7 @@ export default function Dashboard() {
     // 4. Handle Text Input and Sending
     const handleInputChange = (e) => {
         setMessageInput(e.target.value);
-        e.target.style.height = '48px'; 
+        e.target.style.height = '48px';
         e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
     };
 
@@ -1461,7 +1468,7 @@ export default function Dashboard() {
         if (text.length > 20) {
             const detected = hljs.highlightAuto(text);
             const hasCodeSyntax = text.includes('\n') || text.includes('{') || text.includes('</');
-            
+
             if (detected.language && detected.relevance >= 3 && hasCodeSyntax) {
                 finalIsCode = true;
                 finalLang = detected.language === 'xml' ? 'html' : detected.language;
@@ -1477,7 +1484,7 @@ export default function Dashboard() {
         };
 
         socket.emit('send_message', messagePayload);
-        
+
         setMessageInput('');
         if (inputRef.current) inputRef.current.style.height = '48px';
     };
@@ -1514,9 +1521,9 @@ export default function Dashboard() {
         const pageX = touch.pageX;
         const pageY = touch.pageY;
         touchStartCoords.current = { x: pageX, y: pageY };
-        
+
         touchHoldTimer.current = setTimeout(() => {
-            handleContextMenu({ preventDefault: () => {}, pageX, pageY }, 'message', msg);
+            handleContextMenu({ preventDefault: () => { }, pageX, pageY }, 'message', msg);
             touchHoldTimer.current = null;
         }, 500); // 500ms long press for context menu
     };
@@ -1526,7 +1533,7 @@ export default function Dashboard() {
         const touch = e.touches[0];
         const diffX = Math.abs(touch.pageX - touchStartCoords.current.x);
         const diffY = Math.abs(touch.pageY - touchStartCoords.current.y);
-        
+
         // Cancel long press if user swipes/scrolls
         if (diffX > 10 || diffY > 10) {
             clearTimeout(touchHoldTimer.current);
@@ -1602,7 +1609,7 @@ export default function Dashboard() {
                 console.error('Error creating conversation', e);
             }
         }
-        
+
         if (conv) {
             setActiveTab('chats');
             setActiveConversationId(conv._id);
@@ -1617,7 +1624,7 @@ export default function Dashboard() {
 
     const confirmForward = (targetConvId) => {
         if (!socket || !forwardMessageData) return;
-        
+
         // If forwarding a status, we treat image/video as just URL content, and pass caption
         const payload = {
             conversationId: targetConvId,
@@ -1627,7 +1634,7 @@ export default function Dashboard() {
             language: forwardMessageData.language || 'plaintext',
             caption: forwardMessageData.caption || ''
         };
-        
+
         socket.emit('send_message', payload);
         setForwardMessageData(null);
     };
@@ -1642,6 +1649,59 @@ export default function Dashboard() {
     };
 
     // 5. Handle File Uploads to Cloudinary
+    const handleImageUpload = async (file, setter) => {
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const token = await getAccessTokenSilently();
+            const res = await fetch(`${BACKEND_URL}/api/upload`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setter(data.fileUrl);
+            }
+        } catch (error) {
+            console.error('Upload Error:', error);
+        }
+    };
+
+    const handleUpdateGroupAvatar = async (file) => {
+        if (!file || !activeConversation || activeConversation.type !== 'group') return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const token = await getAccessTokenSilently();
+            const uploadRes = await fetch(`${BACKEND_URL}/api/upload`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+            if (!uploadRes.ok) throw new Error('Upload failed');
+            const uploadData = await uploadRes.json();
+
+            const updateRes = await fetch(`${BACKEND_URL}/api/conversations/${activeConversation._id}`, {
+                method: 'PUT',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ avatarUrl: uploadData.fileUrl })
+            });
+            if (updateRes.ok) {
+                const updatedConv = await updateRes.json();
+                setConversations(prev => prev.map(c => c._id === updatedConv._id ? updatedConv : c));
+            }
+        } catch (error) {
+            console.error('Error updating group avatar:', error);
+            alert('Failed to update group picture.');
+        }
+    };
+
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
         if (!file || !socket || !mongoUserId || !activeConversationId) return;
@@ -1652,8 +1712,8 @@ export default function Dashboard() {
             setChatUploadPreview(reader.result);
         };
         reader.readAsDataURL(file);
-        
-        if (fileInputRef.current) fileInputRef.current.value = ''; 
+
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const confirmChatUpload = async () => {
@@ -1671,13 +1731,13 @@ export default function Dashboard() {
             });
 
             if (!res.ok) throw new Error('Failed to upload file');
-            
+
             const data = await res.json();
-            
+
             const messagePayload = {
                 conversationId: activeConversationId,
                 senderId: mongoUserId,
-                content: data.fileUrl, 
+                content: data.fileUrl,
                 caption: chatUploadCaption,
                 isCodeSnippet: false,
                 language: 'plaintext'
@@ -1694,7 +1754,7 @@ export default function Dashboard() {
             setChatUploadCaption('');
         }
     };
-    
+
     const cancelChatUpload = () => {
         setChatUploadFile(null);
         setChatUploadPreview(null);
@@ -1717,7 +1777,7 @@ export default function Dashboard() {
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                 const audioFile = new File([audioBlob], 'voice_note.webm', { type: 'audio/webm' });
-                
+
                 if (!socket || !mongoUserId || !activeConversationId) return;
                 setIsUploading(true);
                 const formData = new FormData();
@@ -1732,13 +1792,13 @@ export default function Dashboard() {
                     });
 
                     if (!res.ok) throw new Error('Failed to upload audio');
-                    
+
                     const data = await res.json();
-                    
+
                     const messagePayload = {
                         conversationId: activeConversationId,
                         senderId: mongoUserId,
-                        content: data.fileUrl, 
+                        content: data.fileUrl,
                         isCodeSnippet: false,
                         language: 'plaintext'
                     };
@@ -1776,37 +1836,42 @@ export default function Dashboard() {
     };
 
     const activeConversation = conversations.find(c => c._id === activeConversationId);
-    const showChatArea = (activeTab === 'chats' && !!activeConversationId) || (activeTab === 'settings' && !!activeSettingTab) || activeTab === 'calls';
-    
+    const showChatArea = !!activeConversationId || (activeTab === 'settings' && !!activeSettingTab);
+
     const isImageUrl = (url) => typeof url === 'string' && url.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$|blob:/i) != null;
     const isAudioUrl = (url) => typeof url === 'string' && url.match(/\.(webm|mp3|wav|ogg|m4a)(\?.*)?$/i) != null;
     const isCloudinaryUrl = (url) => typeof url === 'string' && url.includes('res.cloudinary.com');
+
+    const handleTabChange = (tab) => {
+        if (activeTab === tab) return;
+        setActiveTab(tab);
+    };
 
     return (
         <AppContainer>
             <NavRail mobileHidden={showChatArea}>
                 <NavRailTop>
-                    <NavRailItem active={activeTab === 'status'} onClick={() => setActiveTab('status')} title="Status" style={activeTab === 'status' ? {} : { color: 'var(--colors-textMuted)' }}>
+                    <NavRailItem active={activeTab === 'status'} onClick={() => handleTabChange('status')} title="Status" style={activeTab === 'status' ? {} : { color: 'var(--colors-textMuted)' }}>
                         <Code2 size={24} />
                     </NavRailItem>
-                    <NavRailItem active={activeTab === 'chats'} onClick={() => setActiveTab('chats')} title="Chats">
+                    <NavRailItem active={activeTab === 'chats'} onClick={() => handleTabChange('chats')} title="Chats">
                         <MessageSquare size={22} />
                     </NavRailItem>
-                    <NavRailItem active={activeTab === 'calls'} onClick={() => setActiveTab('calls')} title="Calls">
+                    <NavRailItem active={activeTab === 'calls'} onClick={() => handleTabChange('calls')} title="Calls">
                         <Phone size={22} />
                     </NavRailItem>
-                    <NavRailItem 
-                        active={activeTab === 'communities'} 
-                        onClick={() => setActiveTab('communities')}
+                    <NavRailItem
+                        active={activeTab === 'communities'}
+                        onClick={() => handleTabChange('communities')}
                         title="Communities"
                     >
                         <Users size={22} />
                     </NavRailItem>
-                    <NavRailItem active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} title="Settings">
+                    <NavRailItem active={activeTab === 'settings'} onClick={() => handleTabChange('settings')} title="Settings">
                         <Settings size={22} />
                     </NavRailItem>
                 </NavRailTop>
-                
+
                 <NavRailBottom>
                     <AvatarWrapper title={currentUserData?.displayName || user?.name || user?.nickname || user?.email}>
                         <Avatar
@@ -1819,115 +1884,139 @@ export default function Dashboard() {
                         />
                         <OnlineDot style={{ width: '10px', height: '10px' }} />
                     </AvatarWrapper>
-                    <NavRailItem title="Log Out" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>
+                    <NavRailItem title="Log Out" onClick={() => setIsLogoutModalOpen(true)}>
                         <LogOut size={22} />
                     </NavRailItem>
                 </NavRailBottom>
             </NavRail>
 
             <Sidebar mobileHidden={showChatArea}>
-                    {activeTab === 'calls' && (
-                        <>
-                            <SidebarHeader>
-                                <SectionTitle>Recent Calls</SectionTitle>
-                            </SidebarHeader>
-                            {callLogs.length === 0 ? (
-                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center', marginTop: '40px' }}>
-                                    <Phone size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
-                                    <p>No recent calls</p>
-                                    <p style={{ fontSize: '0.75rem', marginTop: '8px' }}>Your call history will appear here.</p>
-                                </div>
-                            ) : (
-                                <div style={{ overflowY: 'auto', flex: 1 }}>
-                                    {callLogs.map(log => (
-                                        <ChannelItem 
-                                            key={log.id} 
-                                            style={{ height: 'auto', padding: '12px 16px', gap: '16px' }}
-                                            onContextMenu={(e) => handleContextMenu(e, 'callLog', log)}
-                                        >
-                                            <AvatarWrapper style={{ flexShrink: 0 }}>
-                                                <Avatar 
-                                                    src={log.contactAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(log.contactName)}&background=06B6D4&color=fff`} 
-                                                    style={{ width: '40px', height: '40px', border: 'none' }} 
-                                                    onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(log.contactName)}&background=06B6D4&color=fff`; }}
-                                                />
-                                            </AvatarWrapper>
-                                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                                                <span style={{ fontSize: '1rem', color: log.status === 'missed' ? '#EF4444' : 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {log.contactName}
-                                                </span>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>
-                                                    {log.direction === 'incoming' ? (
-                                                        <svg viewBox="0 0 24 24" width="14" height="14" fill={log.status === 'missed' ? '#EF4444' : '#10B981'}><path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41L20 5.41z"></path></svg>
-                                                    ) : (
-                                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="#06B6D4"><path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z"></path></svg>
-                                                    )}
-                                                    <span>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}</span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                {log.type === 'video' ? <Video size={20} color="var(--colors-textMuted)" /> : <Phone size={20} color="var(--colors-textMuted)" />}
-                                            </div>
-                                        </ChannelItem>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {activeTab === 'chats' && (
-                        <>
-                            <SidebarHeader>
-                                <SectionTitle>Channels & DMs</SectionTitle>
-                                <IconButton title="New Chat" onClick={openCreateModal}>
-                                    <PlusIcon />
-                                </IconButton>
-                            </SidebarHeader>
-                            
-                            {conversations.length === 0 ? (
-                        <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>No conversations yet.</div>
-                    ) : (
-                        conversations.map(conv => {
-                            const isGroup = conv.type === 'group';
-                            const otherParticipant = !isGroup ? conv.participants?.find(p => p._id !== mongoUserId) : null;
-                            const isOtherUserOnline = otherParticipant && activeUsers.includes(otherParticipant._id);
-
-                            return (
-                                <ChannelItem
-                                    key={conv._id}
-                                    active={activeConversationId === conv._id}
-                                    onClick={() => setActiveConversationId(conv._id)}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                                        {isGroup ? (
-                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}># {conv.name}</span>
-                                        ) : (
-                                            <>
-                                                <AvatarWrapper style={{ flexShrink: 0 }}>
-                                                    <Avatar 
-                                                        src={otherParticipant?.avatarUrl} 
-                                                        style={{ width: '24px', height: '24px', border: 'none' }} 
-                                                    />
-                                                    {isOtherUserOnline && <OnlineDot style={{ width: '8px', height: '8px', bottom: '0px', right: '0px' }} />}
-                                                </AvatarWrapper>
-                                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {otherParticipant?.displayName || 'Unknown User'}
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-                                    <IconButton 
-                                        className="conv-delete-btn"
-                                        onClick={(e) => deleteConversation(e, conv._id)}
-                                        title="Delete Conversation"
-                                        style={{ padding: '2px', opacity: 0.5 }}
+                {activeTab === 'calls' && (
+                    <>
+                        <SidebarHeader>
+                            <SectionTitle>Recent Calls</SectionTitle>
+                        </SidebarHeader>
+                        {callLogs.length === 0 ? (
+                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center', marginTop: '40px' }}>
+                                <Phone size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                                <p>No recent calls</p>
+                                <p style={{ fontSize: '0.75rem', marginTop: '8px' }}>Your call history will appear here.</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowY: 'auto', flex: 1 }}>
+                                {callLogs.map(log => (
+                                    <ChannelItem
+                                        key={log.id}
+                                        style={{ height: 'auto', padding: '12px 16px', gap: '16px' }}
+                                        onContextMenu={(e) => handleContextMenu(e, 'callLog', log)}
                                     >
-                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>
-                                    </IconButton>
-                                </ChannelItem>
-                            );
-                        })
-                    )}
+                                        <AvatarWrapper style={{ flexShrink: 0 }}>
+                                            <Avatar
+                                                src={log.contactAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(log.contactName)}&background=06B6D4&color=fff`}
+                                                style={{ width: '40px', height: '40px', border: 'none' }}
+                                                onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(log.contactName)}&background=06B6D4&color=fff`; }}
+                                            />
+                                        </AvatarWrapper>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                                            <span style={{ fontSize: '1rem', color: log.status === 'missed' ? '#EF4444' : 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {log.contactName}
+                                            </span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>
+                                                {log.direction === 'incoming' ? (
+                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill={log.status === 'missed' ? '#EF4444' : '#10B981'}><path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41L20 5.41z"></path></svg>
+                                                ) : (
+                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="#06B6D4"><path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z"></path></svg>
+                                                )}
+                                                <span>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            {log.type === 'video' ? <Video size={20} color="var(--colors-textMuted)" /> : <Phone size={20} color="var(--colors-textMuted)" />}
+                                        </div>
+                                    </ChannelItem>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {activeTab === 'chats' && (
+                    <>
+                        <SidebarHeader>
+                            <SectionTitle>Chats</SectionTitle>
+                            <IconButton title="New Chat" onClick={openCreateModal}>
+                                <PlusIcon />
+                            </IconButton>
+                        </SidebarHeader>
+
+                        {conversations.length === 0 ? (
+                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>No conversations yet.</div>
+                        ) : (
+                            conversations.map(conv => {
+                                const isGroup = conv.type === 'group';
+                                const otherParticipant = !isGroup ? conv.participants?.find(p => p._id !== mongoUserId) : null;
+                                const isOtherUserOnline = otherParticipant && activeUsers.includes(otherParticipant._id);
+
+                                return (
+                                    <ChannelItem
+                                        key={conv._id}
+                                        active={activeConversationId === conv._id}
+                                        onClick={() => setActiveConversationId(conv._id)}
+                                        style={{ padding: '12px 16px', borderBottom: '1px solid var(--colors-border)', borderRadius: 0, gap: '12px', alignItems: 'center', margin: 0 }}
+                                        onMouseEnter={(e) => {
+                                            const btn = e.currentTarget.querySelector('.conv-delete-btn');
+                                            if (btn) btn.style.opacity = 1;
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            const btn = e.currentTarget.querySelector('.conv-delete-btn');
+                                            if (btn) btn.style.opacity = 0;
+                                        }}
+                                    >
+                                        <AvatarWrapper style={{ flexShrink: 0 }}>
+                                            <Avatar
+                                                src={isGroup
+                                                    ? (conv.avatarUrl || `https://ui-avatars.com/api/?name=${conv.name}&background=06B6D4&color=fff`)
+                                                    : (otherParticipant?.avatarUrl || `https://ui-avatars.com/api/?name=${otherParticipant?.displayName || 'User'}&background=06B6D4&color=fff`)}
+                                                style={{ width: '48px', height: '48px', border: 'none' }}
+                                            />
+                                            {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
+                                        </AvatarWrapper>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <span style={{ fontSize: '1.05rem', fontWeight: activeConversationId === conv._id ? 'bold' : 'normal', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
+                                                </span>
+                                                {conv.lastMessage && (
+                                                    <span style={{ fontSize: '0.75rem', color: activeConversationId === conv._id ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', flexShrink: 0 }}>
+                                                        {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.85rem', color: activeConversationId === conv._id ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {conv.lastMessage
+                                                        ? ((conv.lastMessage.sender === mongoUserId ? 'You: ' : '') +
+                                                            (conv.lastMessage.content?.includes('res.cloudinary') ? (conv.lastMessage.content.includes('video') ? '🎥 Video' : '📷 Photo') : conv.lastMessage.content))
+                                                        : 'No messages yet'}
+                                                </span>
+                                                <IconButton
+                                                    className="conv-delete-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setContextMenu({ visible: true, x: e.clientX, y: e.clientY, message: null, callLog: null, conversation: conv });
+                                                    }}
+                                                    title="Options"
+                                                    style={{ padding: '2px', opacity: 0, transition: 'opacity 0.2s', color: 'var(--colors-textMuted)', zIndex: 2 }}
+                                                >
+                                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                                </IconButton>
+                                            </div>
+                                        </div>
+                                    </ChannelItem>
+                                );
+                            })
+                        )}
                     </>
                 )}
 
@@ -1939,7 +2028,7 @@ export default function Dashboard() {
                                 <PlusIcon />
                             </IconButton>
                         </SidebarHeader>
-                        
+
                         {conversations.filter(c => c.type === 'group').length === 0 ? (
                             <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>No communities yet.</div>
                         ) : (
@@ -1948,14 +2037,53 @@ export default function Dashboard() {
                                     key={conv._id}
                                     active={activeConversationId === conv._id}
                                     onClick={() => { setActiveConversationId(conv._id); setCommunityTab('chat'); }}
+                                    style={{ padding: '12px 16px', borderBottom: '1px solid var(--colors-border)', borderRadius: 0, gap: '12px', alignItems: 'center', margin: 0 }}
+                                    onMouseEnter={(e) => {
+                                        const btn = e.currentTarget.querySelector('.conv-delete-btn');
+                                        if (btn) btn.style.opacity = 1;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        const btn = e.currentTarget.querySelector('.conv-delete-btn');
+                                        if (btn) btn.style.opacity = 0;
+                                    }}
                                 >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                                        <div style={{ width: 28, height: 28, borderRadius: '8px', backgroundColor: 'var(--colors-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Users size={16} color="var(--colors-textMain)" />
+                                    <AvatarWrapper style={{ flexShrink: 0 }}>
+                                        <Avatar
+                                            src={conv.avatarUrl || `https://ui-avatars.com/api/?name=${conv.name}&background=06B6D4&color=fff`}
+                                            style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none' }}
+                                        />
+                                    </AvatarWrapper>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                            <span style={{ fontSize: '1.05rem', fontWeight: activeConversationId === conv._id ? 'bold' : 'normal', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {conv.name}
+                                            </span>
+                                            {conv.lastMessage && (
+                                                <span style={{ fontSize: '0.75rem', color: activeConversationId === conv._id ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', flexShrink: 0 }}>
+                                                    {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            )}
                                         </div>
-                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: '500' }}>
-                                            {conv.name}
-                                        </span>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.85rem', color: activeConversationId === conv._id ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {conv.lastMessage
+                                                    ? ((conv.lastMessage.sender === mongoUserId ? 'You: ' : '') +
+                                                        (conv.lastMessage.content?.includes('res.cloudinary') ? (conv.lastMessage.content.includes('video') ? '🎥 Video' : '📷 Photo') : conv.lastMessage.content))
+                                                    : 'No messages yet'}
+                                            </span>
+                                            <IconButton
+                                                className="conv-delete-btn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, message: null, callLog: null, conversation: conv });
+                                                }}
+                                                title="Options"
+                                                style={{ padding: '2px', opacity: 0, transition: 'opacity 0.2s', color: 'var(--colors-textMuted)', zIndex: 2 }}
+                                            >
+                                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                            </IconButton>
+                                        </div>
                                     </div>
                                 </ChannelItem>
                             ))
@@ -1984,17 +2112,17 @@ export default function Dashboard() {
                                     { id: 'Keyboard shortcuts', icon: <Monitor size={20} />, title: 'Keyboard shortcuts', sub: 'Quick actions' },
                                     { id: 'Help', icon: <HelpCircle size={20} />, title: 'Help', sub: 'Help centre, contact us, privacy policy' }
                                 ].map((item, i) => (
-                                    <div 
-                                        key={i} 
-                                        style={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            gap: '16px', 
-                                            padding: '12px 8px', 
+                                    <div
+                                        key={i}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '16px',
+                                            padding: '12px 8px',
                                             cursor: 'pointer',
                                             backgroundColor: activeSettingTab === item.id ? 'var(--colors-bg)' : 'transparent',
                                             borderRadius: '8px'
-                                        }} 
+                                        }}
                                         className="settings-item"
                                         onClick={() => setActiveSettingTab(item.id)}
                                     >
@@ -2017,15 +2145,15 @@ export default function Dashboard() {
                         </SidebarHeader>
 
                         <ChannelItem active={activeStatus === 'My status'} onClick={() => {
-                                if (myGroupedStatuses) {
-                                    setStoryViewerInitialUserIndex(groupedStatuses.findIndex(g => g.user._id === mongoUserId));
-                                } else {
-                                    setIsStatusModalOpen(true);
-                                }
-                            }} style={{ height: 'auto', padding: '12px 8px', gap: '16px' }}>
+                            if (myGroupedStatuses) {
+                                setStoryViewerInitialUserIndex(groupedStatuses.findIndex(g => g.user._id === mongoUserId));
+                            } else {
+                                setIsStatusModalOpen(true);
+                            }
+                        }} style={{ height: 'auto', padding: '12px 8px', gap: '16px' }}>
                             <AvatarWrapper style={{ flexShrink: 0 }}>
                                 <Avatar src={currentUserData?.avatarUrl || user?.picture} style={{ width: '48px', height: '48px', border: myGroupedStatuses ? '2px solid var(--colors-accent)' : 'none', padding: myGroupedStatuses ? '2px' : '0' }} />
-                                <div 
+                                <div
                                     onClick={(e) => { e.stopPropagation(); setIsStatusModalOpen(true); }}
                                     style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: 'var(--colors-accent)', borderRadius: '50%', padding: '2px', color: 'white', display: 'flex' }}
                                 >
@@ -2063,7 +2191,7 @@ export default function Dashboard() {
             </Sidebar>
 
             <ChatArea mobileHidden={!showChatArea}>
-                {activeTab === 'settings' && (
+                {activeTab === 'settings' && activeSettingTab ? (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, backgroundColor: 'var(--colors-bg)', overflow: 'hidden' }}>
                         {activeSettingTab === 'Profile' ? (
                             <ProfilePane onBack={() => setActiveSettingTab(null)} currentUser={currentUserData} onUpdateProfile={handleUpdateProfile} getAccessTokenSilently={getAccessTokenSilently} BACKEND_URL={BACKEND_URL} />
@@ -2076,557 +2204,558 @@ export default function Dashboard() {
                         ) : activeSettingTab === 'Notifications' ? (
                             <NotificationsPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} />
                         ) : activeSettingTab === 'Keyboard shortcuts' ? (
-                        <KeyboardShortcutsPane onBack={() => setActiveSettingTab(null)} />
-                    ) : activeSettingTab === 'Help' ? (
-                        <HelpPane onBack={() => setActiveSettingTab(null)} />
-                    ) : (
-                        <PlaceholderView icon={<Settings size={64} />} title="Settings" />
-                    )}
+                            <KeyboardShortcutsPane onBack={() => setActiveSettingTab(null)} />
+                        ) : activeSettingTab === 'Help' ? (
+                            <HelpPane onBack={() => setActiveSettingTab(null)} />
+                        ) : null}
                     </div>
-                )}
-                {activeTab === 'status' && (
-                    activeStatus ? (
-                        <PlaceholderView 
-                            icon={<CircleDashed size={64} />} 
-                            title={`${activeStatus}`} 
-                            subtitle="No current status updates to show." 
-                        />
-                    ) : (
-                        <PlaceholderView icon={<CircleDashed size={64} />} title="Share statuses" subtitle="Share photos, videos and text that disappear after 24 hours." />
-                    )
-                )}
-
-                {activeTab === 'calls' && (
-                    <PlaceholderView 
-                        icon={<Phone size={64} />} 
-                        title="Your Calls" 
-                        subtitle="Start a voice or video call from any of your chats." 
-                    />
-                )}
-                
-                {(activeTab === 'chats' || activeTab === 'communities') && (
-                    !activeConversation ? (
-                        <PlaceholderView 
-                            icon={activeTab === 'communities' ? <Users size={64} /> : <MessageSquare size={64} />} 
-                            title={activeTab === 'communities' ? "Communities" : "Welcome to DevSup!"} 
-                            subtitle={activeTab === 'communities' ? "Select a community or create a new one to get started." : "Click the + button in the sidebar to start a new conversation."} 
-                        />
-                    ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
-                        <ChatHeader style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <>
-                                    <MobileBackButton onClick={() => setActiveConversationId(null)}>
-                                        <ArrowLeft size={24} />
-                                    </MobileBackButton>
-                                    <div 
-                                        onClick={() => setIsDrawerOpen(true)}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
-                                        title={activeConversation.type === 'group' ? 'View Group Info' : 'View Contact Info'}
-                                    >
-                                        <AvatarWrapper>
-                                            <Avatar 
-                                                src={activeConversation.type === 'group' 
-                                                    ? `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff` 
-                                                    : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.avatarUrl || `https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff`)} 
-                                                style={{ width: '40px', height: '40px' }}
-                                            />
-                                        </AvatarWrapper>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontSize: '1rem', fontWeight: 'bold' }}>
-                                                {activeConversation.type === 'group' 
-                                                    ? activeConversation.name 
-                                                    : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName || 'Direct Message')}
-                                            </span>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>
-                                                {activeConversation.type === 'group' ? 'click here for group info' : 'click here for contact info'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </>
-                        </div>
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                            {isSearchOpen && (
-                                <input 
-                                    type="text" 
-                                    placeholder="Search messages..." 
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    style={{ 
-                                        padding: '4px 8px', 
-                                        borderRadius: '4px', 
-                                        border: '1px solid var(--colors-border)', 
-                                        backgroundColor: 'var(--colors-bg)', 
-                                        color: 'var(--colors-textMain)',
-                                        outline: 'none'
-                                    }}
-                                />
-                            )}
-                            <IconButton onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'video' })} title="Video Call">
-                                <Video size={20} />
-                            </IconButton>
-                            <IconButton onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'audio' })} title="Voice Call">
-                                <Phone size={20} />
-                            </IconButton>
-                            <IconButton onClick={() => setIsSearchOpen(!isSearchOpen)} title="Search" style={{ color: isSearchOpen ? 'var(--colors-accent)' : 'inherit' }}>
-                                <Search size={20} />
-                            </IconButton>
-                            <IconButton 
-                                onClick={() => setIsWhiteboardOpen(true)} 
-                                title="Open Whiteboard"
-                                style={{ color: isWhiteboardOpen ? 'var(--colors-accent)' : 'inherit' }}
-                            >
-                                <Brush size={20} />
-                            </IconButton>
-                            <div style={{ position: 'relative' }}>
-                                <IconButton onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)} title="More Options">
-                                    <MoreVertical size={20} />
-                                </IconButton>
-                                {isHeaderMenuOpen && (
+                ) : activeConversation ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
+                            <ChatHeader style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     <>
-                                        <div 
-                                            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1999 }} 
-                                            onClick={() => setIsHeaderMenuOpen(false)} 
-                                        />
-                                        <ContextMenuContainer style={{ top: '100%', right: 0, marginTop: '8px', zIndex: 2000, width: '220px' }}>
-                                            <ContextMenuItem onClick={() => { setIsDrawerOpen(true); setIsHeaderMenuOpen(false); }}>
-                                                {activeConversation.type === 'group' ? 'Group info' : 'Contact info'}
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onClick={() => { alert('Select messages coming soon!'); setIsHeaderMenuOpen(false); }}>
-                                                Select messages
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onClick={() => { setActiveConversationId(null); setIsHeaderMenuOpen(false); }}>
-                                                Close chat
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onClick={() => { alert('Mute notifications coming soon!'); setIsHeaderMenuOpen(false); }}>
-                                                Mute notifications
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onClick={() => { alert('Disappearing messages coming soon!'); setIsHeaderMenuOpen(false); }}>
-                                                Disappearing messages
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onClick={() => { setMessages([]); setIsHeaderMenuOpen(false); }}>
-                                                Clear messages
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onClick={(e) => { deleteConversation(e, activeConversation._id); setIsHeaderMenuOpen(false); }} style={{ color: '#ef4444' }}>
-                                                Delete chat
-                                            </ContextMenuItem>
-                                        </ContextMenuContainer>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </ChatHeader>
-
-                    {activeTab === 'communities' && activeConversation.type === 'group' && (
-                        <div style={{ display: 'flex', gap: '24px', padding: '0 24px', borderBottom: '1px solid var(--colors-border)', backgroundColor: 'var(--colors-surface)', flexShrink: 0 }}>
-                            {['chat', 'live coding', 'hackathons', 'competitions'].map(tab => (
-                                <div 
-                                    key={tab}
-                                    onClick={() => setCommunityTab(tab)}
-                                    style={{ 
-                                        padding: '16px 0', 
-                                        textTransform: 'capitalize', 
-                                        cursor: 'pointer', 
-                                        color: communityTab === tab ? 'var(--colors-accent)' : 'var(--colors-textMuted)',
-                                        borderBottom: communityTab === tab ? '3px solid var(--colors-accent)' : '3px solid transparent',
-                                        fontWeight: communityTab === tab ? '600' : '500',
-                                        transition: 'all 0.2s',
-                                        marginBottom: '-1px'
-                                    }}
-                                >
-                                    {tab}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {(!activeConversation || activeTab === 'chats' || (activeTab === 'communities' && communityTab === 'chat')) ? (
-                        <>
-                            <MessageList style={{
-                                '--wallpaper-url': appSettings.wallpaperUrl ? `url("${appSettings.wallpaperUrl}")` : 'none',
-                                '--wallpaper-darken': 1 - (appSettings.wallpaperBrightness !== undefined ? appSettings.wallpaperBrightness : 100) / 100,
-                                '--wallpaper-size': appSettings.wallpaperType === 'custom' ? 'cover' : '400px',
-                                '--wallpaper-bg-color': appSettings.wallpaperBgColor || '#0b141a',
-                                flex: 1
-                            }}>
-                        {messages.length === 0 ? (
-                            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                                Welcome to the beginning of the conversation.
-                            </div>
-                        ) : (
-                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'flex-start' }}>
-                                {messages.filter(msg => !searchQuery || (msg.content && (typeof msg.content === 'string') && msg.content.toLowerCase().includes(searchQuery.toLowerCase()))).map((msg) => {
-                                    const isOwnMessage = msg.sender?._id === mongoUserId;
-                                    const isGroup = activeConversation?.type === 'group';
-                                    const showSenderName = isGroup && !isOwnMessage;
-                                    const isOnlyUrl = msg.content && typeof msg.content === 'string' && msg.content.trim().startsWith('http') && !msg.content.trim().includes(' ');
-                                    const isMediaMessage = msg.isCodeSnippet || (isOnlyUrl && isImageUrl(msg.content));
-                                    const isImageWithCaption = isMediaMessage && !msg.isCodeSnippet && !!msg.caption;
-                                    return (
-                                        <ChatBubbleWrapper 
-                                            key={msg._id || msg.createdAt}
-                                            isOwn={isOwnMessage}
+                                        <MobileBackButton onClick={() => setActiveConversationId(null)}>
+                                            <ArrowLeft size={24} />
+                                        </MobileBackButton>
+                                        <div
+                                            onClick={() => setIsDrawerOpen(true)}
+                                            style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+                                            title={activeConversation.type === 'group' ? 'View Group Info' : 'View Contact Info'}
                                         >
-                                            <ChatBubble 
-                                                isOwn={isOwnMessage}
-                                                mediaOnly={isMediaMessage}
-                                                onContextMenu={(e) => handleContextMenu(e, 'message', msg)}
-                                                onTouchStart={(e) => handleTouchStart(e, msg)}
-                                                onTouchMove={handleTouchMove}
-                                                onTouchEnd={handleTouchEnd}
-                                                onTouchCancel={handleTouchEnd}
+                                            <AvatarWrapper>
+                                                <Avatar
+                                                    src={activeConversation.type === 'group'
+                                                        ? `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff`
+                                                        : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.avatarUrl || `https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff`)}
+                                                    style={{ width: '40px', height: '40px' }}
+                                                />
+                                            </AvatarWrapper>
+                                            <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '400px' }}>
+                                                <span style={{ fontSize: '1rem', fontWeight: 'bold' }}>
+                                                    {activeConversation.type === 'group'
+                                                        ? activeConversation.name
+                                                        : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName || 'Direct Message')}
+                                                </span>
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {activeConversation.type === 'group' ? activeConversation.participants?.map(p => p._id === mongoUserId ? 'You' : p.displayName).join(', ') : 'click here for contact info'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </>
+                                </div>
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                    {isSearchOpen && (
+                                        <input
+                                            type="text"
+                                            placeholder="Search messages..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '4px',
+                                                border: '1px solid var(--colors-border)',
+                                                backgroundColor: 'var(--colors-bg)',
+                                                color: 'var(--colors-textMain)',
+                                                outline: 'none'
+                                            }}
+                                        />
+                                    )}
+                                    <IconButton onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'video' })} title="Video Call">
+                                        <Video size={20} />
+                                    </IconButton>
+                                    <IconButton onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'audio' })} title="Voice Call">
+                                        <Phone size={20} />
+                                    </IconButton>
+                                    <IconButton onClick={() => setIsSearchOpen(!isSearchOpen)} title="Search" style={{ color: isSearchOpen ? 'var(--colors-accent)' : 'inherit' }}>
+                                        <Search size={20} />
+                                    </IconButton>
+                                    <IconButton
+                                        onClick={() => setIsWhiteboardOpen(true)}
+                                        title="Open Whiteboard"
+                                        style={{ color: isWhiteboardOpen ? 'var(--colors-accent)' : 'inherit' }}
+                                    >
+                                        <Brush size={20} />
+                                    </IconButton>
+                                    <div style={{ position: 'relative' }}>
+                                        <IconButton onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)} title="More Options">
+                                            <MoreVertical size={20} />
+                                        </IconButton>
+                                        {isHeaderMenuOpen && (
+                                            <>
+                                                <div
+                                                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1999 }}
+                                                    onClick={() => setIsHeaderMenuOpen(false)}
+                                                />
+                                                <ContextMenuContainer style={{ top: '100%', right: 0, marginTop: '8px', zIndex: 2000, width: '220px' }}>
+                                                    <ContextMenuItem onClick={() => { setIsDrawerOpen(true); setIsHeaderMenuOpen(false); }}>
+                                                        {activeConversation.type === 'group' ? 'Group info' : 'Contact info'}
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { alert(activeConversation.type === 'group' ? 'Group calls coming soon!' : 'Calls coming soon!'); setIsHeaderMenuOpen(false); }}>
+                                                        {activeConversation.type === 'group' ? 'Group calls' : 'Calls'}
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { alert('Live coding features coming soon!'); setIsHeaderMenuOpen(false); }}>
+                                                        Live coding features
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { alert('Hackathon coming soon!'); setIsHeaderMenuOpen(false); }}>
+                                                        Hackathon
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { alert('Select messages coming soon!'); setIsHeaderMenuOpen(false); }}>
+                                                        Select messages
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { setActiveConversationId(null); setIsHeaderMenuOpen(false); }}>
+                                                        Close chat
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { alert('Mute notifications coming soon!'); setIsHeaderMenuOpen(false); }}>
+                                                        Mute notifications
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { alert('Disappearing messages coming soon!'); setIsHeaderMenuOpen(false); }}>
+                                                        Disappearing messages
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { setMessages([]); setIsHeaderMenuOpen(false); }}>
+                                                        Clear messages
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={(e) => { deleteConversation(e, activeConversation._id); setIsHeaderMenuOpen(false); }} style={{ color: '#ef4444' }}>
+                                                        {activeConversation.type === 'group' ? 'Exit group' : 'Delete chat'}
+                                                    </ContextMenuItem>
+                                                </ContextMenuContainer>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </ChatHeader>
+
+                            {activeTab === 'communities' && activeConversation.type === 'group' && (
+                                <div style={{ display: 'flex', gap: '24px', padding: '0 24px', borderBottom: '1px solid var(--colors-border)', backgroundColor: 'var(--colors-surface)', flexShrink: 0 }}>
+                                    {['chat', 'live coding', 'hackathons', 'competitions'].map(tab => (
+                                        <div
+                                            key={tab}
+                                            onClick={() => setCommunityTab(tab)}
+                                            style={{
+                                                padding: '16px 0',
+                                                textTransform: 'capitalize',
+                                                cursor: 'pointer',
+                                                color: communityTab === tab ? 'var(--colors-accent)' : 'var(--colors-textMuted)',
+                                                borderBottom: communityTab === tab ? '3px solid var(--colors-accent)' : '3px solid transparent',
+                                                fontWeight: communityTab === tab ? '600' : '500',
+                                                transition: 'all 0.2s',
+                                                marginBottom: '-1px'
+                                            }}
+                                        >
+                                            {tab}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {(!activeConversation || activeTab === 'chats' || (activeTab === 'communities' && communityTab === 'chat')) ? (
+                                <>
+                                    <MessageList style={{
+                                        '--wallpaper-url': appSettings.wallpaperUrl ? `url("${appSettings.wallpaperUrl}")` : 'none',
+                                        '--wallpaper-darken': 1 - (appSettings.wallpaperBrightness !== undefined ? appSettings.wallpaperBrightness : 100) / 100,
+                                        '--wallpaper-size': appSettings.wallpaperType === 'custom' ? 'cover' : '400px',
+                                        '--wallpaper-bg-color': appSettings.wallpaperBgColor || '#0b141a',
+                                        flex: 1
+                                    }}>
+                                        {messages.length === 0 ? (
+                                            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+                                                Welcome to the beginning of the conversation.
+                                            </div>
+                                        ) : (
+                                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'flex-start' }}>
+                                                {messages.filter(msg => !searchQuery || (msg.content && (typeof msg.content === 'string') && msg.content.toLowerCase().includes(searchQuery.toLowerCase()))).map((msg) => {
+                                                    const isOwnMessage = msg.sender?._id === mongoUserId;
+                                                    const isGroup = activeConversation?.type === 'group';
+                                                    const showSenderName = isGroup && !isOwnMessage;
+                                                    const isOnlyUrl = msg.content && typeof msg.content === 'string' && msg.content.trim().startsWith('http') && !msg.content.trim().includes(' ');
+                                                    const isMediaMessage = msg.isCodeSnippet || (isOnlyUrl && isImageUrl(msg.content));
+                                                    const isImageWithCaption = isMediaMessage && !msg.isCodeSnippet && !!msg.caption;
+                                                    return (
+                                                        <ChatBubbleWrapper
+                                                            key={msg._id || msg.createdAt}
+                                                            isOwn={isOwnMessage}
+                                                        >
+                                                            <ChatBubble
+                                                                isOwn={isOwnMessage}
+                                                                mediaOnly={isMediaMessage}
+                                                                onContextMenu={(e) => handleContextMenu(e, 'message', msg)}
+                                                                onTouchStart={(e) => handleTouchStart(e, msg)}
+                                                                onTouchMove={handleTouchMove}
+                                                                onTouchEnd={handleTouchEnd}
+                                                                onTouchCancel={handleTouchEnd}
+                                                            >
+                                                                {showSenderName && (
+                                                                    <SenderName style={isMediaMessage ? { padding: '6px 8px 0 8px' } : {}}>{msg.sender?.displayName || 'Unknown User'}</SenderName>
+                                                                )}
+
+                                                                <div style={{ wordBreak: 'break-word', marginTop: showSenderName && !isMediaMessage ? '2px' : '0', maxWidth: isImageWithCaption ? '300px' : 'none' }}>
+                                                                    {(() => {
+                                                                        const embedData = detectEcosystemLink(msg.content);
+
+                                                                        // If it's a code snippet, just render the code block
+                                                                        if (msg.isCodeSnippet) {
+                                                                            return (
+                                                                                <SyntaxHighlighter
+                                                                                    language={msg.language}
+                                                                                    style={vscDarkPlus}
+                                                                                    customStyle={{ borderRadius: '10px', margin: '0', fontSize: '0.9rem' }}
+                                                                                >
+                                                                                    {msg.content}
+                                                                                </SyntaxHighlighter>
+                                                                            );
+                                                                        }
+
+                                                                        // Check if message is strictly just a URL
+                                                                        const isOnlyUrl = msg.content.trim().startsWith('http') && !msg.content.trim().includes(' ');
+                                                                        const hasAttachment = embedData || isImageUrl(msg.content) || isAudioUrl(msg.content) || isCloudinaryUrl(msg.content);
+                                                                        const shouldShowText = !(isOnlyUrl && hasAttachment);
+
+                                                                        return (
+                                                                            <>
+                                                                                {shouldShowText && (
+                                                                                    <div style={{ whiteSpace: 'pre-wrap' }}>
+                                                                                        {msg.content}
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {embedData && (
+                                                                                    <EmbedCard style={{ marginTop: '8px' }}>
+                                                                                        <EmbedHeader>
+                                                                                            {embedData.type === 'github' && (
+                                                                                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+                                                                                            )}
+                                                                                            {embedData.type === 'figma' && (
+                                                                                                <svg viewBox="0 0 38 57" width="14" height="18" fill="currentColor"><path d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" fill="#1abcfe" /><path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fill="#0acf83" /><path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fill="#ff7262" /><path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fill="#f24e1e" /><path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fill="#a259ff" /></svg>
+                                                                                            )}
+                                                                                            {embedData.type === 'notion' && (
+                                                                                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.422.466V4.44h8.33v.234c1.164.047 1.63.14 2.237.792l4.009 4.383v11.854c-.653.606-1.118.56-2.515.466v.233H9.278v-.233c-1.352.093-1.631.14-2.423-.513L4.46 17.653V4.208zm11.751 13.987V8.583L9.65 18.289h6.56zM6.929 16.7l6.387-9.511H7.814l-1.957 2.19v7.927l1.072-.606z" /></svg>
+                                                                                            )}
+                                                                                            {embedData.type === 'github' ? `${embedData.owner}/${embedData.repo}` : embedData.type === 'figma' ? 'Figma Design Workspace' : 'Notion Document'}
+                                                                                        </EmbedHeader>
+                                                                                        <EmbedDescription>
+                                                                                            {embedData.type === 'github' && 'GitHub Repository Preview'}
+                                                                                            {embedData.type === 'figma' && 'Live UI/UX File'}
+                                                                                            {embedData.type === 'notion' && 'Workspace Documentation'}
+                                                                                        </EmbedDescription>
+                                                                                        <EmbedAction href={embedData.url} target="_blank" rel="noopener noreferrer">
+                                                                                            Open in {embedData.type.charAt(0).toUpperCase() + embedData.type.slice(1)}
+                                                                                        </EmbedAction>
+                                                                                    </EmbedCard>
+                                                                                )}
+
+                                                                                {isImageUrl(msg.content) && (
+                                                                                    <a href={msg.content} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: isMediaMessage ? '0' : '8px' }}>
+                                                                                        <AttachmentImage src={msg.content} alt="User attachment" style={isMediaMessage ? { maxWidth: '100%', width: '300px' } : {}} />
+                                                                                    </a>
+                                                                                )}
+
+                                                                                {isAudioUrl(msg.content) && (
+                                                                                    <CustomAudioPlayer src={msg.content} isOwnMessage={isOwnMessage} avatarUrl={msg.sender?.avatarUrl} />
+                                                                                )}
+
+                                                                                {isCloudinaryUrl(msg.content) && !isImageUrl(msg.content) && !isAudioUrl(msg.content) && (
+                                                                                    <AttachmentLink href={msg.content} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', marginTop: '8px' }}>
+                                                                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg>
+                                                                                        View Document
+                                                                                    </AttachmentLink>
+                                                                                )}
+
+                                                                                {msg.caption && (
+                                                                                    <div style={{ whiteSpace: 'pre-wrap', marginTop: '4px', padding: isMediaMessage ? '4px 6px 4px 6px' : '4px 0', borderTop: isMediaMessage ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
+                                                                                        {msg.caption}
+                                                                                    </div>
+                                                                                )}
+                                                                            </>
+                                                                        );
+                                                                    })()}
+                                                                    <span style={{ display: 'inline-block', width: msg.isEdited ? '80px' : '50px', height: '10px' }}>&#8203;</span>
+                                                                </div>
+
+                                                                <MessageTime isOwn={isOwnMessage}>
+                                                                    {msg.isEdited && <i>edited</i>}
+                                                                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </MessageTime>
+
+                                                                {editingMessageId === msg._id && (
+                                                                    <form onSubmit={submitEdit} style={{ marginTop: '8px', zIndex: 10 }}>
+                                                                        <EditInput
+                                                                            autoFocus
+                                                                            value={editInputContent}
+                                                                            onChange={e => setEditInputContent(e.target.value)}
+                                                                            style={{ color: 'black' }}
+                                                                        />
+                                                                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                                                                            <Button type="button" variant="outline" onClick={cancelEditing} style={{ padding: '2px 8px', fontSize: '0.8rem', color: 'inherit', borderColor: 'currentColor' }}>Cancel</Button>
+                                                                            <Button type="submit" variant="primary" style={{ padding: '2px 8px', fontSize: '0.8rem', backgroundColor: '$bg', color: '$textMain' }}>Save</Button>
+                                                                        </div>
+                                                                    </form>
+                                                                )}
+                                                            </ChatBubble>
+                                                        </ChatBubbleWrapper>
+                                                    )
+                                                })}
+                                                <div ref={messagesEndRef} />
+                                            </div>
+                                        )}
+
+                                    </MessageList>
+
+                                    <InputArea onSubmit={handleSendMessage} style={{ flexShrink: 0 }}>
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            style={{ display: 'none' }}
+                                            onChange={handleFileSelect}
+                                            accept="image/*,.pdf,.doc,.docx"
+                                        />
+
+                                        <AttachButton
+                                            type="button"
+                                            title="Attach File"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={isUploading || isRecording}
+                                        >
+                                            {isUploading ? <Spinner /> : <PlusIcon />}
+                                        </AttachButton>
+
+                                        {isRecording ? (
+                                            <VoiceRecordingIndicator time={recordingTime} />
+                                        ) : (
+                                            <Input
+                                                ref={inputRef}
+                                                placeholder="Message..."
+                                                value={messageInput}
+                                                onChange={handleInputChange}
+                                                onKeyDown={handleKeyDown}
+                                                rows={1}
+                                            />
+                                        )}
+
+                                        {messageInput.trim().length > 0 ? (
+                                            <SendButton type="submit" title="Send Message" disabled={isUploading || isRecording}>
+                                                <SendIcon />
+                                            </SendButton>
+                                        ) : (
+                                            <SendButton
+                                                type="button"
+                                                title={isRecording ? "Stop Recording" : "Record Voice Note"}
+                                                onClick={isRecording ? stopRecording : startRecording}
+                                                disabled={isUploading}
+                                                style={isRecording ? { backgroundColor: 'var(--colors-danger)' } : {}}
                                             >
-                                                {showSenderName && (
-                                                    <SenderName style={isMediaMessage ? { padding: '6px 8px 0 8px' } : {}}>{msg.sender?.displayName || 'Unknown User'}</SenderName>
-                                                )}
-                                                
-                                                <div style={{ wordBreak: 'break-word', marginTop: showSenderName && !isMediaMessage ? '2px' : '0', maxWidth: isImageWithCaption ? '300px' : 'none' }}>
-                                                    {(() => {
-                                                        const embedData = detectEcosystemLink(msg.content);
-                                                        
-                                                        // If it's a code snippet, just render the code block
-                                                        if (msg.isCodeSnippet) {
-                                                            return (
-                                                                <SyntaxHighlighter 
-                                                                    language={msg.language} 
-                                                                    style={vscDarkPlus}
-                                                                    customStyle={{ borderRadius: '10px', margin: '0', fontSize: '0.9rem' }}
-                                                                >
-                                                                    {msg.content}
-                                                                </SyntaxHighlighter>
-                                                            );
-                                                        } 
-                                                        
-                                                        // Check if message is strictly just a URL
-                                                        const isOnlyUrl = msg.content.trim().startsWith('http') && !msg.content.trim().includes(' ');
-                                                        const hasAttachment = embedData || isImageUrl(msg.content) || isAudioUrl(msg.content) || isCloudinaryUrl(msg.content);
-                                                        const shouldShowText = !(isOnlyUrl && hasAttachment);
-
-                                                        return (
-                                                            <>
-                                                                {shouldShowText && (
-                                                                    <div style={{ whiteSpace: 'pre-wrap' }}>
-                                                                        {msg.content}
-                                                                    </div>
-                                                                )}
-                                                                
-                                                                {embedData && (
-                                                                    <EmbedCard style={{ marginTop: '8px' }}>
-                                                                        <EmbedHeader>
-                                                                            {embedData.type === 'github' && (
-                                                                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
-                                                                            )}
-                                                                            {embedData.type === 'figma' && (
-                                                                                <svg viewBox="0 0 38 57" width="14" height="18" fill="currentColor"><path d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" fill="#1abcfe"/><path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fill="#0acf83"/><path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fill="#ff7262"/><path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fill="#f24e1e"/><path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fill="#a259ff"/></svg>
-                                                                            )}
-                                                                            {embedData.type === 'notion' && (
-                                                                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.422.466V4.44h8.33v.234c1.164.047 1.63.14 2.237.792l4.009 4.383v11.854c-.653.606-1.118.56-2.515.466v.233H9.278v-.233c-1.352.093-1.631.14-2.423-.513L4.46 17.653V4.208zm11.751 13.987V8.583L9.65 18.289h6.56zM6.929 16.7l6.387-9.511H7.814l-1.957 2.19v7.927l1.072-.606z"/></svg>
-                                                                            )}
-                                                                            {embedData.type === 'github' ? `${embedData.owner}/${embedData.repo}` : embedData.type === 'figma' ? 'Figma Design Workspace' : 'Notion Document'}
-                                                                        </EmbedHeader>
-                                                                        <EmbedDescription>
-                                                                            {embedData.type === 'github' && 'GitHub Repository Preview'}
-                                                                            {embedData.type === 'figma' && 'Live UI/UX File'}
-                                                                            {embedData.type === 'notion' && 'Workspace Documentation'}
-                                                                        </EmbedDescription>
-                                                                        <EmbedAction href={embedData.url} target="_blank" rel="noopener noreferrer">
-                                                                            Open in {embedData.type.charAt(0).toUpperCase() + embedData.type.slice(1)}
-                                                                        </EmbedAction>
-                                                                    </EmbedCard>
-                                                                )}
-
-                                                                {isImageUrl(msg.content) && (
-                                                                    <a href={msg.content} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: isMediaMessage ? '0' : '8px' }}>
-                                                                        <AttachmentImage src={msg.content} alt="User attachment" style={isMediaMessage ? { maxWidth: '100%', width: '300px' } : {}} />
-                                                                    </a>
-                                                                )}
-
-                                                                {isAudioUrl(msg.content) && (
-                                                                    <CustomAudioPlayer src={msg.content} isOwnMessage={isOwnMessage} avatarUrl={msg.sender?.avatarUrl} />
-                                                                )}
-
-                                                                {isCloudinaryUrl(msg.content) && !isImageUrl(msg.content) && !isAudioUrl(msg.content) && (
-                                                                    <AttachmentLink href={msg.content} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', marginTop: '8px' }}>
-                                                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg>
-                                                                        View Document
-                                                                    </AttachmentLink>
-                                                                )}
-
-                                                                {msg.caption && (
-                                                                    <div style={{ whiteSpace: 'pre-wrap', marginTop: '4px', padding: isMediaMessage ? '4px 6px 4px 6px' : '4px 0', borderTop: isMediaMessage ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
-                                                                        {msg.caption}
-                                                                    </div>
-                                                                )}
-                                                            </>
-                                                        );
-                                                    })()}
-                                                    <span style={{ display: 'inline-block', width: msg.isEdited ? '80px' : '50px', height: '10px' }}>&#8203;</span>
-                                                </div>
-
-                                                <MessageTime isOwn={isOwnMessage}>
-                                                    {msg.isEdited && <i>edited</i>}
-                                                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </MessageTime>
-                                                
-                                                {editingMessageId === msg._id && (
-                                                    <form onSubmit={submitEdit} style={{ marginTop: '8px', zIndex: 10 }}>
-                                                        <EditInput 
-                                                            autoFocus
-                                                            value={editInputContent}
-                                                            onChange={e => setEditInputContent(e.target.value)}
-                                                            style={{ color: 'black' }}
-                                                        />
-                                                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                                                            <Button type="button" variant="outline" onClick={cancelEditing} style={{ padding: '2px 8px', fontSize: '0.8rem', color: 'inherit', borderColor: 'currentColor' }}>Cancel</Button>
-                                                            <Button type="submit" variant="primary" style={{ padding: '2px 8px', fontSize: '0.8rem', backgroundColor: '$bg', color: '$textMain' }}>Save</Button>
-                                                        </div>
-                                                    </form>
-                                                )}
-                                            </ChatBubble>
-                                        </ChatBubbleWrapper>
-                                    )
-                                })}
-                                <div ref={messagesEndRef} />
-                            </div>
-                        )}
-                        
-                    </MessageList>
-
-                    <InputArea onSubmit={handleSendMessage} style={{ flexShrink: 0 }}>
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            style={{ display: 'none' }} 
-                            onChange={handleFileSelect}
-                            accept="image/*,.pdf,.doc,.docx" 
-                        />
-                        
-                        <AttachButton 
-                            type="button" 
-                            title="Attach File"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploading || isRecording}
-                        >
-                            {isUploading ? <Spinner /> : <PlusIcon />}
-                        </AttachButton>
-
-                        {isRecording ? (
-                            <VoiceRecordingIndicator time={recordingTime} />
-                        ) : (
-                            <Input
-                                ref={inputRef}
-                                placeholder="Message..."
-                                value={messageInput}
-                                onChange={handleInputChange}
-                                onKeyDown={handleKeyDown}
-                                rows={1}
-                            />
-                        )}
-                        
-                        {messageInput.trim().length > 0 ? (
-                            <SendButton type="submit" title="Send Message" disabled={isUploading || isRecording}>
-                                <SendIcon />
-                            </SendButton>
-                        ) : (
-                            <SendButton 
-                                type="button" 
-                                title={isRecording ? "Stop Recording" : "Record Voice Note"}
-                                onClick={isRecording ? stopRecording : startRecording}
-                                disabled={isUploading}
-                                style={isRecording ? { backgroundColor: 'var(--colors-danger)' } : {}}
-                            >
-                                {isRecording ? <Square size={20} /> : <CustomMicIcon size={20} />}
-                            </SendButton>
-                        )}
-                    </InputArea>
-                    </>
-                    ) : (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)' }}>
-                            <PlaceholderView 
-                                icon={
-                                    communityTab === 'live coding' ? <Code2 size={64} /> :
-                                    communityTab === 'hackathons' ? <Users size={64} /> :
-                                    <Monitor size={64} />
-                                } 
-                                title={`${communityTab.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} Space`} 
-                                subtitle={`This dedicated space for community ${communityTab} is coming soon. Stay tuned!`} 
-                            />
+                                                {isRecording ? <Square size={20} /> : <CustomMicIcon size={20} />}
+                                            </SendButton>
+                                        )}
+                                    </InputArea>
+                                </>
+                            ) : (
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)' }}>
+                                    <PlaceholderView
+                                        icon={
+                                            communityTab === 'live coding' ? <Code2 size={64} /> :
+                                                communityTab === 'hackathons' ? <Users size={64} /> :
+                                                    <Monitor size={64} />
+                                        }
+                                        title={`${communityTab.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} Space`}
+                                        subtitle={`This dedicated space for community ${communityTab} is coming soon. Stay tuned!`}
+                                    />
+                                </div>
+                            )}
                         </div>
-                    )}
-                    </div>
-                    )
+                ) : (
+                    <>
+                        {activeTab === 'settings' && <PlaceholderView icon={<Settings size={64} />} title="Settings" />}
+                        {activeTab === 'status' && (activeStatus ? <PlaceholderView icon={<CircleDashed size={64} />} title={`${activeStatus}`} subtitle="No current status updates to show." /> : <PlaceholderView icon={<CircleDashed size={64} />} title="Share statuses" subtitle="Share photos, videos and text that disappear after 24 hours." />)}
+                        {activeTab === 'calls' && <PlaceholderView icon={<Phone size={64} />} title="Your Calls" subtitle="Start a voice or video call from any of your chats." />}
+                        {(activeTab === 'chats' || activeTab === 'communities') && (
+                            <PlaceholderView
+                                icon={activeTab === 'communities' ? <Users size={64} /> : <MessageSquare size={64} />}
+                                title={activeTab === 'communities' ? "Communities" : "Welcome to DevSup!"}
+                                subtitle={activeTab === 'communities' ? "Select a community or create a new one to get started." : "Click the + button in the sidebar to start a new conversation."}
+                            />
+                        )}
+                    </>
                 )}
             </ChatArea>
 
             <RightDrawer isOpen={isDrawerOpen}>
                 {isDrawerOpen && activeConversation && (
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', paddingBottom: '32px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '16px', backgroundColor: 'var(--colors-surface)', position: 'sticky', top: 0, zIndex: 10 }}>
-                        <IconButton onClick={() => setIsDrawerOpen(false)}>
-                            <X size={20} />
-                        </IconButton>
-                        <span style={{ fontSize: '1.1rem', color: 'var(--colors-textMain)', fontWeight: '500' }}>
-                            {activeConversation.type === 'group' ? 'Group Info' : 'Contact Info'}
-                        </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px', backgroundColor: 'var(--colors-surface)' }}>
-                        <Avatar 
-                            src={activeConversation.type === 'group' 
-                                ? `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff&size=200` 
-                                : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.avatarUrl || `https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff&size=200`)} 
-                            style={{ width: '160px', height: '160px', borderRadius: '50%', marginBottom: '16px', border: 'none' }}
-                        />
-                        <h2 style={{ margin: '0 0 8px 0', fontSize: '1.4rem', color: 'var(--colors-textMain)' }}>
-                            {activeConversation.type === 'group' ? activeConversation.name : activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName}
-                        </h2>
-                        {activeConversation.type === 'group' && <span style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', marginBottom: '16px' }}>Group • {activeConversation.participants?.length || 0} participants</span>}
-                        {(!activeConversation.type || activeConversation.type === 'direct') ? <span style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', marginBottom: '16px' }}>{activeConversation.participants?.find(p => p._id !== mongoUserId)?.techDiscipline || 'Available'}</span> : null}
-                        
-                        <div style={{ display: 'flex', gap: '32px', marginTop: '8px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'audio' })}>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Phone size={20} />
-                                </div>
-                                <span style={{ fontSize: '0.85rem' }}>Audio</span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'video' })}>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Video size={20} />
-                                </div>
-                                <span style={{ fontSize: '0.85rem' }}>Video</span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => { setIsSearchOpen(true); setIsDrawerOpen(false); }}>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Search size={20} />
-                                </div>
-                                <span style={{ fontSize: '0.85rem' }}>Search</span>
-                            </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', paddingBottom: '32px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '16px', backgroundColor: 'var(--colors-surface)', position: 'sticky', top: 0, zIndex: 10 }}>
+                            <IconButton onClick={() => setIsDrawerOpen(false)}>
+                                <X size={20} />
+                            </IconButton>
+                            <span style={{ fontSize: '1.1rem', color: 'var(--colors-textMain)', fontWeight: '500' }}>
+                                {activeConversation.type === 'group' ? 'Group Info' : 'Contact Info'}
+                            </span>
                         </div>
-                    </div>
 
-                    <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px', backgroundColor: 'var(--colors-surface)' }}>
+                            <label style={{ cursor: activeConversation.type === 'group' ? 'pointer' : 'default', position: 'relative', display: 'inline-block' }}>
+                                <Avatar
+                                    src={activeConversation.type === 'group'
+                                        ? (activeConversation.avatarUrl || `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff&size=200`)
+                                        : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.avatarUrl || `https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff&size=200`)}
+                                    style={{ width: '160px', height: '160px', borderRadius: '50%', marginBottom: '16px', border: 'none', objectFit: 'cover' }}
+                                />
+                                {activeConversation.type === 'group' && (
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        style={{ display: 'none' }}
+                                        onChange={(e) => handleUpdateGroupAvatar(e.target.files[0])}
+                                    />
+                                )}
+                            </label>
+                            <h2 style={{ margin: '0 0 8px 0', fontSize: '1.4rem', color: 'var(--colors-textMain)' }}>
+                                {activeConversation.type === 'group' ? activeConversation.name : activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName}
+                            </h2>
+                            {activeConversation.type === 'group' && <span style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', marginBottom: '16px' }}>Group • {activeConversation.participants?.length || 0} participants</span>}
+                            {(!activeConversation.type || activeConversation.type === 'direct') ? <span style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', marginBottom: '16px' }}>{activeConversation.participants?.find(p => p._id !== mongoUserId)?.techDiscipline || 'Available'}</span> : null}
 
-                    {(!activeConversation.type || activeConversation.type === 'direct') && (() => {
-                        const contact = activeConversation.participants?.find(p => p._id !== mongoUserId);
-                        return (
-                            <>
-                                <div style={{ padding: '16px', backgroundColor: 'var(--colors-surface)' }}>
-                                    <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '8px' }}>About</div>
-                                    <div style={{ color: 'var(--colors-textMain)', fontSize: '1rem', marginBottom: '16px' }}>
-                                        {contact?.about || 'Available'}
+                            <div style={{ display: 'flex', gap: '32px', marginTop: '8px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'audio' })}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Phone size={20} />
                                     </div>
-                                    <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '8px' }}>Tech Discipline</div>
-                                    <div style={{ color: 'var(--colors-textMain)', fontSize: '1rem', marginBottom: '16px' }}>
-                                        {contact?.techDiscipline || 'Fullstack'}
-                                    </div>
-                                    
-                                    {(contact?.githubProfile || contact?.linkedinProfile || contact?.portfolioUrl) && (
-                                        <>
-                                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '12px' }}>Professional Profiles</div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                {contact?.githubProfile && (
-                                                    <a href={contact.githubProfile} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--colors-accent)', textDecoration: 'none' }}>
-                                                        <Code2 size={18} />
-                                                        <span style={{ fontSize: '0.95rem' }}>GitHub Profile</span>
-                                                    </a>
-                                                )}
-                                                {contact?.linkedinProfile && (
-                                                    <a href={contact.linkedinProfile} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--colors-accent)', textDecoration: 'none' }}>
-                                                        <Briefcase size={18} />
-                                                        <span style={{ fontSize: '0.95rem' }}>LinkedIn Profile</span>
-                                                    </a>
-                                                )}
-                                                {contact?.portfolioUrl && (
-                                                    <a href={contact.portfolioUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--colors-accent)', textDecoration: 'none' }}>
-                                                        <LinkIcon size={18} />
-                                                        <span style={{ fontSize: '0.95rem' }}>Portfolio Website</span>
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
+                                    <span style={{ fontSize: '0.85rem' }}>Audio</span>
                                 </div>
-                                <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
-                            </>
-                        );
-                    })()}
-
-                    <div style={{ padding: '24px 16px', backgroundColor: 'var(--colors-surface)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
-                            <Image size={24} color="var(--colors-textMuted)" />
-                            <span style={{ fontSize: '1rem' }}>Media, links and docs</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
-                            <Star size={24} color="var(--colors-textMuted)" />
-                            <span style={{ fontSize: '1rem' }}>Starred messages</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
-                            <Bell size={24} color="var(--colors-textMuted)" />
-                            <span style={{ fontSize: '1rem' }}>Notification settings</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
-                            <Clock size={24} color="var(--colors-textMuted)" />
-                            <span style={{ fontSize: '1rem' }}>Disappearing messages</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
-                            <Lock size={24} color="var(--colors-textMuted)" />
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontSize: '1rem' }}>Encryption</span>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>Messages are end-to-end encrypted. Click to verify.</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'video' })}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Video size={20} />
+                                    </div>
+                                    <span style={{ fontSize: '0.85rem' }}>Video</span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => { setIsSearchOpen(true); setIsDrawerOpen(false); }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Search size={20} />
+                                    </div>
+                                    <span style={{ fontSize: '0.85rem' }}>Search</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
+                        <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
 
-                    {activeConversation.type === 'group' ? (
-                        <div style={{ padding: '16px', backgroundColor: 'var(--colors-surface)' }}>
-                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '16px' }}>{activeConversation.participants?.length || 0} participants</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                {activeConversation?.participants?.map(participant => (
-                                    <div key={participant._id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <Avatar 
-                                            src={participant._id === mongoUserId ? (currentUserData?.avatarUrl || participant.avatarUrl) : participant.avatarUrl} 
-                                            style={{ width: '40px', height: '40px' }} 
-                                        />
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ color: 'var(--colors-textMain)', fontSize: '1rem' }}>
-                                                {participant._id === mongoUserId ? 'You' : participant.displayName}
-                                            </span>
-                                            <span style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>
-                                                {participant.techDiscipline || 'Fullstack'}
-                                            </span>
+                        {(!activeConversation.type || activeConversation.type === 'direct') && (() => {
+                            const contact = activeConversation.participants?.find(p => p._id !== mongoUserId);
+                            return (
+                                <>
+                                    <div style={{ padding: '16px', backgroundColor: 'var(--colors-surface)' }}>
+                                        <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '8px' }}>About</div>
+                                        <div style={{ color: 'var(--colors-textMain)', fontSize: '1rem', marginBottom: '16px' }}>
+                                            {contact?.about || 'Available'}
                                         </div>
+                                        <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '8px' }}>Tech Discipline</div>
+                                        <div style={{ color: 'var(--colors-textMain)', fontSize: '1rem', marginBottom: '16px' }}>
+                                            {contact?.techDiscipline || 'Fullstack'}
+                                        </div>
+
+                                        {(contact?.githubProfile || contact?.linkedinProfile || contact?.portfolioUrl) && (
+                                            <>
+                                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '12px' }}>Professional Profiles</div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                    {contact?.githubProfile && (
+                                                        <a href={contact.githubProfile} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--colors-accent)', textDecoration: 'none' }}>
+                                                            <Code2 size={18} />
+                                                            <span style={{ fontSize: '0.95rem' }}>GitHub Profile</span>
+                                                        </a>
+                                                    )}
+                                                    {contact?.linkedinProfile && (
+                                                        <a href={contact.linkedinProfile} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--colors-accent)', textDecoration: 'none' }}>
+                                                            <Briefcase size={18} />
+                                                            <span style={{ fontSize: '0.95rem' }}>LinkedIn Profile</span>
+                                                        </a>
+                                                    )}
+                                                    {contact?.portfolioUrl && (
+                                                        <a href={contact.portfolioUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--colors-accent)', textDecoration: 'none' }}>
+                                                            <LinkIcon size={18} />
+                                                            <span style={{ fontSize: '0.95rem' }}>Portfolio Website</span>
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    ) : (
+                                    <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
+                                </>
+                            );
+                        })()}
+
                         <div style={{ padding: '24px 16px', backgroundColor: 'var(--colors-surface)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer', color: '#ef4444' }} onClick={(e) => deleteConversation(e, activeConversation._id)}>
-                                <Trash2 size={24} color="#ef4444" />
-                                <span style={{ fontSize: '1rem' }}>Clear chat</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
+                                <Image size={24} color="var(--colors-textMuted)" />
+                                <span style={{ fontSize: '1rem' }}>Media, links and docs</span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer', color: '#ef4444' }}>
-                                <ShieldAlert size={24} color="#ef4444" />
-                                <span style={{ fontSize: '1rem' }}>Block {activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
+                                <Star size={24} color="var(--colors-textMuted)" />
+                                <span style={{ fontSize: '1rem' }}>Starred messages</span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer', color: '#ef4444' }}>
-                                <ThumbsDown size={24} color="#ef4444" />
-                                <span style={{ fontSize: '1rem' }}>Report {activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
+                                <Bell size={24} color="var(--colors-textMuted)" />
+                                <span style={{ fontSize: '1rem' }}>Notification settings</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
+                                <Clock size={24} color="var(--colors-textMuted)" />
+                                <span style={{ fontSize: '1rem' }}>Disappearing messages</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer' }}>
+                                <Lock size={24} color="var(--colors-textMuted)" />
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '1rem' }}>Encryption</span>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>Messages are end-to-end encrypted. Click to verify.</span>
+                                </div>
                             </div>
                         </div>
-                    )}
-                </div>
+
+                        <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
+
+                        {activeConversation.type === 'group' ? (
+                            <div style={{ padding: '16px', backgroundColor: 'var(--colors-surface)' }}>
+                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '16px' }}>{activeConversation.participants?.length || 0} participants</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    {activeConversation?.participants?.map(participant => (
+                                        <div key={participant._id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <Avatar
+                                                src={participant._id === mongoUserId ? (currentUserData?.avatarUrl || participant.avatarUrl) : participant.avatarUrl}
+                                                style={{ width: '40px', height: '40px' }}
+                                            />
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ color: 'var(--colors-textMain)', fontSize: '1rem' }}>
+                                                    {participant._id === mongoUserId ? 'You' : participant.displayName}
+                                                </span>
+                                                <span style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>
+                                                    {participant.techDiscipline || 'Fullstack'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ padding: '24px 16px', backgroundColor: 'var(--colors-surface)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer', color: '#ef4444' }} onClick={(e) => deleteConversation(e, activeConversation._id)}>
+                                    <Trash2 size={24} color="#ef4444" />
+                                    <span style={{ fontSize: '1rem' }}>Clear chat</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer', color: '#ef4444' }}>
+                                    <ShieldAlert size={24} color="#ef4444" />
+                                    <span style={{ fontSize: '1rem' }}>Block {activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName}</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', cursor: 'pointer', color: '#ef4444' }}>
+                                    <ThumbsDown size={24} color="#ef4444" />
+                                    <span style={{ fontSize: '1rem' }}>Report {activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 )}
             </RightDrawer>
 
-        {isWhiteboardOpen && (
-                <Whiteboard 
-                    socket={socket} 
-                    conversationId={activeConversationId} 
-                    onClose={() => setIsWhiteboardOpen(false)} 
+            {isWhiteboardOpen && (
+                <Whiteboard
+                    socket={socket}
+                    conversationId={activeConversationId}
+                    onClose={() => setIsWhiteboardOpen(false)}
                 />
             )}
 
@@ -2638,18 +2767,18 @@ export default function Dashboard() {
                             {activeTab === 'communities' ? 'Create Community' : 'New Conversation'}
                             <IconButton onClick={() => setIsModalOpen(false)}>✕</IconButton>
                         </ModalTitle>
-                        
+
                         {activeTab !== 'communities' && (
                             <FormGroup>
                                 <Label>Type</Label>
                                 <div style={{ display: 'flex', gap: '4px', padding: '4px', backgroundColor: 'var(--colors-bg)', border: '1px solid var(--colors-border)', borderRadius: '8px' }}>
-                                    <div 
+                                    <div
                                         onClick={() => { setConvType('direct'); setSelectedUsers([]); }}
                                         style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', borderRadius: '6px', backgroundColor: convType === 'direct' ? 'var(--colors-surface)' : 'transparent', color: convType === 'direct' ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', border: convType === 'direct' ? '1px solid var(--colors-border)' : '1px solid transparent', transition: 'all 0.2s', fontWeight: convType === 'direct' ? '600' : 'normal', boxShadow: convType === 'direct' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none' }}
                                     >
                                         Direct Message
                                     </div>
-                                    <div 
+                                    <div
                                         onClick={() => { setConvType('group'); setSelectedUsers([]); }}
                                         style={{ flex: 1, padding: '8px', textAlign: 'center', cursor: 'pointer', borderRadius: '6px', backgroundColor: convType === 'group' ? 'var(--colors-surface)' : 'transparent', color: convType === 'group' ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', border: convType === 'group' ? '1px solid var(--colors-border)' : '1px solid transparent', transition: 'all 0.2s', fontWeight: convType === 'group' ? '600' : 'normal', boxShadow: convType === 'group' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none' }}
                                     >
@@ -2660,15 +2789,40 @@ export default function Dashboard() {
                         )}
 
                         {convType === 'group' && (
-                            <FormGroup>
-                                <Label>{activeTab === 'communities' ? 'Community Name' : 'Group Name'}</Label>
-                                <ModalInput 
-                                    placeholder={activeTab === 'communities' ? "e.g. Open Source Contributors" : "e.g. Project Alpha"}
-                                    value={convName}
-                                    onChange={e => setConvName(e.target.value)}
-                                    style={{ padding: '12px', borderRadius: '8px' }}
-                                />
-                            </FormGroup>
+                            <>
+                                <FormGroup>
+                                    <Label>{activeTab === 'communities' ? 'Community Name' : 'Group Name'}</Label>
+                                    <ModalInput
+                                        placeholder={activeTab === 'communities' ? "e.g. Open Source Contributors" : "e.g. Project Alpha"}
+                                        value={convName}
+                                        onChange={e => setConvName(e.target.value)}
+                                        style={{ padding: '12px', borderRadius: '8px' }}
+                                    />
+                                </FormGroup>
+                                <FormGroup>
+                                    <Label>Description (optional)</Label>
+                                    <ModalInput
+                                        placeholder="What is this group about?"
+                                        value={convDescription}
+                                        onChange={e => setConvDescription(e.target.value)}
+                                        style={{ padding: '12px', borderRadius: '8px' }}
+                                    />
+                                </FormGroup>
+                                <FormGroup>
+                                    <Label>Group Image (optional)</Label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+                                        {convAvatarUrl && (
+                                            <img src={convAvatarUrl} alt="Preview" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }} />
+                                        )}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => handleImageUpload(e.target.files[0], setConvAvatarUrl)}
+                                            style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}
+                                        />
+                                    </div>
+                                </FormGroup>
+                            </>
                         )}
 
                         <FormGroup>
@@ -2678,7 +2832,7 @@ export default function Dashboard() {
                                     <div style={{ padding: '16px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center' }}>No other users found.</div>
                                 ) : (
                                     allUsers.map(u => (
-                                        <UserListItem 
+                                        <UserListItem
                                             key={u._id}
                                             selected={selectedUsers.includes(u._id)}
                                             onClick={() => toggleUserSelection(u._id)}
@@ -2700,9 +2854,9 @@ export default function Dashboard() {
                             </UserList>
                         </FormGroup>
 
-                        <Button 
-                            variant="primary" 
-                            fullWidth 
+                        <Button
+                            variant="primary"
+                            fullWidth
                             onClick={handleCreateConversation}
                             disabled={selectedUsers.length === 0 || (convType === 'group' && !convName)}
                             style={{ padding: '14px', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', marginTop: '8px' }}
@@ -2726,19 +2880,16 @@ export default function Dashboard() {
                                 <div style={{ color: 'var(--colors-textMuted)', textAlign: 'center', padding: '16px' }}>No active conversations found.</div>
                             ) : (
                                 conversations.map(c => {
-                                    const otherParticipants = c.participants.filter(p => p._id !== mongoUserId);
-                                    let displayName = c.isGroup ? c.groupName : 'Unknown User';
-                                    if (!c.isGroup && otherParticipants.length > 0) {
-                                        displayName = otherParticipants.map(p => p.displayName).join(', ');
-                                    }
+                                    const isGroup = c.type === 'group';
+                                    const otherParticipant = !isGroup ? c.participants?.find(p => p._id !== mongoUserId) : null;
 
                                     return (
-                                        <div 
-                                            key={c._id} 
-                                            onClick={() => confirmForward(c._id)} 
-                                            style={{ 
-                                                padding: '12px 16px', 
-                                                cursor: 'pointer', 
+                                        <div
+                                            key={c._id}
+                                            onClick={() => confirmForward(c._id)}
+                                            style={{
+                                                padding: '12px 16px',
+                                                cursor: 'pointer',
                                                 borderBottom: '1px solid var(--colors-border)',
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -2749,14 +2900,21 @@ export default function Dashboard() {
                                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--colors-border)'}
                                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                         >
-                                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--colors-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                                                {c.isGroup ? (
-                                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path></svg>
-                                                ) : (
-                                                    otherParticipants[0]?.avatarUrl ? <img src={otherParticipants[0].avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path></svg>
-                                                )}
+                                            <AvatarWrapper style={{ flexShrink: 0 }}>
+                                                <Avatar
+                                                    src={isGroup
+                                                        ? (c.avatarUrl || `https://ui-avatars.com/api/?name=${c.name}&background=06B6D4&color=fff`)
+                                                        : (otherParticipant?.avatarUrl || `https://ui-avatars.com/api/?name=${otherParticipant?.displayName || 'User'}&background=06B6D4&color=fff`)}
+                                                    style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none' }}
+                                                />
+                                            </AvatarWrapper>
+                                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {isGroup ? c.name : (otherParticipant?.displayName || 'Unknown User')}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div style={{ fontWeight: '500' }}>{displayName}</div>
                                         </div>
                                     );
                                 })
@@ -2767,14 +2925,14 @@ export default function Dashboard() {
             )}
 
             {isStatusModalOpen && (
-                <StatusUploadModal 
+                <StatusUploadModal
                     onClose={() => setIsStatusModalOpen(false)}
                     BACKEND_URL={BACKEND_URL}
                     getAccessTokenSilently={getAccessTokenSilently}
                     onUpload={handleStatusUpload}
                 />
             )}
-            
+
             {storyViewerInitialUserIndex !== null && (
                 <StoryViewer
                     groupedStatuses={groupedStatuses}
@@ -2803,23 +2961,23 @@ export default function Dashboard() {
                                 <img src={chatUploadPreview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
                             )}
                         </div>
-                        <input 
-                            type="text" 
-                            placeholder="Add a caption..." 
+                        <input
+                            type="text"
+                            placeholder="Add a caption..."
                             value={chatUploadCaption}
                             onChange={(e) => setChatUploadCaption(e.target.value)}
                             style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--colors-border)', backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)', outline: 'none', fontSize: '1rem' }}
                             autoFocus
                         />
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                            <button 
+                            <button
                                 onClick={cancelChatUpload}
                                 style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--colors-border)', backgroundColor: 'transparent', color: 'var(--colors-textMain)', cursor: 'pointer', fontSize: '1rem' }}
                             >
                                 Cancel
                             </button>
-                            <button 
-                                onClick={confirmChatUpload} 
+                            <button
+                                onClick={confirmChatUpload}
                                 disabled={isUploading}
                                 style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--colors-accent, #00C853)', color: '#fff', cursor: isUploading ? 'not-allowed' : 'pointer', fontSize: '1rem', opacity: isUploading ? 0.7 : 1 }}
                             >
@@ -2830,16 +2988,32 @@ export default function Dashboard() {
                 </ModalOverlay>
             )}
 
-            <CallOverlay 
-                socket={socket} 
-                mongoUserId={mongoUserId} 
+            <CallOverlay
+                socket={socket}
+                mongoUserId={mongoUserId}
                 activeConversation={activeConversation}
                 callConfig={callConfig}
                 onEndCall={() => setCallConfig({ active: false, isReceiving: false, callerData: null, callType: 'video' })}
             />
 
-            {contextMenu.visible && (contextMenu.message || contextMenu.callLog) && (
+            {contextMenu.visible && (contextMenu.message || contextMenu.callLog || contextMenu.conversation) && (
                 <ContextMenuContainer style={{ top: contextMenu.y, left: contextMenu.x, zIndex: 9999, position: 'fixed' }}>
+                    {contextMenu.conversation && (
+                        <>
+                            <ContextMenuItem onClick={(e) => { setContextMenu({ ...contextMenu, visible: false }); deleteConversation(e, contextMenu.conversation._id); }} style={{ color: '#ef4444' }}>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>
+                                Delete {contextMenu.conversation.type === 'group' ? 'Community' : 'Chat'}
+                            </ContextMenuItem>
+                            <ContextMenuItem onClick={() => setContextMenu({ ...contextMenu, visible: false })}>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"></path></svg>
+                                Archive Chat
+                            </ContextMenuItem>
+                            <ContextMenuItem onClick={() => setContextMenu({ ...contextMenu, visible: false })}>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6zM7.58 4.08L6.15 2.65C3.75 4.48 2.17 7.3 2.03 10.5h2c.15-2.65 1.51-4.97 3.55-6.42zm12.39 6.42h2c-.15-3.2-1.73-6.02-4.12-7.85l-1.42 1.43c2.02 1.45 3.39 3.77 3.54 6.42z"></path></svg>
+                                Mute Notifications
+                            </ContextMenuItem>
+                        </>
+                    )}
                     {contextMenu.message && (
                         <>
                             {!isAudioUrl(contextMenu.message.content) && contextMenu.message.sender._id === mongoUserId && (
@@ -2894,6 +3068,38 @@ export default function Dashboard() {
                     )}
                 </ContextMenuContainer>
             )}
+
+            {/* Logout Confirmation Modal */}
+            {isLogoutModalOpen && (
+                <ModalOverlay onClick={() => setIsLogoutModalOpen(false)} style={{ zIndex: 9999 }}>
+                    <ModalContent onClick={e => e.stopPropagation()} style={{ maxWidth: '380px', padding: '32px 24px', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', marginBottom: '8px' }}>
+                            <LogOut size={32} style={{ marginLeft: '4px' }} />
+                        </div>
+                        <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--colors-textMain)', margin: 0 }}>Ready to leave?</h2>
+                        <p style={{ color: 'var(--colors-textMuted)', fontSize: '0.95rem', textAlign: 'center', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                            Are you sure you want to log out of DevSup? You will need to sign in again to access your workspaces.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setIsLogoutModalOpen(false)}
+                                style={{ flex: 1, padding: '12px', borderRadius: '10px', fontWeight: '600' }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button 
+                                variant="primary" 
+                                onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+                                style={{ flex: 1, padding: '12px', borderRadius: '10px', backgroundColor: '#ef4444', color: '#fff', border: 'none', fontWeight: '600' }}
+                            >
+                                Log Out
+                            </Button>
+                        </div>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
+
         </AppContainer>
     );
 }

@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
 import { styled } from '../stitches.config.js';
-import { X, Brush, Eraser, Trash2, Undo2, Redo2, ChevronDown, ChevronRight, Square, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
+import { X, Brush, Eraser, Trash2, Undo2, Redo2, ChevronDown, ChevronRight, Square, ArrowUpToLine, ArrowDownToLine, Send } from 'lucide-react';
 import { MOCKUP_TYPES, MOCKUP_CATEGORIES } from './MockupComponents';
+import html2canvas from 'html2canvas';
 
 const WhiteboardOverlay = styled('div', {
     position: 'absolute',
@@ -139,7 +140,7 @@ const CanvasContainer = styled('div', {
 });
 
 
-export default function Whiteboard({ socket, conversationId, onClose }) {
+export default function Whiteboard({ socket, conversationId, onClose, onSendToChat }) {
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -457,6 +458,26 @@ export default function Whiteboard({ socket, conversationId, onClose }) {
         setBgColor(newColor);
         if (socket && conversationId) {
             socket.emit('whiteboard_draw', { conversationId, action: 'sync_bg', bgColor: newColor });
+        }
+    };
+
+    const exportToChat = async () => {
+        if (!onSendToChat || !containerRef.current) return;
+        try {
+            setSelectedElements([]);
+            setContextMenu(null);
+            
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            const canvas = await html2canvas(containerRef.current, {
+                backgroundColor: bgColor === 'transparent' ? '#0f172a' : bgColor,
+                useCORS: true
+            });
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            onSendToChat(dataUrl);
+        } catch (err) {
+            console.error("Failed to export whiteboard:", err);
+            alert("Failed to export whiteboard as image.");
         }
     };
 
@@ -847,9 +868,20 @@ export default function Whiteboard({ socket, conversationId, onClose }) {
                     </IconButton>
                 </ToolsGroup>
 
-                <IconButton title="Close Whiteboard" onClick={onClose}>
-                    <X size={24} />
-                </IconButton>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {onSendToChat && (
+                        <button 
+                            onClick={exportToChat}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: 'var(--colors-accent)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '500' }}
+                            title="Send as JPEG to Chat"
+                        >
+                            <Send size={16} /> Send to Chat
+                        </button>
+                    )}
+                    <IconButton title="Close Whiteboard" onClick={onClose}>
+                        <X size={24} />
+                    </IconButton>
+                </div>
             </Toolbar>
 
             <MainArea 

@@ -1,4 +1,5 @@
 import { useAuth0 } from '@auth0/auth0-react';
+import { useNavigate } from 'react-router-dom';
 import { styled, keyframes } from '../stitches.config.js';
 import { Terminal, Code, Layers, Zap, MessageSquare, LayoutTemplate, PenTool } from 'lucide-react';
 
@@ -229,7 +230,7 @@ const TerminalPrompt = styled('span', {
 });
 
 export default function Home() {
-    const { loginWithRedirect } = useAuth0();
+    const navigate = useNavigate();
 
     const techStack = [
         { name: 'React', icon: <Code size={24} /> },
@@ -250,7 +251,7 @@ export default function Home() {
                 <Subtitle>
                     DevSup is a developer-centric chat application engineered to bridge the gap between casual communication and heavy-duty technical collaboration. No more context switching.
                 </Subtitle>
-                <CyanGlowButton onClick={() => loginWithRedirect()}>
+                <CyanGlowButton onClick={() => navigate('/login')}>
                     <Terminal size={20} />
                     Launch DevSup
                 </CyanGlowButton>
@@ -311,7 +312,7 @@ export default function Home() {
                         <div style={{ color: '#94A3B8', margin: '10px 0' }}>{'>'} Resolving dependencies...</div>
                         <div style={{ color: '#10B981', margin: '10px 0' }}>{'>'} Ready to bridge code and chat.</div>
                         <div style={{ marginTop: '20px' }}>
-                            <CyanGlowButton onClick={() => loginWithRedirect()} style={{ padding: '8px 20px', fontSize: '1rem', width: '100%', justifyContent: 'center' }}>
+                            <CyanGlowButton onClick={() => navigate('/login')} style={{ padding: '8px 20px', fontSize: '1rem', width: '100%', justifyContent: 'center' }}>
                                 initialize()
                             </CyanGlowButton>
                         </div>
