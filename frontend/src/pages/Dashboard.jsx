@@ -3324,7 +3324,7 @@ export default function Dashboard() {
                             const convName = isGroup ? c.name : (otherParticipant?.displayName || '');
                             return convName.toLowerCase().includes(chatSearchQuery.toLowerCase());
                         }).length === 0 ? (
-                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>No conversations yet.</div>
+                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>Chat not found.</div>
                         ) : (
                             [...conversations].filter(c => {
                                 if (!chatSearchQuery) return true;
@@ -3548,7 +3548,7 @@ export default function Dashboard() {
                             if (!chatSearchQuery) return true;
                             return c.name.toLowerCase().includes(chatSearchQuery.toLowerCase());
                         }).length === 0 ? (
-                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>No communities found.</div>
+                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>Group not found.</div>
                         ) : (
                             [...conversations].filter(c => {
                                 if (c.type !== 'group') return false;
