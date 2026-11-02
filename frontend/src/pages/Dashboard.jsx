@@ -5559,6 +5559,7 @@ export default function Dashboard() {
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', textAlign: 'center' }}>
                                                     <div style={{ color: 'var(--colors-textMain)', fontSize: '0.95rem', fontWeight: 'bold' }}>Search by @username</div>
                                                     <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.82rem' }}>Type a username to find someone</div>
+
                                                 </div>
                                             </div>
                                         );

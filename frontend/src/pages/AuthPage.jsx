@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { styled, keyframes } from '../stitches.config.js';
-import { Terminal, Code, Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { Terminal, Code, Mail, Lock, User, AlertCircle, Eye, EyeOff, Check } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
@@ -190,9 +190,72 @@ const Divider = styled('div', {
     '&:not(:empty)::after': { marginLeft: '1rem' },
 });
 
+const PasswordToggle = styled('button', {
+    position: 'absolute',
+    right: '12px',
+    background: 'transparent',
+    border: 'none',
+    color: '$textMuted',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    padding: 0,
+    '&:hover': {
+        color: '$textMain',
+    }
+});
+
+const RequirementList = styled('div', {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    marginTop: '6px',
+    fontSize: '0.78rem',
+    color: '$textMuted',
+});
+
+const RequirementItem = styled('div', {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'color 0.2s ease',
+    variants: {
+        met: {
+            true: {
+                color: '#10B981',
+            },
+            false: {
+                color: '$textMuted',
+            }
+        }
+    }
+});
+
+export const validatePassword = (password) => {
+    if (!password) {
+        return 'Password is required.';
+    }
+    const missing = [];
+    if (password.length < 7) {
+        missing.push('at least 7 characters');
+    }
+    if (!/[a-z]/.test(password)) {
+        missing.push('at least one lowercase letter');
+    }
+    if (!/[0-9]/.test(password)) {
+        missing.push('at least one number');
+    }
+    if (missing.length > 0) {
+        return `Password must contain ${missing.join(', ')}.`;
+    }
+    return null;
+};
+
 export default function AuthPage() {
     const { loginWithRedirect } = useAuth0();
     const [isSignup, setIsSignup] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         identifier: '',
@@ -201,14 +264,18 @@ export default function AuthPage() {
     const [authError, setAuthError] = useState('');
     const [isResolving, setIsResolving] = useState(false);
 
+    const passwordValue = formData.password || '';
+    const hasMinLength = passwordValue.length >= 7;
+    const hasLowercase = /[a-z]/.test(passwordValue);
+    const hasNumber = /[0-9]/.test(passwordValue);
+
     const handleSocialLogin = (connection) => {
         setAuthError('');
-        loginWithRedirect({
-            authorizationParams: { 
-                connection,
-                screen_hint: isSignup ? 'signup' : 'login' 
-            }
-        });
+        const authorizationParams = { connection };
+        if (isSignup) {
+            authorizationParams.screen_hint = 'signup';
+        }
+        loginWithRedirect({ authorizationParams });
     };
 
     const handleFormSubmit = async (e) => {
@@ -221,30 +288,48 @@ export default function AuthPage() {
             return;
         }
 
+        const pwdError = validatePassword(formData.password);
+        if (pwdError) {
+            setAuthError(pwdError);
+            return;
+        }
+
         if (isSignup) {
             // New account signup requires a valid email address
-            if (!rawIdentifier.includes('@') || !rawIdentifier.includes('.')) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(rawIdentifier)) {
                 setAuthError('Please enter a valid email address to create an account. You will choose your unique @username right after.');
                 return;
             }
-            loginWithRedirect({
-                authorizationParams: { 
-                    screen_hint: 'signup',
-                    login_hint: rawIdentifier
-                }
-            });
+            try {
+                await loginWithRedirect({
+                    authorizationParams: { 
+                        screen_hint: 'signup',
+                        login_hint: rawIdentifier
+                    }
+                });
+            } catch (err) {
+                console.error('Signup redirect error:', err);
+                setAuthError(err.message || 'Failed to start signup. Please try again.');
+            }
             return;
         }
 
         // Login flow: check if identifier is email or username
-        const looksLikeEmail = rawIdentifier.includes('@') && rawIdentifier.includes('.');
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const looksLikeEmail = emailRegex.test(rawIdentifier);
         if (looksLikeEmail) {
-            loginWithRedirect({
-                authorizationParams: { 
-                    screen_hint: 'login',
-                    login_hint: rawIdentifier
-                }
-            });
+            try {
+                await loginWithRedirect({
+                    authorizationParams: { 
+                        prompt: 'login',
+                        login_hint: rawIdentifier
+                    }
+                });
+            } catch (err) {
+                console.error('Login redirect error:', err);
+                setAuthError(err.message || 'Failed to start login. Please try again.');
+            }
             return;
         }
 
@@ -260,24 +345,29 @@ export default function AuthPage() {
                 return;
             }
             const foundUser = await res.json();
-            loginWithRedirect({
+            await loginWithRedirect({
                 authorizationParams: { 
-                    screen_hint: 'login',
+                    prompt: 'login',
                     login_hint: foundUser.email
                 }
             });
         } catch (err) {
             console.error('User lookup error:', err);
             // Fallback to Auth0 with whatever was typed
-            loginWithRedirect({
+            await loginWithRedirect({
                 authorizationParams: { 
-                    screen_hint: 'login',
+                    prompt: 'login',
                     login_hint: rawIdentifier
                 }
             });
         } finally {
             setIsResolving(false);
         }
+    };
+
+    const toggleAuthMode = () => {
+        setAuthError('');
+        setIsSignup(prev => !prev);
     };
 
     const handleChange = (e) => {
@@ -371,14 +461,37 @@ export default function AuthPage() {
                             <InputWrapper>
                                 <InputIcon><Lock size={18} /></InputIcon>
                                 <Input 
-                                    type="password" 
+                                    type={showPassword ? "text" : "password"} 
                                     name="password" 
                                     placeholder="••••••••" 
                                     required 
+                                    minLength={7}
                                     value={formData.password}
                                     onChange={handleChange}
+                                    style={{ paddingRight: '40px' }}
                                 />
+                                <PasswordToggle 
+                                    type="button" 
+                                    onClick={() => setShowPassword(prev => !prev)}
+                                    title={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </PasswordToggle>
                             </InputWrapper>
+                            <RequirementList>
+                                <RequirementItem met={hasMinLength}>
+                                    {hasMinLength ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
+                                    <span>At least 7 characters</span>
+                                </RequirementItem>
+                                <RequirementItem met={hasLowercase}>
+                                    {hasLowercase ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
+                                    <span>At least one lowercase letter</span>
+                                </RequirementItem>
+                                <RequirementItem met={hasNumber}>
+                                    {hasNumber ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
+                                    <span>At least one number</span>
+                                </RequirementItem>
+                            </RequirementList>
                         </InputGroup>
 
                         <AuthButton type="submit" variant="primary" style={{ marginTop: '8px' }} disabled={isResolving}>
@@ -392,7 +505,7 @@ export default function AuthPage() {
                         <AuthButton 
                             type="button" 
                             variant="outline" 
-                            onClick={() => loginWithRedirect({ authorizationParams: { connection: 'github' } })} 
+                            onClick={() => handleSocialLogin('github')} 
                             style={{ padding: '12px', flex: 1, justifyContent: 'center' }}
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -403,7 +516,7 @@ export default function AuthPage() {
                         <AuthButton 
                             type="button" 
                             variant="outline" 
-                            onClick={() => loginWithRedirect({ authorizationParams: { connection: 'google-oauth2' } })} 
+                            onClick={() => handleSocialLogin('google-oauth2')} 
                             style={{ padding: '12px', flex: 1, justifyContent: 'center' }}
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -423,7 +536,7 @@ export default function AuthPage() {
                         <AuthButton 
                             type="button" 
                             variant="ghost" 
-                            onClick={() => setIsSignup(!isSignup)}
+                            onClick={toggleAuthMode}
                             style={{ display: 'inline', width: 'auto', padding: 0 }}
                         >
                             {isSignup ? 'Log in' : 'Sign up'}
