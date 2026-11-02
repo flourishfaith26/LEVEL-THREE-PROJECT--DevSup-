@@ -186,6 +186,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     const [bgColor, setBgColor] = useState('transparent');
     const [size, setSize] = useState(2);
     const [tool, setTool] = useState('pencil'); // 'pencil' or 'eraser'
+    const [isSendingToChat, setIsSendingToChat] = useState(false);
     
     const [history, setHistory] = useState([]);
     const [historyStep, setHistoryStep] = useState(-1);
@@ -525,7 +526,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const exportToChat = async () => {
-        if (!onSendToChat || !containerRef.current) return;
+        if (!onSendToChat || !containerRef.current || isSendingToChat) return;
+        setIsSendingToChat(true);
         try {
             setSelectedElements([]);
             setContextMenu(null);
@@ -578,6 +580,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
         } catch (err) {
             console.error("Failed to export whiteboard:", err);
             alert("Failed to export whiteboard as image. " + err.message);
+        } finally {
+            setIsSendingToChat(false);
         }
     };
 
@@ -985,10 +989,11 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                     {onSendToChat && (
                         <button 
                             onClick={exportToChat}
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: 'var(--colors-accent)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '500' }}
+                            disabled={isSendingToChat}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: isSendingToChat ? 'var(--colors-border)' : 'var(--colors-accent)', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSendingToChat ? 'not-allowed' : 'pointer', fontSize: '0.9rem', fontWeight: '500', opacity: isSendingToChat ? 0.7 : 1 }}
                             title="Send Mock-up to Chat"
                         >
-                            <Send size={16} /> Send to Chat
+                            <Send size={16} /> {isSendingToChat ? 'Sending…' : 'Send to Chat'}
                         </button>
                     )}
                     <IconButton title="Close Whiteboard" onClick={onClose}>

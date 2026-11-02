@@ -1222,14 +1222,17 @@ const formatMessageClock = (dateString) => {
 };
 
 const compareMessages = (a, b) => {
+    // Pending messages always go last (optimistic UI)
     if (Boolean(a.pending) !== Boolean(b.pending)) return a.pending ? 1 : -1;
 
     const aHasSequence = Number.isFinite(a.sequence);
     const bHasSequence = Number.isFinite(b.sequence);
 
-    if (aHasSequence !== bHasSequence) return aHasSequence ? 1 : -1;
-    if (aHasSequence && a.sequence !== b.sequence) return a.sequence - b.sequence;
+    // Both have a DB sequence — most reliable ordering
+    if (aHasSequence && bHasSequence) return a.sequence - b.sequence;
 
+    // One or neither has a sequence (e.g. messages saved before sequence field was added):
+    // fall back to createdAt so old messages stay before new ones
     const createdAtDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     if (createdAtDifference !== 0) return createdAtDifference;
     return String(a._id || '').localeCompare(String(b._id || ''));
@@ -2005,9 +2008,11 @@ export default function Dashboard() {
                         }
 
                         // Reconcile optimistic pending message
+                        // Note: never match whiteboard messages by content — each send must be a new message
                         const pendingIndex = prev.findIndex(msg =>
                             (incomingMessage.clientMessageId && (msg.clientMessageId === incomingMessage.clientMessageId || String(msg._id) === incomingMessage.clientMessageId)) ||
                             (msg.pending && 
+                             incomingMessage.attachmentType !== 'whiteboard' &&
                              String(msg.sender?._id || msg.sender) === String(incomingMessage.sender?._id || incomingMessage.sender) && 
                              msg.content === incomingMessage.content)
                         );
@@ -2181,13 +2186,16 @@ export default function Dashboard() {
         setUserSearchQuery('');
         setUserSearchResults([]);
         setSelectedUsers([]);
-        // For communities tab (which is always group type), pre-fetch users
+        // For communities tab (which is always group type), show friends-only contacts list
         if (activeTab === 'communities') {
+            setConvType('group');
             try {
                 const token = await getAccessTokenSilently();
                 const res = await fetch(`${BACKEND_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
                 const users = await res.json();
-                setAllUsers(users.filter(u => u._id !== mongoUserId));
+                // Only keep friends (people we've had direct conversations with)
+                const friendIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
+                setAllUsers(users.filter(u => u._id !== mongoUserId && friendIds.includes(u._id)));
             } catch (err) { console.error('Failed to fetch users:', err); }
         }
     };
@@ -5431,13 +5439,14 @@ export default function Dashboard() {
                                         setSelectedUsers([]); 
                                         setUserSearchQuery('');
                                         setUserSearchResults([]);
-                                        // Fetch all users for group contacts list
+                                        // Fetch friends (contacts) for group creation
                                         if (allUsers.length === 0) {
                                             try {
                                                 const token = await getAccessTokenSilently();
                                                 const res = await fetch(`${BACKEND_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
                                                 const users = await res.json();
-                                                setAllUsers(users.filter(u => u._id !== mongoUserId));
+                                                const friendIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
+                                                setAllUsers(users.filter(u => u._id !== mongoUserId && friendIds.includes(u._id)));
                                             } catch (err) { console.error('Failed to fetch users:', err); }
                                         }
                                     }}
