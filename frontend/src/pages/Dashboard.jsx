@@ -2197,30 +2197,113 @@ export default function Dashboard() {
                 const friendIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
                 setAllUsers(users.filter(u => u._id !== mongoUserId && friendIds.includes(u._id)));
             } catch (err) { console.error('Failed to fetch users:', err); }
+        } else {
+            // Pre-fetch all users so direct searching is instant and resilient
+            try {
+                const token = await getAccessTokenSilently();
+                const res = await fetch(`${BACKEND_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
+                if (res.ok) {
+                    const users = await res.json();
+                    setAllUsers(users.filter(u => u._id !== mongoUserId));
+                }
+            } catch (err) { console.error('Failed to pre-fetch users:', err); }
         }
     };
 
     const searchUsersDebounced = async (query) => {
         if (userSearchTimerRef.current) clearTimeout(userSearchTimerRef.current);
         const cleanQuery = normalizeUsername(query);
-        if (!cleanQuery) {
+        const rawQuery = (query || '').trim().replace(/^@+/, '').trim().toLowerCase();
+
+        if (!cleanQuery && !rawQuery) {
             setUserSearchResults([]);
             setIsSearchingUsers(false);
             return;
         }
+
+        // Instant responsive local filtering if allUsers is populated
+        if (allUsers && allUsers.length > 0) {
+            const localMatches = allUsers.filter(u => {
+                const uName = (u.username || '').toLowerCase();
+                const dName = (u.displayName || '').toLowerCase();
+                const dCompact = dName.replace(/\s+/g, '');
+                return (
+                    (cleanQuery && uName.includes(cleanQuery)) ||
+                    (rawQuery && dName.includes(rawQuery)) ||
+                    (cleanQuery && dCompact.includes(cleanQuery))
+                );
+            }).map(u => ({
+                ...u,
+                isSelf: mongoUserId && String(u._id) === String(mongoUserId)
+            }));
+            if (localMatches.length > 0) {
+                setUserSearchResults(localMatches);
+            }
+        }
+
         setIsSearchingUsers(true);
         userSearchTimerRef.current = setTimeout(async () => {
             try {
                 const token = await getAccessTokenSilently();
-                const res = await fetch(`${BACKEND_URL}/api/users/search?username=${encodeURIComponent(cleanQuery)}`, {
+                const res = await fetch(`${BACKEND_URL}/api/users/search?username=${encodeURIComponent(cleanQuery || rawQuery)}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (res.ok) {
                     const results = await res.json();
                     setUserSearchResults(results);
+                    return;
+                }
+                
+                // Fallback: If /api/users/search returns an error, fetch all users and filter client-side
+                const fallbackRes = await fetch(`${BACKEND_URL}/api/users`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (fallbackRes.ok) {
+                    const users = await fallbackRes.json();
+                    setAllUsers(users.filter(u => u._id !== mongoUserId));
+                    const filtered = users.filter(u => {
+                        const uName = (u.username || '').toLowerCase();
+                        const dName = (u.displayName || '').toLowerCase();
+                        const dCompact = dName.replace(/\s+/g, '');
+                        return (
+                            (cleanQuery && uName.includes(cleanQuery)) ||
+                            (rawQuery && dName.includes(rawQuery)) ||
+                            (cleanQuery && dCompact.includes(cleanQuery))
+                        );
+                    }).map(u => ({
+                        ...u,
+                        isSelf: mongoUserId && String(u._id) === String(mongoUserId)
+                    }));
+                    setUserSearchResults(filtered);
                 }
             } catch (err) {
-                console.error('Failed to search users:', err);
+                console.error('Failed to search users, using fallback:', err);
+                try {
+                    const token = await getAccessTokenSilently();
+                    const fallbackRes = await fetch(`${BACKEND_URL}/api/users`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (fallbackRes.ok) {
+                        const users = await fallbackRes.json();
+                        setAllUsers(users.filter(u => u._id !== mongoUserId));
+                        const filtered = users.filter(u => {
+                            const uName = (u.username || '').toLowerCase();
+                            const dName = (u.displayName || '').toLowerCase();
+                            const dCompact = dName.replace(/\s+/g, '');
+                            return (
+                                (cleanQuery && uName.includes(cleanQuery)) ||
+                                (rawQuery && dName.includes(rawQuery)) ||
+                                (cleanQuery && dCompact.includes(cleanQuery))
+                            );
+                        }).map(u => ({
+                            ...u,
+                            isSelf: mongoUserId && String(u._id) === String(mongoUserId)
+                        }));
+                        setUserSearchResults(filtered);
+                    }
+                } catch (fallbackErr) {
+                    console.error('Fallback search also failed:', fallbackErr);
+                }
             } finally {
                 setIsSearchingUsers(false);
             }
@@ -5622,7 +5705,7 @@ export default function Dashboard() {
                                                     {u.displayName}
                                                     {u.isSelf && <span style={{ fontSize: '0.75rem', color: 'var(--colors-textMuted)', fontWeight: '400' }}>(You)</span>}
                                                 </span>
-                                                <span style={{ color: 'var(--colors-accent)', fontSize: '0.78rem', fontWeight: '500' }}>@{u.username}</span>
+                                                <span style={{ color: 'var(--colors-accent)', fontSize: '0.78rem', fontWeight: '500' }}>{u.username ? `@${u.username}` : (u.techDiscipline || 'Fullstack')}</span>
                                             </div>
                                             <div style={{ 
                                                 width: '22px', 
