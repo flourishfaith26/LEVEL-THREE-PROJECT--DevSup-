@@ -23,6 +23,14 @@ const userSchema = new mongoose.Schema({
     required: true, 
     unique: true 
   },
+  passwordHash: {
+    type: String,
+    select: false
+  },
+  passwordSalt: {
+    type: String,
+    select: false
+  },
   avatarUrl: { 
     type: String 
   },

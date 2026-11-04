@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '../context/AuthContext.jsx';
 import { io } from 'socket.io-client';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
@@ -1240,7 +1240,7 @@ const compareMessages = (a, b) => {
 
 // --- Main Dashboard Component ---
 export default function Dashboard() {
-    const { user, logout, getAccessTokenSilently } = useAuth0();
+    const { user, logout, getAccessTokenSilently } = useAuth();
     const navigate = useNavigate();
 
     const [mongoUserId, setMongoUserId] = useState(null);

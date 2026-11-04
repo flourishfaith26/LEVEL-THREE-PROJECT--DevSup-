@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import { styled, keyframes } from '../stitches.config.js';
 import { Terminal, Code, Mail, Lock, User, AlertCircle, Eye, EyeOff, Check } from 'lucide-react';
 
@@ -253,7 +254,8 @@ export const validatePassword = (password) => {
 };
 
 export default function AuthPage() {
-    const { loginWithRedirect } = useAuth0();
+    const navigate = useNavigate();
+    const { loginNative, signupNative, loginWithRedirect } = useAuth();
     const [isSignup, setIsSignup] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
@@ -294,72 +296,34 @@ export default function AuthPage() {
             return;
         }
 
-        if (isSignup) {
-            // New account signup requires a valid email address
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(rawIdentifier)) {
-                setAuthError('Please enter a valid email address to create an account. You will choose your unique @username right after.');
-                return;
-            }
-            try {
-                await loginWithRedirect({
-                    authorizationParams: { 
-                        screen_hint: 'signup',
-                        login_hint: rawIdentifier
-                    }
-                });
-            } catch (err) {
-                console.error('Signup redirect error:', err);
-                setAuthError(err.message || 'Failed to start signup. Please try again.');
-            }
-            return;
-        }
-
-        // Login flow: check if identifier is email or username
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const looksLikeEmail = emailRegex.test(rawIdentifier);
-        if (looksLikeEmail) {
-            try {
-                await loginWithRedirect({
-                    authorizationParams: { 
-                        prompt: 'login',
-                        login_hint: rawIdentifier
-                    }
-                });
-            } catch (err) {
-                console.error('Login redirect error:', err);
-                setAuthError(err.message || 'Failed to start login. Please try again.');
-            }
-            return;
-        }
-
-        // It's a username (e.g. "flo", "@flo", "blossom123")
         setIsResolving(true);
         try {
-            const clean = rawIdentifier.replace(/^@+\s*/, '').replace(/\s+/g, '').toLowerCase();
-            const res = await fetch(`${BACKEND_URL}/api/users/lookup?identifier=${encodeURIComponent(clean)}`);
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                setAuthError(data.message || `No account found with username @${clean}. Please check your username or use your email address.`);
-                setIsResolving(false);
-                return;
+            if (isSignup) {
+                // Native direct signup
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(rawIdentifier)) {
+                    setAuthError('Please enter a valid email address to create an account.');
+                    setIsResolving(false);
+                    return;
+                }
+                const user = await signupNative(rawIdentifier, formData.password, formData.name);
+                if (user?.hasCompletedProfile) {
+                    navigate('/dashboard', { replace: true });
+                } else {
+                    navigate('/setup', { replace: true });
+                }
+            } else {
+                // Native direct login (accepts email or @username)
+                const user = await loginNative(rawIdentifier, formData.password);
+                if (user?.hasCompletedProfile || user?.username) {
+                    navigate('/dashboard', { replace: true });
+                } else {
+                    navigate('/setup', { replace: true });
+                }
             }
-            const foundUser = await res.json();
-            await loginWithRedirect({
-                authorizationParams: { 
-                    prompt: 'login',
-                    login_hint: foundUser.email
-                }
-            });
         } catch (err) {
-            console.error('User lookup error:', err);
-            // Fallback to Auth0 with whatever was typed
-            await loginWithRedirect({
-                authorizationParams: { 
-                    prompt: 'login',
-                    login_hint: rawIdentifier
-                }
-            });
+            console.error('Authentication error:', err);
+            setAuthError(err.message || 'Authentication failed. Please check your credentials.');
         } finally {
             setIsResolving(false);
         }

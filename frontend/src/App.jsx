@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
+import { Auth0Provider } from '@auth0/auth0-react';
+import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { styled } from './stitches.config.js';
 const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -25,7 +26,7 @@ const SESSION_TIMEOUT_MS = 48 * 60 * 60 * 1000;
 const SESSION_ACTIVITY_KEY_PREFIX = 'devsup:last-active:';
 
 function SessionTimeout() {
-  const { isAuthenticated, isLoading, user, logout } = useAuth0();
+  const { isAuthenticated, isLoading, user, logout } = useAuth();
   const isLoggingOut = useRef(false);
 
   useEffect(() => {
@@ -88,7 +89,12 @@ const Auth0ProviderWithNavigate = ({ children }) => {
   };
 
   if (!(domain && clientId)) {
-    return null;
+    return (
+      <AuthProvider>
+        <SessionTimeout />
+        {children}
+      </AuthProvider>
+    );
   }
 
   return (
@@ -102,14 +108,16 @@ const Auth0ProviderWithNavigate = ({ children }) => {
       cacheLocation="localstorage"
       onRedirectCallback={onRedirectCallback}
     >
-    <SessionTimeout />
-    {children}
+      <AuthProvider>
+        <SessionTimeout />
+        {children}
+      </AuthProvider>
     </Auth0Provider>
   );
 };
 
 function AppRoutes() {
-  const { isAuthenticated, isLoading, error } = useAuth0();
+  const { isAuthenticated, isLoading, error } = useAuth();
 
   if (error) {
     return (

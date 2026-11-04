@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 import { connectDB } from './src/config/db.js';
+import authRoutes from './src/routers/authRoutes.js';
 import userRoutes from './src/routers/userRoutes.js';
 import conversationRoutes from './src/routers/conversationRoutes.js';
 import messageRoutes from './src/routers/messageRoutes.js';
@@ -29,6 +30,7 @@ app.use(cors({
     origin: "*" 
 }));
 app.use(express.json());
+app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);

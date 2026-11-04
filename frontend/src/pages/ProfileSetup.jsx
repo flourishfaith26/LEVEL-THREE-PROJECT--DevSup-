@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '../context/AuthContext.jsx';
 import { styled, keyframes } from '../stitches.config.js';
 import { Globe, Briefcase, Link as LinkIcon, CheckCircle, ShieldCheck, User as UserIcon, Code2, Loader2, Camera, Check, AlertCircle } from 'lucide-react';
 import { normalizeUsername, validateUsernameFormat } from '../utils/username.js';
@@ -224,7 +224,7 @@ const InfoBox = styled('div', {
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 export default function ProfileSetup() {
-  const { user, getAccessTokenSilently } = useAuth0();
+  const { user, getAccessTokenSilently } = useAuth();
   const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
