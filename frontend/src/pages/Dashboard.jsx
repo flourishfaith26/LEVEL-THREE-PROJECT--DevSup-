@@ -990,21 +990,33 @@ const VoiceRecordingIndicator = ({ time }) => {
     );
 };
 
-// --- Custom Audio Player Component ---
-const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl }) => {
+// --- Custom Audio Player Component (WhatsApp Voice Note Style) ---
+const WAVEFORM_BAR_HEIGHTS = [
+    6, 10, 16, 22, 14, 8, 18, 24, 20, 12,
+    16, 26, 22, 10, 14, 20, 18, 8, 12, 24,
+    26, 16, 10, 18, 22, 14, 8, 12, 16, 10
+];
+
+const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) => {
     const audioRef = useRef(null);
+    const waveformRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
 
     const togglePlay = () => {
+        if (!audioRef.current) return;
         if (isPlaying) {
             audioRef.current.pause();
+            setIsPlaying(false);
         } else {
-            audioRef.current.play();
+            audioRef.current.play().then(() => {
+                setIsPlaying(true);
+            }).catch(() => {
+                setIsPlaying(false);
+            });
         }
-        setIsPlaying(!isPlaying);
     };
 
     const handleTimeUpdate = () => {
@@ -1018,13 +1030,40 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl }) => {
     };
 
     const handleLoadedMetadata = () => {
-        if (audioRef.current) {
+        if (audioRef.current && audioRef.current.duration) {
             setDuration(audioRef.current.duration);
         }
     };
 
+    const seekToPosition = (clientX) => {
+        if (!waveformRef.current || !audioRef.current) return;
+        const rect = waveformRef.current.getBoundingClientRect();
+        const clickX = clientX - rect.left;
+        const pct = Math.max(0, Math.min(1, clickX / rect.width));
+        const dur = audioRef.current.duration || duration;
+        if (dur > 0) {
+            const newTime = pct * dur;
+            audioRef.current.currentTime = newTime;
+            setCurrentTime(newTime);
+            setProgress(pct * 100);
+        }
+    };
+
+    const handlePointerDown = (e) => {
+        seekToPosition(e.clientX);
+        const onPointerMove = (moveEvent) => {
+            seekToPosition(moveEvent.clientX);
+        };
+        const onPointerUp = () => {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+        };
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+    };
+
     const formatTime = (time) => {
-        if (isNaN(time)) return '0:00';
+        if (isNaN(time) || !isFinite(time) || time <= 0) return '0:00';
         const minutes = Math.floor(time / 60);
         const seconds = Math.floor(time % 60);
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
@@ -1035,64 +1074,152 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl }) => {
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            marginTop: '4px',
-            backgroundColor: 'transparent',
-            padding: '4px 0px',
-            width: '240px',
+            padding: '2px 0',
+            width: '260px',
             maxWidth: '100%',
-            color: 'inherit'
+            color: 'inherit',
+            userSelect: 'none'
         }}>
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-                <img src={avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                <div style={{ position: 'absolute', bottom: -2, right: -4, color: isOwnMessage ? '#06b6d4' : '#94A3B8' }}>
-                    <Mic size={16} fill="currentColor" />
-                </div>
-            </div>
-
+            {/* Play/Pause Button */}
             <button
+                type="button"
                 onClick={togglePlay}
                 style={{
                     background: 'none',
                     border: 'none',
-                    color: '#94A3B8',
+                    color: isOwnMessage ? '#ffffff' : '#e2e8f0',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: 0,
-                    opacity: 1,
+                    padding: '2px',
                     flexShrink: 0,
-                    outline: 'none'
+                    outline: 'none',
+                    transition: 'transform 0.1s ease'
                 }}
+                aria-label={isPlaying ? 'Pause voice message' : 'Play voice message'}
             >
-                {isPlaying ? <Pause size={28} fill="currentColor" strokeWidth={0} /> : <Play size={28} fill="currentColor" strokeWidth={0} />}
+                {isPlaying ? (
+                    <Pause size={24} fill="currentColor" strokeWidth={0} />
+                ) : (
+                    <Play size={24} fill="currentColor" strokeWidth={0} />
+                )}
             </button>
 
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', paddingTop: '4px' }}>
-                <AudioSlider
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={progress || 0}
-                    onChange={(e) => {
-                        if (!audioRef.current) return;
-                        const newTime = (e.target.value / 100) * duration;
-                        audioRef.current.currentTime = newTime;
-                        setProgress(e.target.value);
-                    }}
+            {/* Middle: Waveform + Timings */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {/* Waveform Bar Track with Scrubber Head */}
+                <div
+                    ref={waveformRef}
+                    onPointerDown={handlePointerDown}
                     style={{
-                        '--thumb-color': isOwnMessage ? '#06b6d4' : '#94A3B8',
-                        background: `linear-gradient(to right, ${isOwnMessage ? '#06b6d4' : '#94A3B8'} ${progress || 0}%, rgba(255, 255, 255, 0.2) ${progress || 0}%)`
+                        position: 'relative',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '2px',
+                        height: '26px',
+                        cursor: 'pointer',
+                        touchAction: 'none'
+                    }}
+                >
+                    {WAVEFORM_BAR_HEIGHTS.map((height, i) => {
+                        const barPct = (i / WAVEFORM_BAR_HEIGHTS.length) * 100;
+                        const isPlayed = barPct <= progress;
+                        return (
+                            <div
+                                key={i}
+                                style={{
+                                    flex: 1,
+                                    height: `${height}px`,
+                                    borderRadius: '2px',
+                                    backgroundColor: isPlayed ? '#06b6d4' : 'rgba(255, 255, 255, 0.28)',
+                                    pointerEvents: 'none',
+                                    transition: 'background-color 0.1s ease'
+                                }}
+                            />
+                        );
+                    })}
+
+                    {/* Scrubber Circle Dot */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            left: `${Math.max(0, Math.min(100, progress))}%`,
+                            top: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            backgroundColor: '#06b6d4',
+                            boxShadow: '0 0 6px rgba(6, 182, 212, 0.8)',
+                            pointerEvents: 'none',
+                            zIndex: 2
+                        }}
+                    />
+                </div>
+
+                {/* Duration on Left, Timestamp + ticks on Right */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.68rem',
+                    lineHeight: 1
+                }}>
+                    <span style={{ color: isOwnMessage ? '#06b6d4' : 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>
+                        {formatTime(isPlaying ? currentTime : (duration || 0))}
+                    </span>
+                    <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        whiteSpace: 'nowrap'
+                    }}>
+                        <span>{time}</span>
+                        {statusTicks}
+                    </span>
+                </div>
+            </div>
+
+            {/* Avatar on Right with Microphone badge overlapping bottom-left */}
+            <div style={{ position: 'relative', flexShrink: 0, width: '40px', height: '40px', marginLeft: '2px' }}>
+                <img
+                    src={avatarUrl || '/default-avatar.svg'}
+                    onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                    alt="Voice message sender"
+                    style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        display: 'block'
                     }}
                 />
-                <span style={{ fontSize: '0.85rem', color: '#94A3B8', fontWeight: '500', alignSelf: 'flex-start', marginTop: '4px' }}>
-                    {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
+                <div style={{
+                    position: 'absolute',
+                    bottom: '-2px',
+                    left: '-4px',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    backgroundColor: '#111b21',
+                    border: '1.5px solid rgba(255, 255, 255, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#06b6d4',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
+                }}>
+                    <Mic size={10} fill="currentColor" />
+                </div>
             </div>
 
             <audio
                 ref={audioRef}
                 src={src}
+                preload="metadata"
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
                 onEnded={() => {
@@ -4524,8 +4651,86 @@ export default function Dashboard() {
                                                         (typeof msg.attachmentName === 'string' && msg.attachmentName.toLowerCase().includes('whiteboard')) ||
                                                         (typeof msg.caption === 'string' && msg.caption.toLowerCase().includes('mock-up'))
                                                     );
-                                                    const isMediaMessage = !msg.isDeletedForEveryone && !isWhiteboardMessage && (msg.isCodeSnippet || (isOnlyUrl && isImageUrl(msg.content, msg.attachmentType)));
+                                                    const isMediaMessage = !msg.isDeletedForEveryone && !isWhiteboardMessage && (
+                                                        msg.isCodeSnippet ||
+                                                        (isOnlyUrl && (isImageUrl(msg.content, msg.attachmentType) || isVideoUrl(msg.content, msg.attachmentType)))
+                                                    );
                                                     const isImageWithCaption = isMediaMessage && !msg.isCodeSnippet && !!msg.caption;
+
+                                                    const renderStatusTicks = () => {
+                                                        if (!isOwnMessage) return null;
+                                                        const receiptsEnabled = appSettings.readReceipts !== false;
+                                                        const readCount = msg.readBy
+                                                            ? msg.readBy.filter(id => String(id?._id || id) !== String(mongoUserId)).length
+                                                            : 0;
+                                                        const deliveredCount = msg.deliveredTo
+                                                            ? msg.deliveredTo.filter(id => String(id?._id || id) !== String(mongoUserId)).length
+                                                            : 0;
+
+                                                        if (readCount > 0 && receiptsEnabled) {
+                                                            return <CheckCheck size={14} color="#06B6D4" title="Read" />;
+                                                        } else if (deliveredCount > 0 || (readCount > 0 && !receiptsEnabled)) {
+                                                            return <CheckCheck size={14} color="rgba(255,255,255,0.6)" title="Delivered" />;
+                                                        } else {
+                                                            return <Check size={14} color="rgba(255,255,255,0.6)" title="Sent" />;
+                                                        }
+                                                    };
+
+                                                    const renderInlineTimestamp = (extraMargin = '12px') => (
+                                                        <span style={{
+                                                            float: 'right',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '3px',
+                                                            marginLeft: extraMargin,
+                                                            marginTop: '6px',
+                                                            position: 'relative',
+                                                            bottom: '-2px',
+                                                            fontSize: isMobileViewport ? '0.62rem' : '0.65rem',
+                                                            color: isOwnMessage ? 'rgba(255, 255, 255, 0.75)' : 'rgba(255, 255, 255, 0.6)',
+                                                            whiteSpace: 'nowrap',
+                                                            userSelect: 'none',
+                                                            lineHeight: 1
+                                                        }}>
+                                                            {msg.isEdited && <i style={{ marginRight: '3px', fontSize: '0.6rem' }}>edited</i>}
+                                                            <span>{formatMessageClock(msg.createdAt)}</span>
+                                                            {isOwnMessage && (
+                                                                <span style={{ marginLeft: '3px', display: 'inline-flex', alignItems: 'center' }}>
+                                                                    {renderStatusTicks()}
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    );
+
+                                                    const renderOverlayTimestamp = () => (
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            bottom: '8px',
+                                                            right: '8px',
+                                                            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                                            backdropFilter: 'blur(4px)',
+                                                            WebkitBackdropFilter: 'blur(4px)',
+                                                            padding: '2px 6px',
+                                                            borderRadius: '10px',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '3px',
+                                                            fontSize: '0.65rem',
+                                                            color: '#ffffff',
+                                                            userSelect: 'none',
+                                                            pointerEvents: 'none',
+                                                            zIndex: 2,
+                                                            lineHeight: 1
+                                                        }}>
+                                                            {msg.isEdited && <i style={{ marginRight: '3px', fontSize: '0.6rem' }}>edited</i>}
+                                                            <span>{formatMessageClock(msg.createdAt)}</span>
+                                                            {isOwnMessage && (
+                                                                <span style={{ marginLeft: '3px', display: 'inline-flex', alignItems: 'center' }}>
+                                                                    {renderStatusTicks()}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
                                                     
                                                     const prevMsg = index > 0 ? array[index - 1] : null;
                                                     const showDateSeparator = !prevMsg || formatMessageDate(msg.createdAt) !== formatMessageDate(prevMsg.createdAt);
@@ -4602,12 +4807,12 @@ export default function Dashboard() {
                                                                 )}
                                                                 <ChatBubble
                                                                 isOwn={isOwnMessage}
-                                                                mediaOnly={isMediaMessage}
+                                                                mediaOnly={isMediaMessage && !msg.caption}
                                                                 embedOnly={isEmbedOnly}
                                                                 style={isWhiteboardMessage ? {
                                                                     width: 'fit-content',
                                                                     maxWidth: '360px',
-                                                                    padding: '10px 10px 24px 10px',
+                                                                    padding: '10px 10px 10px 10px',
                                                                 } : {}}
                                                                 onContextMenu={(e) => {
                                                                     if (!msg.isDeletedForEveryone) handleContextMenu(e, 'message', msg);
@@ -4637,7 +4842,8 @@ export default function Dashboard() {
                                                                     {msg.isDeletedForEveryone ? (
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--colors-textMuted)', fontStyle: 'italic' }}>
                                                                             <Trash2 size={14} />
-                                                                            {isOwnMessage ? 'You deleted this message' : 'This message was deleted'}
+                                                                            <span>{isOwnMessage ? 'You deleted this message' : 'This message was deleted'}</span>
+                                                                            {renderInlineTimestamp('12px')}
                                                                         </div>
                                                                     ) : (
                                                                     <>
@@ -4674,20 +4880,24 @@ export default function Dashboard() {
                                                                     {(() => {
                                                                         const embedData = detectEcosystemLink(msg.content);
 
-                                                                        // If it's a code snippet, just render the code block
+                                                                        // If it's a code snippet, just render the code block with right-aligned timestamp
                                                                         if (msg.isCodeSnippet) {
                                                                             return (
-                                                                                <SyntaxHighlighter
-                                                                                    language={msg.language === 'plaintext' ? 'text' : msg.language}
-                                                                                    style={vscDarkPlus}
-                                                                                    customStyle={{ borderRadius: '10px', margin: '0', fontSize: '0.9rem' }}
-                                                                                >
-                                                                                    {msg.content}
-                                                                                </SyntaxHighlighter>
+                                                                                <div>
+                                                                                    <SyntaxHighlighter
+                                                                                        language={msg.language === 'plaintext' ? 'text' : msg.language}
+                                                                                        style={vscDarkPlus}
+                                                                                        customStyle={{ borderRadius: '10px', margin: '0', fontSize: '0.9rem' }}
+                                                                                    >
+                                                                                        {msg.content}
+                                                                                    </SyntaxHighlighter>
+                                                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                                                                        {renderInlineTimestamp('0px')}
+                                                                                    </div>
+                                                                                </div>
                                                                             );
                                                                         }
 
-                                                                        
                                                                         const isCallLog = msg.content && typeof msg.content === 'string' && msg.content.startsWith('$CALL_LOG$');
                                                                         if (isCallLog) {
                                                                             const parts = msg.content.split('|');
@@ -4695,16 +4905,19 @@ export default function Dashboard() {
                                                                             const callStatus = parts[2];
                                                                             
                                                                             return (
-                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                                    {callType === 'video' ? <Video size={18} color="rgba(255,255,255,0.7)" /> : <Phone size={18} color="rgba(255,255,255,0.7)" />}
-                                                                                    <div>
-                                                                                        <div style={{ fontWeight: '500', color: 'var(--colors-textMain)' }}>
-                                                                                            {callType === 'video' ? 'Video call' : 'Voice call'}
-                                                                                        </div>
-                                                                                        <div style={{ fontSize: '0.85rem', color: callStatus === 'missed' ? '#ef4444' : 'var(--colors-textMuted)' }}>
-                                                                                            {callStatus === 'missed' ? 'Missed' : callStatus === 'rejected' ? 'Declined' : 'Completed'}
+                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                                        {callType === 'video' ? <Video size={18} color="rgba(255,255,255,0.7)" /> : <Phone size={18} color="rgba(255,255,255,0.7)" />}
+                                                                                        <div>
+                                                                                            <div style={{ fontWeight: '500', color: 'var(--colors-textMain)' }}>
+                                                                                                {callType === 'video' ? 'Video call' : 'Voice call'}
+                                                                                            </div>
+                                                                                            <div style={{ fontSize: '0.85rem', color: callStatus === 'missed' ? '#ef4444' : 'var(--colors-textMuted)' }}>
+                                                                                                {callStatus === 'missed' ? 'Missed' : callStatus === 'rejected' ? 'Declined' : 'Completed'}
+                                                                                            </div>
                                                                                         </div>
                                                                                     </div>
+                                                                                    {renderInlineTimestamp('8px')}
                                                                                 </div>
                                                                             );
                                                                         }
@@ -4717,9 +4930,12 @@ export default function Dashboard() {
                                                                         return (
                                                                             <>
                                                                                 {shouldShowText && (
-                                                                                    <span style={{ whiteSpace: 'pre-wrap', display: 'inline' }}>
-                                                                                        {msg.content}
-                                                                                    </span>
+                                                                                    <>
+                                                                                        <span style={{ whiteSpace: 'pre-wrap', display: 'inline' }}>
+                                                                                            {msg.content}
+                                                                                        </span>
+                                                                                        {renderInlineTimestamp('12px')}
+                                                                                    </>
                                                                                 )}
 
                                                                                 {isWhiteboardMessage && (
@@ -4861,37 +5077,49 @@ export default function Dashboard() {
                                                                                             </button>
                                                                                         </div>
 
-                                                                                        {msg.caption && msg.caption !== 'View the mock-up' && (
-                                                                                            <div style={{ fontSize: '0.82rem', opacity: 0.9, marginTop: '2px', padding: '0 2px' }}>
-                                                                                                {msg.caption}
+                                                                                        {msg.caption && msg.caption !== 'View the mock-up' ? (
+                                                                                            <div style={{ fontSize: '0.82rem', opacity: 0.9, marginTop: '4px', padding: '0 2px' }}>
+                                                                                                <span>{msg.caption}</span>
+                                                                                                {renderInlineTimestamp('12px')}
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                                                                                {renderInlineTimestamp('0px')}
                                                                                             </div>
                                                                                         )}
                                                                                     </div>
                                                                                 )}
 
                                                                                 {embedData && appSettings.richIntegrations !== false && (
-                                                                                    <EmbedCard style={{ marginTop: shouldShowText ? '8px' : '0', borderRadius: shouldShowText ? '8px' : '0', borderBottom: 'none' }}>
-                                                                                        <EmbedHeader>
-                                                                                            {embedData.type === 'github' && (
-                                                                                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
-                                                                                            )}
-                                                                                            {embedData.type === 'figma' && (
-                                                                                                <svg viewBox="0 0 38 57" width="14" height="18" fill="currentColor"><path d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" fill="#1abcfe" /><path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fill="#0acf83" /><path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fill="#ff7262" /><path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fill="#f24e1e" /><path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fill="#a259ff" /></svg>
-                                                                                            )}
-                                                                                            {embedData.type === 'notion' && (
-                                                                                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.422.466V4.44h8.33v.234c1.164.047 1.63.14 2.237.792l4.009 4.383v11.854c-.653.606-1.118.56-2.515.466v.233H9.278v-.233c-1.352.093-1.631.14-2.423-.513L4.46 17.653V4.208zm11.751 13.987V8.583L9.65 18.289h6.56zM6.929 16.7l6.387-9.511H7.814l-1.957 2.19v7.927l1.072-.606z" /></svg>
-                                                                                            )}
-                                                                                            {embedData.type === 'github' ? `${embedData.owner}/${embedData.repo}` : embedData.type === 'figma' ? 'Figma Design Workspace' : 'Notion Document'}
-                                                                                        </EmbedHeader>
-                                                                                        <EmbedDescription>
-                                                                                            {embedData.type === 'github' && 'GitHub Repository Preview'}
-                                                                                            {embedData.type === 'figma' && 'Live UI/UX File'}
-                                                                                            {embedData.type === 'notion' && 'Workspace Documentation'}
-                                                                                        </EmbedDescription>
-                                                                                        <EmbedAction href={embedData.url} target="_blank" rel="noopener noreferrer">
-                                                                                            Open in {embedData.type.charAt(0).toUpperCase() + embedData.type.slice(1)}
-                                                                                        </EmbedAction>
-                                                                                    </EmbedCard>
+                                                                                    <div>
+                                                                                        <EmbedCard style={{ marginTop: shouldShowText ? '8px' : '0', borderRadius: shouldShowText ? '8px' : '0', borderBottom: 'none' }}>
+                                                                                            <EmbedHeader>
+                                                                                                {embedData.type === 'github' && (
+                                                                                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+                                                                                                )}
+                                                                                                {embedData.type === 'figma' && (
+                                                                                                    <svg viewBox="0 0 38 57" width="14" height="18" fill="currentColor"><path d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" fill="#1abcfe" /><path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fill="#0acf83" /><path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fill="#ff7262" /><path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fill="#f24e1e" /><path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fill="#a259ff" /></svg>
+                                                                                                )}
+                                                                                                {embedData.type === 'notion' && (
+                                                                                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.422.466V4.44h8.33v.234c1.164.047 1.63.14 2.237.792l4.009 4.383v11.854c-.653.606-1.118.56-2.515.466v.233H9.278v-.233c-1.352.093-1.631.14-2.423-.513L4.46 17.653V4.208zm11.751 13.987V8.583L9.65 18.289h6.56zM6.929 16.7l6.387-9.511H7.814l-1.957 2.19v7.927l1.072-.606z" /></svg>
+                                                                                                )}
+                                                                                                {embedData.type === 'github' ? `${embedData.owner}/${embedData.repo}` : embedData.type === 'figma' ? 'Figma Design Workspace' : 'Notion Document'}
+                                                                                            </EmbedHeader>
+                                                                                            <EmbedDescription>
+                                                                                                {embedData.type === 'github' && 'GitHub Repository Preview'}
+                                                                                                {embedData.type === 'figma' && 'Live UI/UX File'}
+                                                                                                {embedData.type === 'notion' && 'Workspace Documentation'}
+                                                                                            </EmbedDescription>
+                                                                                            <EmbedAction href={embedData.url} target="_blank" rel="noopener noreferrer">
+                                                                                                Open in {embedData.type.charAt(0).toUpperCase() + embedData.type.slice(1)}
+                                                                                            </EmbedAction>
+                                                                                        </EmbedCard>
+                                                                                        {isEmbedOnly && (
+                                                                                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px', padding: '0 4px' }}>
+                                                                                                {renderInlineTimestamp('0px')}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
                                                                                 )}
 
                                                                                 {isVideoUrl(msg.content, msg.attachmentType) && (
@@ -4911,35 +5139,98 @@ export default function Dashboard() {
                                                                                         >
                                                                                             <Maximize2 size={18} />
                                                                                         </button>
+                                                                                        {!msg.caption && renderOverlayTimestamp()}
                                                                                     </div>
                                                                                 )}
 
                                                                                 {isImageUrl(msg.content, msg.attachmentType) && !isWhiteboardMessage && (
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => openMediaViewer(msg.content, 'image', msg.attachmentName || 'Photo')}
-                                                                                        aria-label="View photo fullscreen"
-                                                                                        title="View fullscreen"
-                                                                                        style={{ display: 'block', marginTop: isMediaMessage ? '0' : '8px', padding: 0, border: 0, background: 'transparent', cursor: 'zoom-in' }}
-                                                                                    >
-                                                                                        <AttachmentImage src={msg.content} alt="User attachment" style={isMediaMessage ? { width: '100%', height: 'auto', objectFit: 'cover', borderRadius: '8px' } : {}} />
-                                                                                    </button>
+                                                                                    <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => openMediaViewer(msg.content, 'image', msg.attachmentName || 'Photo')}
+                                                                                            aria-label="View photo fullscreen"
+                                                                                            title="View fullscreen"
+                                                                                            style={{ display: 'block', marginTop: isMediaMessage ? '0' : '8px', padding: 0, border: 0, background: 'transparent', cursor: 'zoom-in' }}
+                                                                                        >
+                                                                                            <AttachmentImage src={msg.content} alt="User attachment" style={isMediaMessage ? { width: '100%', height: 'auto', objectFit: 'cover', borderRadius: '8px' } : {}} />
+                                                                                        </button>
+                                                                                        {!msg.caption && renderOverlayTimestamp()}
+                                                                                    </div>
                                                                                 )}
 
                                                                                 {isAudioUrl(msg.content, msg.attachmentType) && (
-                                                                                    <CustomAudioPlayer src={msg.content} isOwnMessage={isOwnMessage} avatarUrl={msg.sender?.avatarUrl} />
+                                                                                    <CustomAudioPlayer
+                                                                                        src={msg.content}
+                                                                                        isOwnMessage={isOwnMessage}
+                                                                                        avatarUrl={msg.sender?.avatarUrl}
+                                                                                        time={formatMessageClock(msg.createdAt)}
+                                                                                        statusTicks={renderStatusTicks()}
+                                                                                    />
                                                                                 )}
 
                                                                                 {isCloudinaryUrl(msg.content) && !isImageUrl(msg.content, msg.attachmentType) && !isAudioUrl(msg.content, msg.attachmentType) && !isVideoUrl(msg.content, msg.attachmentType) && (
-                                                                                    <AttachmentLink href={msg.content} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', marginTop: '8px' }}>
-                                                                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg>
-                                                                                        {msg.attachmentName || 'Download file'}
-                                                                                    </AttachmentLink>
+                                                                                    <div style={{
+                                                                                        display: 'flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '12px',
+                                                                                        padding: '10px 12px',
+                                                                                        backgroundColor: isOwnMessage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                                                                                        borderRadius: '8px',
+                                                                                        minWidth: '220px',
+                                                                                        maxWidth: '320px',
+                                                                                        marginTop: shouldShowText ? '8px' : '0'
+                                                                                    }}>
+                                                                                        <div style={{
+                                                                                            width: '40px',
+                                                                                            height: '40px',
+                                                                                            borderRadius: '8px',
+                                                                                            backgroundColor: '#06b6d4',
+                                                                                            display: 'flex',
+                                                                                            alignItems: 'center',
+                                                                                            justifyContent: 'center',
+                                                                                            color: '#ffffff',
+                                                                                            flexShrink: 0
+                                                                                        }}>
+                                                                                            <FileText size={22} />
+                                                                                        </div>
+                                                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                            <a
+                                                                                                href={msg.content}
+                                                                                                target="_blank"
+                                                                                                rel="noopener noreferrer"
+                                                                                                style={{
+                                                                                                    display: 'block',
+                                                                                                    fontWeight: '600',
+                                                                                                    fontSize: '0.88rem',
+                                                                                                    color: '#ffffff',
+                                                                                                    textDecoration: 'none',
+                                                                                                    overflow: 'hidden',
+                                                                                                    textOverflow: 'ellipsis',
+                                                                                                    whiteSpace: 'nowrap'
+                                                                                                }}
+                                                                                                title={msg.attachmentName || 'Document'}
+                                                                                            >
+                                                                                                {msg.attachmentName || 'Document'}
+                                                                                            </a>
+                                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px' }}>
+                                                                                                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)' }}>
+                                                                                                    {msg.attachmentName?.split('.').pop()?.toUpperCase() || 'DOCUMENT'}
+                                                                                                </span>
+                                                                                                {!msg.caption && (
+                                                                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
+                                                                                                        <span>{formatMessageClock(msg.createdAt)}</span>
+                                                                                                        {isOwnMessage && renderStatusTicks()}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
                                                                                 )}
 
                                                                                 {msg.caption && !isWhiteboardMessage && (
-                                                                                    <div style={{ whiteSpace: 'pre-wrap', marginTop: '4px', padding: isMediaMessage ? '4px 6px 4px 6px' : '4px 0', borderTop: isMediaMessage ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
-                                                                                        {msg.caption}
+                                                                                    <div style={{ whiteSpace: 'pre-wrap', marginTop: '6px', padding: isMediaMessage ? '4px 6px 2px 6px' : '4px 0', borderTop: isMediaMessage ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
+                                                                                        <span>{msg.caption}</span>
+                                                                                        {renderInlineTimestamp('12px')}
                                                                                     </div>
                                                                                 )}
                                                                             </>
@@ -4947,36 +5238,7 @@ export default function Dashboard() {
                                                                     })()}
                                                                     </>
                                                                     )}
-                                                                    <span style={{ display: 'inline-block', width: msg.isEdited ? (isMobileViewport ? '60px' : '76px') : (isMobileViewport ? (isOwnMessage ? '44px' : '36px') : '48px'), height: isMobileViewport ? '0px' : '4px' }}>&#8203;</span>
                                                                 </div>
-
-                                                                <MessageTime isOwn={isOwnMessage}>
-                                                                    {msg.isEdited && <i style={{ marginRight: '4px' }}>edited</i>}
-                                                                    {formatMessageClock(msg.createdAt)}
-                                                                    {isOwnMessage && (
-                                                                        <span style={{ marginLeft: '4px', display: 'inline-flex', alignItems: 'center' }}>
-                                                                            {(() => {
-                                                                                const receiptsEnabled = appSettings.readReceipts !== false;
-                                                                                
-                                                                                // Exclude the sender's own ID from counts (only other users count)
-                                                                                const readCount = msg.readBy
-                                                                                    ? msg.readBy.filter(id => String(id?._id || id) !== String(mongoUserId)).length
-                                                                                    : 0;
-                                                                                const deliveredCount = msg.deliveredTo
-                                                                                    ? msg.deliveredTo.filter(id => String(id?._id || id) !== String(mongoUserId)).length
-                                                                                    : 0;
-                                                                                
-                                                                                if (readCount > 0 && receiptsEnabled) {
-                                                                                    return <CheckCheck size={14} color="#06B6D4" title="Read" />; // Blue ticks = read
-                                                                                } else if (deliveredCount > 0 || (readCount > 0 && !receiptsEnabled)) {
-                                                                                    return <CheckCheck size={14} color="rgba(255,255,255,0.6)" title="Delivered" />; // Two grey ticks = delivered
-                                                                                } else {
-                                                                                    return <Check size={14} color="rgba(255,255,255,0.6)" title="Sent" />; // One grey tick = sent
-                                                                                }
-                                                                            })()}
-                                                                        </span>
-                                                                    )}
-                                                                </MessageTime>
 
                                                                 {editingMessageId === msg._id && !msg.isDeletedForEveryone && (
                                                                     <form onSubmit={submitEdit} style={{ marginTop: '8px', zIndex: 10 }}>
