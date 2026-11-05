@@ -3321,9 +3321,6 @@ export default function Dashboard() {
         <AppContainer>
             <NavRail className={showChatArea ? 'mobile-hidden' : ''}>
                 <NavRailTop>
-                    <NavRailLogo title="DevSup">
-                        <DevSupLogo size={28} />
-                    </NavRailLogo>
                     <NavRailItem active={activeTab === 'chats'} onClick={() => handleTabChange('chats')} title="Chats">
                         <MessageSquare size={22} />
                     </NavRailItem>
@@ -3365,19 +3362,30 @@ export default function Dashboard() {
             </NavRail>
 
             <Sidebar className={showChatArea ? 'mobile-hidden' : ''}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '12px 20px 4px 20px',
+                    userSelect: 'none'
+                }}>
+                    <DevSupLogo size={14} />
+                    <span style={{
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: 'var(--colors-textMain)',
+                        letterSpacing: '0.2px'
+                    }}>
+                        DevSup
+                    </span>
+                </div>
+
                 {activeTab === 'calls' && (
                     <>
-                        <div style={{ padding: '16px 20px 12px' }}>
+                        <div style={{ padding: '8px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
-                                <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    {isCallLogsSelectionMode ? (
-                                        `${selectedCallLogs.length} selected`
-                                    ) : (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <DevSupLogo size={24} />
-                                            <span style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--colors-textMain)', letterSpacing: '-0.3px' }}>DevSup</span>
-                                        </div>
-                                    )}
+                                <h2 style={{ fontSize: '1.45rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
+                                    {isCallLogsSelectionMode ? `${selectedCallLogs.length} selected` : 'Recent Calls'}
                                 </h2>
                                 {isCallLogsSelectionMode ? (
                                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -3478,17 +3486,10 @@ export default function Dashboard() {
 
                 {activeTab === 'chats' && (
                     <>
-                        <div style={{ padding: '16px 20px 12px' }}>
+                        <div style={{ padding: '8px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
-                                <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    {isChatsSelectionMode ? (
-                                        `${selectedChats.length} selected`
-                                    ) : (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <DevSupLogo size={24} />
-                                            <span style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--colors-textMain)', letterSpacing: '-0.3px' }}>DevSup</span>
-                                        </div>
-                                    )}
+                                <h2 style={{ fontSize: '1.45rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
+                                    {isChatsSelectionMode ? `${selectedChats.length} selected` : 'Chats'}
                                 </h2>
                                 {isChatsSelectionMode ? (
                                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -3731,17 +3732,10 @@ export default function Dashboard() {
 
                 {activeTab === 'communities' && (
                     <>
-                        <div style={{ padding: '16px 20px 12px' }}>
+                        <div style={{ padding: '8px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
-                                <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    {isChatsSelectionMode ? (
-                                        `${selectedChats.length} selected`
-                                    ) : (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <DevSupLogo size={24} />
-                                            <span style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--colors-textMain)', letterSpacing: '-0.3px' }}>DevSup</span>
-                                        </div>
-                                    )}
+                                <h2 style={{ fontSize: '1.45rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
+                                    {isChatsSelectionMode ? `${selectedChats.length} selected` : 'Communities'}
                                 </h2>
                                 {isChatsSelectionMode ? (
                                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -4026,13 +4020,10 @@ export default function Dashboard() {
 
                 {activeTab === 'status' && (
                     <>
-                        <div style={{ padding: '16px 20px 12px' }}>
+                        <div style={{ padding: '8px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <DevSupLogo size={24} />
-                                        <span style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--colors-textMain)', letterSpacing: '-0.3px' }}>DevSup</span>
-                                    </div>
+                                <h2 style={{ fontSize: '1.45rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
+                                    Status
                                 </h2>
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                     <IconButton title="New Status" onClick={() => setIsStatusModalOpen(true)} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
