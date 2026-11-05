@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { styled, keyframes } from './stitches.config.js';
@@ -179,6 +179,7 @@ const Auth0ProviderWithNavigate = ({ children }) => {
 
 function AppRoutes() {
   const { isAuthenticated, isLoading, error } = useAuth();
+  const location = useLocation();
 
   if (error) {
     return (
@@ -189,12 +190,15 @@ function AppRoutes() {
     );
   }
 
-  if (isLoading) {
-    return <DevSupPumpLoader />;
+  // Only show the pump loader when transitioning from home/login into dashboard, NOT when already on dashboard
+  const isDashboardRoute = location.pathname.startsWith('/dashboard');
+
+  if (isLoading && !isDashboardRoute) {
+    return <DevSupPumpLoader size={36} />;
   }
 
   return (
-    <Suspense fallback={<DevSupPumpLoader />}>
+    <Suspense fallback={isDashboardRoute ? null : <DevSupPumpLoader size={36} />}>
       <Routes>
         <Route 
           path="/" 

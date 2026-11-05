@@ -511,7 +511,7 @@ export default function AuthPage() {
                 </AuthBox>
             </RightPanel>
 
-            {isResolving && <DevSupPumpLoader overlay size={72} />}
+            {isResolving && <DevSupPumpLoader overlay size={36} />}
         </PageContainer>
     );
 }
