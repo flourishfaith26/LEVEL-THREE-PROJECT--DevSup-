@@ -3581,7 +3581,7 @@ export default function Dashboard() {
                                                 onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                             />
                                         </AvatarWrapper>
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: isMobileViewport ? '32px' : '36px', justifyContent: isMobileViewport ? 'center' : 'space-between', gap: isMobileViewport ? '2px' : 0, boxSizing: 'border-box' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', gap: '2px', boxSizing: 'border-box' }}>
                                             <span style={{ fontSize: '0.94rem', color: log.status === 'missed' ? '#EF4444' : 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                 {log.contactName}
                                             </span>
@@ -3815,19 +3815,19 @@ export default function Dashboard() {
                                             {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
                                         </AvatarWrapper>
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: isMobileViewport ? '34px' : '42px', justifyContent: isMobileViewport ? 'center' : 'space-between', gap: isMobileViewport ? '2px' : 0, padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15, marginBottom: '0px' }}>
-                                                <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
+                                        <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', gap: '2px', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
+                                                <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                     {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
                                                 </span>
                                                 {conv.lastMessage && (
-                                                    <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.15 }}>
+                                                    <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.2 }}>
                                                         {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                     </span>
                                                 )}
                                             </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15 }}>
-                                                <span style={{ fontSize: '0.82rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
+                                                <span style={{ fontSize: '0.82rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                     {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                                 </span>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3843,9 +3843,9 @@ export default function Dashboard() {
                                                             setContextMenu({ visible: true, x: e.clientX, y: e.clientY, message: null, callLog: null, conversation: conv });
                                                         }}
                                                         title="Options"
-                                                        style={{ padding: '2px', opacity: 0, transition: 'opacity 0.2s', color: 'var(--colors-textMuted)', zIndex: 2 }}
+                                                        style={{ padding: '2px', height: '18px', width: '18px', opacity: 0, transition: 'opacity 0.2s', color: 'var(--colors-textMuted)', zIndex: 2 }}
                                                     >
-                                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                                     </IconButton>}
                                                 </div>
                                             </div>
@@ -4026,19 +4026,19 @@ export default function Dashboard() {
                                         />
                                     </AvatarWrapper>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: isMobileViewport ? '34px' : '42px', justifyContent: isMobileViewport ? 'center' : 'space-between', gap: isMobileViewport ? '2px' : 0, padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15, marginBottom: '0px' }}>
-                                            <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
+                                    <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', gap: '2px', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
+                                            <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                 {conv.name}
                                             </span>
                                             {conv.lastMessage && (
-                                                <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.15 }}>
+                                                <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.2 }}>
                                                     {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                 </span>
                                             )}
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15 }}>
-                                            <span style={{ fontSize: '0.82rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
+                                            <span style={{ fontSize: '0.82rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                 {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                             </span>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4054,9 +4054,9 @@ export default function Dashboard() {
                                                         setContextMenu({ visible: true, x: e.clientX, y: e.clientY, message: null, callLog: null, conversation: conv });
                                                     }}
                                                     title="Options"
-                                                    style={{ padding: '2px', opacity: 0, transition: 'opacity 0.2s', color: 'var(--colors-textMuted)', zIndex: 2 }}
+                                                    style={{ padding: '2px', height: '18px', width: '18px', opacity: 0, transition: 'opacity 0.2s', color: 'var(--colors-textMuted)', zIndex: 2 }}
                                                 >
-                                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                                 </IconButton>}
                                             </div>
                                         </div>

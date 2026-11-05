@@ -64,3 +64,11 @@ body {
     border-color: var(--midnight-accent);
     box-shadow: 0 0 0 0.25rem rgba(6, 182, 212, 0.25);
 }
+
+.chat-item-text {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    height: auto !important;
+}
