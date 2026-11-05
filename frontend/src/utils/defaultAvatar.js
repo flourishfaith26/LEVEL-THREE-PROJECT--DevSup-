@@ -6,3 +6,4 @@ export const getAvatarUrl = (url, name = 'User') => {
   }
   return DEFAULT_AVATAR;
 };
+

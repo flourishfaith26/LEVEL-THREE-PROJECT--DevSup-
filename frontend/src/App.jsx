@@ -1,13 +1,74 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
-import { styled } from './stitches.config.js';
+import { styled, keyframes } from './stitches.config.js';
 import DevSupPumpLoader from './components/DevSupPumpLoader.jsx';
+import { WifiOff } from 'lucide-react';
 const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProfileSetup = lazy(() => import('./pages/ProfileSetup'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
+
+const slideDown = keyframes({
+  '0%': { transform: 'translateY(-100%)', opacity: 0 },
+  '100%': { transform: 'translateY(0)', opacity: 1 },
+});
+
+const OfflineBanner = styled('div', {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 100000,
+  backgroundColor: '#0F172A',
+  borderBottom: '1px solid rgba(239, 68, 68, 0.4)',
+  color: '#F8FAFC',
+  padding: '10px 16px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '12px',
+  fontSize: '0.9rem',
+  fontWeight: '500',
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+  animation: `${slideDown} 0.3s ease-out`,
+});
+
+function OfflineNotifier() {
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  if (!isOffline) return null;
+
+  return (
+    <OfflineBanner role="alert">
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+        color: '#EF4444'
+      }}>
+        <WifiOff size={14} />
+      </div>
+      <span>You are offline. Please check your connection.</span>
+    </OfflineBanner>
+  );
+}
 
 // Custom Stitches error container
 const LoadingContainer = styled('div', {
@@ -163,6 +224,7 @@ function AppRoutes() {
 function App() {
   return (
     <Router>
+      <OfflineNotifier />
       <Auth0ProviderWithNavigate>
         <AppRoutes />
       </Auth0ProviderWithNavigate>

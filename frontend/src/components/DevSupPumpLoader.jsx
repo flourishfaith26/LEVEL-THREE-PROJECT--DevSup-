@@ -3,19 +3,19 @@ import DevSupLogo from './DevSupLogo.jsx';
 
 const pump = keyframes({
   '0%': {
-    transform: 'scale(0.86)',
-    filter: 'drop-shadow(0 0 10px rgba(6, 182, 212, 0.35))',
-    opacity: 0.85,
+    transform: 'scale(0.88)',
+    filter: 'drop-shadow(0 0 6px #06b6d4) drop-shadow(0 0 14px rgba(6, 182, 212, 0.6))',
+    opacity: 0.9,
   },
   '50%': {
-    transform: 'scale(1.28)',
-    filter: 'drop-shadow(0 0 40px rgba(6, 182, 212, 0.95))',
+    transform: 'scale(1.22)',
+    filter: 'drop-shadow(0 0 10px #06b6d4) drop-shadow(0 0 22px rgba(6, 182, 212, 0.85))',
     opacity: 1,
   },
   '100%': {
-    transform: 'scale(0.86)',
-    filter: 'drop-shadow(0 0 10px rgba(6, 182, 212, 0.35))',
-    opacity: 0.85,
+    transform: 'scale(0.88)',
+    filter: 'drop-shadow(0 0 6px #06b6d4) drop-shadow(0 0 14px rgba(6, 182, 212, 0.6))',
+    opacity: 0.9,
   },
 });
 
@@ -26,12 +26,12 @@ const LoaderContainer = styled('div', {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: '$bg',
+  backgroundColor: '#050811', // Deep pitch black background
   variants: {
     overlay: {
       true: {
-        backgroundColor: 'rgba(15, 23, 42, 0.88)',
-        backdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(3, 7, 18, 0.96)', // Pitch-dark backdrop
+        backdropFilter: 'blur(10px)',
       }
     }
   }
@@ -53,4 +53,5 @@ export default function DevSupPumpLoader({ overlay = false, size = 72 }) {
     </LoaderContainer>
   );
 }
+
 
