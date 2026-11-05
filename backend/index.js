@@ -48,6 +48,8 @@ const io = new Server(httpServer, {
   }
 });
 
+app.set('io', io);
+
 setupSocket(io);
 
 app.get('/api/health', (req, res) => {

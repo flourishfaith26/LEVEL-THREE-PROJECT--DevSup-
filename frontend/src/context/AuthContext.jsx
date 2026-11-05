@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { getAvatarUrl } from '../utils/defaultAvatar.js';
 
 const AuthContext = createContext(null);
 
@@ -33,10 +34,14 @@ export function AuthProvider({ children }) {
         name: nativeUser.displayName,
         displayName: nativeUser.displayName,
         email: nativeUser.email,
-        picture: nativeUser.avatarUrl,
-        avatarUrl: nativeUser.avatarUrl,
+        picture: getAvatarUrl(nativeUser.avatarUrl),
+        avatarUrl: getAvatarUrl(nativeUser.avatarUrl),
         username: nativeUser.username
-    } : auth0.user;
+    } : (auth0.user ? {
+        ...auth0.user,
+        picture: getAvatarUrl(auth0.user.picture),
+        avatarUrl: getAvatarUrl(auth0.user.picture)
+    } : null);
 
     const getAccessTokenSilently = useCallback(async () => {
         if (nativeToken) {

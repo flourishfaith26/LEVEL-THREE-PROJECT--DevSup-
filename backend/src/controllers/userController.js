@@ -7,15 +7,19 @@ export const syncUser = async (req, res) => {
     
     const { email, displayName, avatarUrl, techDiscipline } = req.body;
 
+    const validAvatar = (avatarUrl && typeof avatarUrl === 'string' && !avatarUrl.includes('placeholder') && !avatarUrl.includes('ui-avatars')) ? avatarUrl.trim() : '/default-avatar.svg';
+
     let user = await User.findOne({ auth0Id });
     
     if (!user) {
-      user = await User.create({ auth0Id, email, displayName, avatarUrl, techDiscipline });
+      user = await User.create({ auth0Id, email, displayName, avatarUrl: validAvatar, techDiscipline });
     } else {
       // Only update email unconditionally
       user.email = email;
       // Do not overwrite user's custom avatar or display name if they already exist
-      if (!user.avatarUrl) user.avatarUrl = avatarUrl;
+      if (!user.avatarUrl || user.avatarUrl.includes('ui-avatars') || user.avatarUrl.includes('placeholder')) {
+        user.avatarUrl = validAvatar;
+      }
       if (!user.displayName) user.displayName = displayName;
       if (techDiscipline && !user.techDiscipline) user.techDiscipline = techDiscipline;
       if (user.username && !user.hasCompletedProfile) user.hasCompletedProfile = true;

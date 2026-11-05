@@ -34,6 +34,7 @@ const EventsView = lazy(() => import('../components/EventsView'));
 import { useNavigate } from 'react-router-dom';
 import { normalizeUsername } from '../utils/username.js';
 import DevSupLogo from '../components/DevSupLogo.jsx';
+import { getAvatarUrl } from '../utils/defaultAvatar.js';
 
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
@@ -1945,7 +1946,7 @@ export default function Dashboard() {
 
                 newSocket.on('receive_message', (incomingMessage) => {
                     const incomingSenderId = String(incomingMessage.sender?._id || incomingMessage.sender || '');
-                    const currentUid = String(mongoUser._id || '');
+                    const currentUid = String(mongoUser?._id || mongoUserId || '');
                     const convId = String(incomingMessage.conversationId?._id || incomingMessage.conversationId || '');
                     const currentActiveConvId = String(activeConversationIdRef.current || '');
                     const receiptsEnabled = appSettingsRef.current?.readReceipts !== false;
@@ -2017,7 +2018,8 @@ export default function Dashboard() {
                     }
 
                     setMessages((prev) => {
-                        if (String(activeConversationIdRef.current) !== String(incomingMessage.conversationId)) return prev;
+                        const incomingConvId = String(incomingMessage.conversationId?._id || incomingMessage.conversationId || '');
+                        if (String(activeConversationIdRef.current) !== incomingConvId) return prev;
 
                         // Deduplicate: if server message already exists, update in-place without creating a duplicate
                         const existingServerMsgIndex = prev.findIndex(msg => !msg.pending && String(msg._id) === String(incomingMessage._id));
@@ -2205,6 +2207,18 @@ export default function Dashboard() {
                 userId: currentUid,
                 messageIds
             });
+
+            // HTTP fallback to guarantee read receipt persists in DB even if socket reconnected
+            getAccessTokenSilently().then(token => {
+                fetch(`${BACKEND_URL}/api/messages/${currentConvId}/read`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ messageIds })
+                }).catch(() => {});
+            }).catch(() => {});
 
             // Optimistically update local messages to prevent re-triggering this effect
             setMessages(prev => prev.map(msg => {
@@ -3249,12 +3263,12 @@ export default function Dashboard() {
                 <NavRailBottom>
                     <AvatarWrapper title={currentUserData?.displayName || user?.name || user?.nickname || user?.email}>
                         <Avatar
-                            src={currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg'}
+                            src={getAvatarUrl(currentUserData?.avatarUrl || user?.picture)}
                             alt={user?.name || user?.nickname || 'User'}
-                            onClick={() => openMediaViewer(currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg', 'image', currentUserData?.displayName || user?.name || 'Profile picture')}
+                            onClick={() => openMediaViewer(getAvatarUrl(currentUserData?.avatarUrl || user?.picture), 'image', currentUserData?.displayName || user?.name || 'Profile picture')}
                             style={{ width: '32px', height: '32px', cursor: 'zoom-in' }}
                             onError={(e) => {
-                                e.target.src = '/default-avatar.svg';
+                                e.currentTarget.src = '/default-avatar.svg';
                             }}
                         />
                         <OnlineDot style={{ width: '10px', height: '10px' }} />
@@ -3566,8 +3580,8 @@ export default function Dashboard() {
                                         >
                                             <Avatar
                                                 src={isGroup
-                                                    ? (conv.avatarUrl || '/default-avatar.svg')
-                                                    : (otherParticipant?.avatarUrl || '/default-avatar.svg')}
+                                                    ? getAvatarUrl(conv.avatarUrl)
+                                                    : getAvatarUrl(otherParticipant?.avatarUrl)}
                                                 onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                                 style={{ width: '48px', height: '48px', border: 'none', flexShrink: 0 }}
                                             />
@@ -3874,7 +3888,7 @@ export default function Dashboard() {
                                     onClick={() => setActiveSettingTab('Profile')}
                                     className="settings-item-profile"
                                 >
-                                    <img src={currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg'} alt="Profile" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} />
+                                    <img src={getAvatarUrl(currentUserData?.avatarUrl || user?.picture)} alt="Profile" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} />
                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                         <span style={{ color: 'var(--colors-textMain)', fontSize: '1.1rem', fontWeight: '500', marginBottom: '2px' }}>{currentUserData?.displayName || 'Profile'}</span>
                                         <span style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>{currentUserData?.about || 'Available'}</span>
@@ -3979,7 +3993,7 @@ export default function Dashboard() {
                                         }
                                     })()
                                 ) : (
-                                    <Avatar src={currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '48px', height: '48px', flexShrink: 0 }} />
+                                    <Avatar src={getAvatarUrl(currentUserData?.avatarUrl || user?.picture)} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '48px', height: '48px', flexShrink: 0 }} />
                                 )}
                                 <div
                                     onClick={(e) => { e.stopPropagation(); setIsStatusModalOpen(true); }}
@@ -4125,8 +4139,8 @@ export default function Dashboard() {
                                             <AvatarWrapper style={{ flexShrink: 0 }}>
                                                 <Avatar
                                                     src={activeConversation.type === 'group'
-                                                        ? (activeConversation.avatarUrl || '/default-avatar.svg')
-                                                        : (activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId))?.avatarUrl || '/default-avatar.svg')}
+                                                        ? getAvatarUrl(activeConversation.avatarUrl)
+                                                        : getAvatarUrl(activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId))?.avatarUrl)}
                                                     onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                                     onClick={(event) => {
                                                         event.stopPropagation();
@@ -5238,8 +5252,8 @@ export default function Dashboard() {
                             <label htmlFor={`group-avatar-upload-${activeConversation._id}`} style={{ cursor: activeConversation.type === 'group' ? 'pointer' : 'default', position: 'relative', display: 'inline-block' }}>
                                 <Avatar
                                     src={activeConversation.type === 'group'
-                                        ? (activeConversation.avatarUrl || '/default-avatar.svg')
-                                        : (activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId))?.avatarUrl || '/default-avatar.svg')}
+                                        ? getAvatarUrl(activeConversation.avatarUrl)
+                                        : getAvatarUrl(activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId))?.avatarUrl)}
                                     onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                     style={{ width: '160px', height: '160px', borderRadius: '50%', marginBottom: '16px', border: 'none', objectFit: 'cover' }}
                                 />
@@ -5429,7 +5443,7 @@ export default function Dashboard() {
                                     {activeConversation?.participants?.map(participant => (
                                         <div key={participant._id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             <Avatar
-                                                src={String(participant._id || participant) === String(mongoUserId) ? (currentUserData?.avatarUrl || user?.picture || participant.avatarUrl || '/default-avatar.svg') : (participant.avatarUrl || '/default-avatar.svg')} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                                src={String(participant._id || participant) === String(mongoUserId) ? getAvatarUrl(currentUserData?.avatarUrl || user?.picture || participant.avatarUrl) : getAvatarUrl(participant.avatarUrl)} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                                 style={{ width: '40px', height: '40px' }}
                                             />
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -5791,7 +5805,7 @@ export default function Dashboard() {
                                             onMouseLeave={(e) => { if (!selectedUsers.includes(u._id)) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
                                         >
                                             <AvatarWrapper>
-                                                <Avatar src={u.avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedUsers.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
+                                                <Avatar src={getAvatarUrl(u.avatarUrl)} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedUsers.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
                                                 {activeUsers.includes(u._id) && <OnlineDot style={{ width: '12px', height: '12px', bottom: '-2px', right: '-2px', border: '2.5px solid var(--colors-bg)' }} />}
                                             </AvatarWrapper>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -5862,7 +5876,7 @@ export default function Dashboard() {
                                             onMouseLeave={(e) => { if (!selectedUsers.includes(u._id)) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
                                         >
                                             <AvatarWrapper>
-                                                <Avatar src={u.avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedUsers.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
+                                                <Avatar src={getAvatarUrl(u.avatarUrl)} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedUsers.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
                                                 {activeUsers.includes(u._id) && <OnlineDot style={{ width: '12px', height: '12px', bottom: '-2px', right: '-2px', border: '2.5px solid var(--colors-bg)' }} />}
                                             </AvatarWrapper>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -6037,7 +6051,7 @@ export default function Dashboard() {
                                         onMouseLeave={(e) => { if (!selectedMembersToAdd.includes(u._id)) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
                                     >
                                         <AvatarWrapper>
-                                            <Avatar src={u.avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedMembersToAdd.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
+                                            <Avatar src={getAvatarUrl(u.avatarUrl)} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedMembersToAdd.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
                                             {activeUsers.includes(u._id) && <OnlineDot style={{ width: '12px', height: '12px', bottom: '-2px', right: '-2px', border: '2.5px solid var(--colors-bg)' }} />}
                                         </AvatarWrapper>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -6138,8 +6152,8 @@ export default function Dashboard() {
                                             <AvatarWrapper style={{ flexShrink: 0 }}>
                                                 <Avatar
                                                     src={isGroup
-                                                        ? (c.avatarUrl || '/default-avatar.svg')
-                                                        : (otherParticipant?.avatarUrl || '/default-avatar.svg')}
+                                                        ? getAvatarUrl(c.avatarUrl)
+                                                        : getAvatarUrl(otherParticipant?.avatarUrl)}
                                                     onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                                     style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none' }}
                                                 />
@@ -6413,7 +6427,7 @@ export default function Dashboard() {
                 <IncomingMessageNotification aria-label="New message notification" aria-live="polite">
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                         <img 
-                            src={incomingMessageNotification.sender?.avatarUrl || '/default-avatar.svg'} 
+                            src={getAvatarUrl(incomingMessageNotification.sender?.avatarUrl)} 
                             alt="" 
                             onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                             style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }} 

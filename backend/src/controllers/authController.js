@@ -71,6 +71,7 @@ export const signup = async (req, res) => {
             passwordSalt: salt,
             auth0Id: tempAuth0Id,
             techDiscipline: 'Fullstack',
+            avatarUrl: '/default-avatar.svg',
             hasCompletedProfile: false
         });
 
