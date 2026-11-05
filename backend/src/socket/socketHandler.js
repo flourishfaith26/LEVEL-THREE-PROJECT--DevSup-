@@ -27,7 +27,7 @@ export const setupSocket = (io) => {
         console.log(`Client connected: ${socket.id}`);
 
         // 1. Track User Coming Online
-        socket.on('user_connected', (userId) => {
+        socket.on('user_connected', async (userId) => {
             const normalizedUserId = String(userId);
             const userSockets = onlineUsers.get(normalizedUserId) || new Set();
             userSockets.add(socket.id);
@@ -36,6 +36,49 @@ export const setupSocket = (io) => {
             socket.join(getUserRoom(normalizedUserId));
             // Broadcast the array of active User IDs to all connected clients
             io.emit('presence_update', Array.from(onlineUsers.keys()));
+
+            // Auto-mark undelivered messages in conversations for this user as delivered
+            try {
+                if (mongoose.Types.ObjectId.isValid(normalizedUserId)) {
+                    const userObjId = new mongoose.Types.ObjectId(normalizedUserId);
+                    const userConvs = await Conversation.find({ participants: userObjId }).select('_id');
+                    const convIds = userConvs.map(c => c._id);
+                    if (convIds.length > 0) {
+                        const undeliveredMessages = await Message.find({
+                            conversationId: { $in: convIds },
+                            sender: { $ne: userObjId },
+                            deliveredTo: { $ne: userObjId }
+                        }).select('_id conversationId');
+
+                        if (undeliveredMessages.length > 0) {
+                            const undeliveredIds = undeliveredMessages.map(m => m._id);
+                            await Message.updateMany(
+                                { _id: { $in: undeliveredIds } },
+                                { $addToSet: { deliveredTo: userObjId } }
+                            );
+
+                            const byConv = {};
+                            undeliveredMessages.forEach(m => {
+                                const cId = String(m.conversationId);
+                                if (!byConv[cId]) byConv[cId] = [];
+                                byConv[cId].push(String(m._id));
+                            });
+
+                            for (const [cId, ids] of Object.entries(byConv)) {
+                                io.to(cId).emit('messages_status_updated', { messageIds: ids, status: 'delivered', userId: normalizedUserId });
+                                const cDoc = await Conversation.findById(cId).select('participants');
+                                if (cDoc?.participants) {
+                                    cDoc.participants.forEach(pId => {
+                                        io.to(getUserRoom(pId)).emit('messages_status_updated', { messageIds: ids, status: 'delivered', userId: normalizedUserId });
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (deliveryErr) {
+                console.error('Error auto-marking delivered on user connect:', deliveryErr);
+            }
         });
 
         // 2. Room Joining
@@ -241,15 +284,24 @@ export const setupSocket = (io) => {
         socket.on('mark_messages_delivered', async ({ conversationId, userId, messageIds }) => {
             try {
                 if (!messageIds || messageIds.length === 0) return;
+                const userObjId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+                const validMsgIds = messageIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id));
+                if (validMsgIds.length === 0) return;
+
                 await Message.updateMany(
-                    { _id: { $in: messageIds } },
-                    { $addToSet: { deliveredTo: userId } }
+                    { _id: { $in: validMsgIds } },
+                    { $addToSet: { deliveredTo: userObjId } }
                 );
-                io.to(conversationId).emit('messages_status_updated', { messageIds, status: 'delivered', userId });
+
+                const cIdStr = String(conversationId);
+                const stringMsgIds = validMsgIds.map(String);
+                const stringUserId = String(userId);
+
+                io.to(cIdStr).emit('messages_status_updated', { messageIds: stringMsgIds, status: 'delivered', userId: stringUserId });
                 const conv = await Conversation.findById(conversationId);
                 if (conv?.participants) {
                     conv.participants.forEach(pId => {
-                        io.to(getUserRoom(pId)).emit('messages_status_updated', { messageIds, status: 'delivered', userId });
+                        io.to(getUserRoom(pId)).emit('messages_status_updated', { messageIds: stringMsgIds, status: 'delivered', userId: stringUserId });
                     });
                 }
             } catch (error) {
@@ -260,15 +312,24 @@ export const setupSocket = (io) => {
         socket.on('mark_messages_read', async ({ conversationId, userId, messageIds }) => {
             try {
                 if (!messageIds || messageIds.length === 0) return;
+                const userObjId = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+                const validMsgIds = messageIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id));
+                if (validMsgIds.length === 0) return;
+
                 await Message.updateMany(
-                    { _id: { $in: messageIds } },
-                    { $addToSet: { readBy: userId, deliveredTo: userId } }
+                    { _id: { $in: validMsgIds } },
+                    { $addToSet: { readBy: userObjId, deliveredTo: userObjId } }
                 );
-                io.to(conversationId).emit('messages_status_updated', { messageIds, status: 'read', userId });
+
+                const cIdStr = String(conversationId);
+                const stringMsgIds = validMsgIds.map(String);
+                const stringUserId = String(userId);
+
+                io.to(cIdStr).emit('messages_status_updated', { messageIds: stringMsgIds, status: 'read', userId: stringUserId });
                 const conv = await Conversation.findById(conversationId);
                 if (conv?.participants) {
                     conv.participants.forEach(pId => {
-                        io.to(getUserRoom(pId)).emit('messages_status_updated', { messageIds, status: 'read', userId });
+                        io.to(getUserRoom(pId)).emit('messages_status_updated', { messageIds: stringMsgIds, status: 'read', userId: stringUserId });
                     });
                 }
             } catch (error) {

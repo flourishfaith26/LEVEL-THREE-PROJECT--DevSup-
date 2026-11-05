@@ -180,7 +180,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
             {/* Header */}
             <div style={{ position: 'absolute', top: '24px', left: '16px', right: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <img src={currentUserGroup.user.avatarUrl} alt="avatar" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                    <img src={currentUserGroup.user.avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} alt="avatar" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
                     <div style={{ color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
                         <div style={{ fontWeight: '600', fontSize: '1rem' }}>{currentUserGroup.user.displayName}</div>
                         <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>

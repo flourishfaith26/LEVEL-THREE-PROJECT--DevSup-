@@ -32,7 +32,8 @@ const userSchema = new mongoose.Schema({
     select: false
   },
   avatarUrl: { 
-    type: String 
+    type: String,
+    default: '/default-avatar.svg'
   },
   about: {
     type: String,

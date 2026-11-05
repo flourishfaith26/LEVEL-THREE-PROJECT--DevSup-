@@ -1035,14 +1035,12 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl }) => {
             maxWidth: '100%',
             color: 'inherit'
         }}>
-            {avatarUrl && (
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <img src={avatarUrl} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', bottom: -2, right: -4, color: isOwnMessage ? '#06b6d4' : '#94A3B8' }}>
-                        <Mic size={16} fill="currentColor" />
-                    </div>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+                <img src={avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                <div style={{ position: 'absolute', bottom: -2, right: -4, color: isOwnMessage ? '#06b6d4' : '#94A3B8' }}>
+                    <Mic size={16} fill="currentColor" />
                 </div>
-            )}
+            </div>
 
             <button
                 onClick={togglePlay}
@@ -1673,7 +1671,7 @@ export default function Dashboard() {
             id: log._id,
             contactId: contact ? contact._id : null,
             contactName: isGroup ? contact.name : (contact ? contact.displayName : 'Unknown'),
-            contactAvatar: contact ? (isGroup ? contact.avatarUrl || `https://ui-avatars.com/api/?name=${contact.name}&background=06B6D4&color=fff` : contact.avatarUrl) : null,
+            contactAvatar: contact ? (contact.avatarUrl || '/default-avatar.svg') : '/default-avatar.svg',
             type: log.type,
             direction: isCaller ? 'outgoing' : 'incoming',
             status: log.status,
@@ -1948,16 +1946,20 @@ export default function Dashboard() {
                 newSocket.on('receive_message', (incomingMessage) => {
                     const incomingSenderId = String(incomingMessage.sender?._id || incomingMessage.sender || '');
                     const currentUid = String(mongoUser._id || '');
+                    const convId = String(incomingMessage.conversationId?._id || incomingMessage.conversationId || '');
+                    const currentActiveConvId = String(activeConversationIdRef.current || '');
+                    const receiptsEnabled = appSettingsRef.current?.readReceipts !== false;
+
                     if (incomingSenderId && currentUid && incomingSenderId !== currentUid) {
                         newSocket.emit('mark_messages_delivered', { 
-                            conversationId: incomingMessage.conversationId, 
+                            conversationId: convId, 
                             userId: currentUid, 
                             messageIds: [incomingMessage._id] 
                         });
 
-                        if (activeConversationIdRef.current === incomingMessage.conversationId && appSettingsRef.current?.readReceipts) {
+                        if (currentActiveConvId && currentActiveConvId === convId && receiptsEnabled) {
                             newSocket.emit('mark_messages_read', {
-                                conversationId: incomingMessage.conversationId,
+                                conversationId: convId,
                                 userId: currentUid,
                                 messageIds: [incomingMessage._id]
                             });
@@ -2045,7 +2047,8 @@ export default function Dashboard() {
                     });
 
                     setConversations((prev) => {
-                        const convIndex = prev.findIndex(c => c._id === incomingMessage.conversationId);
+                        const incomingConvId = String(incomingMessage.conversationId?._id || incomingMessage.conversationId || '');
+                        const convIndex = prev.findIndex(c => String(c._id) === incomingConvId);
                         if (convIndex === -1) return prev;
                         
                         const newConvs = [...prev];
@@ -2065,15 +2068,19 @@ export default function Dashboard() {
                 });
 
                 newSocket.on('messages_status_updated', ({ messageIds, status, userId }) => {
+                    if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+                    const targetIds = new Set(messageIds.map(String));
+                    const uid = String(userId);
                     setMessages(prev => prev.map(msg => {
-                        if (messageIds && messageIds.some(id => String(id) === String(msg._id))) {
-                            const uid = String(userId);
+                        if (targetIds.has(String(msg._id)) || (msg.clientMessageId && targetIds.has(String(msg.clientMessageId)))) {
+                            const currentDelivered = (msg.deliveredTo || []).map(id => String(id?._id || id));
+                            const currentRead = (msg.readBy || []).map(id => String(id?._id || id));
                             if (status === 'delivered') {
-                                const deliveredTo = Array.from(new Set([...(msg.deliveredTo || []).map(String), uid]));
+                                const deliveredTo = Array.from(new Set([...currentDelivered, uid]));
                                 return { ...msg, deliveredTo };
                             } else if (status === 'read') {
-                                const readBy = Array.from(new Set([...(msg.readBy || []).map(String), uid]));
-                                const deliveredTo = Array.from(new Set([...(msg.deliveredTo || []).map(String), uid]));
+                                const readBy = Array.from(new Set([...currentRead, uid]));
+                                const deliveredTo = Array.from(new Set([...currentDelivered, uid]));
                                 return { ...msg, readBy, deliveredTo };
                             }
                         }
@@ -2179,22 +2186,39 @@ export default function Dashboard() {
 
     // Mark messages as read when viewing a chat
     useEffect(() => {
-        if (!socket || !activeConversationId || !mongoUserId || !appSettings.readReceipts) return;
+        if (!socket || !activeConversationId || !mongoUserId || appSettings.readReceipts === false) return;
         
+        const currentConvId = String(activeConversationId);
+        const currentUid = String(mongoUserId);
+
         // Find messages in the active chat that are NOT from us, and NOT yet read by us
         const unreadMessages = messages.filter(m => 
-            m.conversationId === activeConversationId && 
-            String(m.sender?._id || m.sender) !== String(mongoUserId) && 
-            !(m.readBy && m.readBy.some(id => String(id) === String(mongoUserId)))
+            String(m.conversationId?._id || m.conversationId) === currentConvId && 
+            String(m.sender?._id || m.sender) !== currentUid && 
+            !(m.readBy && m.readBy.some(id => String(id?._id || id) === currentUid))
         );
 
         if (unreadMessages.length > 0) {
             const messageIds = unreadMessages.map(m => m._id);
             socket.emit('mark_messages_read', {
-                conversationId: activeConversationId,
-                userId: mongoUserId,
+                conversationId: currentConvId,
+                userId: currentUid,
                 messageIds
             });
+
+            // Optimistically update local messages to prevent re-triggering this effect
+            setMessages(prev => prev.map(msg => {
+                if (messageIds.some(id => String(id) === String(msg._id))) {
+                    const currentRead = (msg.readBy || []).map(id => String(id?._id || id));
+                    const currentDelivered = (msg.deliveredTo || []).map(id => String(id?._id || id));
+                    return {
+                        ...msg,
+                        readBy: Array.from(new Set([...currentRead, currentUid])),
+                        deliveredTo: Array.from(new Set([...currentDelivered, currentUid]))
+                    };
+                }
+                return msg;
+            }));
         }
     }, [messages, activeConversationId, socket, mongoUserId, appSettings.readReceipts]);
 
@@ -3311,9 +3335,9 @@ export default function Dashboard() {
                                         )}
                                         <AvatarWrapper style={{ flexShrink: 0 }}>
                                             <Avatar
-                                                src={log.contactAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(log.contactName)}&background=06B6D4&color=fff`}
+                                                src={log.contactAvatar || '/default-avatar.svg'}
                                                 style={{ width: '40px', height: '40px', border: 'none' }}
-                                                onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(log.contactName)}&background=06B6D4&color=fff`; }}
+                                                onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                             />
                                         </AvatarWrapper>
                                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
@@ -3542,8 +3566,9 @@ export default function Dashboard() {
                                         >
                                             <Avatar
                                                 src={isGroup
-                                                    ? (conv.avatarUrl || `https://ui-avatars.com/api/?name=${conv.name}&background=06B6D4&color=fff`)
-                                                    : (otherParticipant?.avatarUrl || `https://ui-avatars.com/api/?name=${otherParticipant?.displayName || 'User'}&background=06B6D4&color=fff`)}
+                                                    ? (conv.avatarUrl || '/default-avatar.svg')
+                                                    : (otherParticipant?.avatarUrl || '/default-avatar.svg')}
+                                                onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                                 style={{ width: '48px', height: '48px', border: 'none', flexShrink: 0 }}
                                             />
                                             {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
@@ -3763,7 +3788,8 @@ export default function Dashboard() {
                                     )}
                                     <AvatarWrapper style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <Avatar
-                                            src={conv.avatarUrl || `https://ui-avatars.com/api/?name=${conv.name}&background=06B6D4&color=fff`}
+                                            src={conv.avatarUrl || '/default-avatar.svg'}
+                                            onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                             style={{ width: '48px', height: '48px', border: 'none', flexShrink: 0 }}
                                         />
                                     </AvatarWrapper>
@@ -3848,7 +3874,7 @@ export default function Dashboard() {
                                     onClick={() => setActiveSettingTab('Profile')}
                                     className="settings-item-profile"
                                 >
-                                    <img src={currentUserData?.avatarUrl || 'https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff'} alt="Profile" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.target.src = 'https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff' }} />
+                                    <img src={currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg'} alt="Profile" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} />
                                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                                         <span style={{ color: 'var(--colors-textMain)', fontSize: '1.1rem', fontWeight: '500', marginBottom: '2px' }}>{currentUserData?.displayName || 'Profile'}</span>
                                         <span style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>{currentUserData?.about || 'Available'}</span>
@@ -3953,7 +3979,7 @@ export default function Dashboard() {
                                         }
                                     })()
                                 ) : (
-                                    <Avatar src={currentUserData?.avatarUrl || user?.picture} style={{ width: '48px', height: '48px', flexShrink: 0 }} />
+                                    <Avatar src={currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '48px', height: '48px', flexShrink: 0 }} />
                                 )}
                                 <div
                                     onClick={(e) => { e.stopPropagation(); setIsStatusModalOpen(true); }}
@@ -4099,16 +4125,18 @@ export default function Dashboard() {
                                             <AvatarWrapper style={{ flexShrink: 0 }}>
                                                 <Avatar
                                                     src={activeConversation.type === 'group'
-                                                        ? (activeConversation.avatarUrl || `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff`)
-                                                        : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.avatarUrl || `https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff`)}
+                                                        ? (activeConversation.avatarUrl || '/default-avatar.svg')
+                                                        : (activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId))?.avatarUrl || '/default-avatar.svg')}
+                                                    onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                                     onClick={(event) => {
                                                         event.stopPropagation();
+                                                        const otherP = activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId));
                                                         const image = activeConversation.type === 'group'
                                                             ? activeConversation.avatarUrl
-                                                            : activeConversation.participants?.find(p => p._id !== mongoUserId)?.avatarUrl;
-                                                        openMediaViewer(image, 'image', activeConversation.type === 'group'
+                                                            : otherP?.avatarUrl;
+                                                        openMediaViewer(image || '/default-avatar.svg', 'image', activeConversation.type === 'group'
                                                             ? activeConversation.name
-                                                            : activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName || 'Profile picture');
+                                                            : otherP?.displayName || 'Profile picture');
                                                     }}
                                                     style={{ width: '40px', height: '40px', flexShrink: 0, cursor: 'zoom-in' }}
                                                 />
@@ -4829,9 +4857,7 @@ export default function Dashboard() {
                                                                     {isOwnMessage && (
                                                                         <span style={{ marginLeft: '4px', display: 'inline-flex', alignItems: 'center' }}>
                                                                             {(() => {
-                                                                                if (!appSettings.readReceipts) {
-                                                                                    return <CheckCheck size={14} color="rgba(255,255,255,0.6)" />; // Always show 2 grey ticks if receipts are disabled
-                                                                                }
+                                                                                const receiptsEnabled = appSettings.readReceipts !== false;
                                                                                 
                                                                                 // Exclude the sender's own ID from counts (only other users count)
                                                                                 const readCount = msg.readBy
@@ -4841,12 +4867,12 @@ export default function Dashboard() {
                                                                                     ? msg.deliveredTo.filter(id => String(id?._id || id) !== String(mongoUserId)).length
                                                                                     : 0;
                                                                                 
-                                                                                if (readCount > 0) {
-                                                                                    return <CheckCheck size={14} color="#06B6D4" />; // Blue ticks = read
-                                                                                } else if (deliveredCount > 0) {
-                                                                                    return <CheckCheck size={14} color="rgba(255,255,255,0.6)" />; // Two grey ticks = delivered
+                                                                                if (readCount > 0 && receiptsEnabled) {
+                                                                                    return <CheckCheck size={14} color="#06B6D4" title="Read" />; // Blue ticks = read
+                                                                                } else if (deliveredCount > 0 || (readCount > 0 && !receiptsEnabled)) {
+                                                                                    return <CheckCheck size={14} color="rgba(255,255,255,0.6)" title="Delivered" />; // Two grey ticks = delivered
                                                                                 } else {
-                                                                                    return <Check size={14} color="rgba(255,255,255,0.6)" />; // One grey tick = sent
+                                                                                    return <Check size={14} color="rgba(255,255,255,0.6)" title="Sent" />; // One grey tick = sent
                                                                                 }
                                                                             })()}
                                                                         </span>
@@ -5212,8 +5238,9 @@ export default function Dashboard() {
                             <label htmlFor={`group-avatar-upload-${activeConversation._id}`} style={{ cursor: activeConversation.type === 'group' ? 'pointer' : 'default', position: 'relative', display: 'inline-block' }}>
                                 <Avatar
                                     src={activeConversation.type === 'group'
-                                        ? (activeConversation.avatarUrl || `https://ui-avatars.com/api/?name=${activeConversation.name}&background=06B6D4&color=fff&size=200`)
-                                        : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.avatarUrl || `https://ui-avatars.com/api/?name=User&background=06B6D4&color=fff&size=200`)}
+                                        ? (activeConversation.avatarUrl || '/default-avatar.svg')
+                                        : (activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId))?.avatarUrl || '/default-avatar.svg')}
+                                    onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                     style={{ width: '160px', height: '160px', borderRadius: '50%', marginBottom: '16px', border: 'none', objectFit: 'cover' }}
                                 />
                                 {activeConversation.type === 'group' && (
@@ -5402,7 +5429,7 @@ export default function Dashboard() {
                                     {activeConversation?.participants?.map(participant => (
                                         <div key={participant._id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             <Avatar
-                                                src={participant._id === mongoUserId ? (currentUserData?.avatarUrl || participant.avatarUrl) : participant.avatarUrl}
+                                                src={String(participant._id || participant) === String(mongoUserId) ? (currentUserData?.avatarUrl || user?.picture || participant.avatarUrl || '/default-avatar.svg') : (participant.avatarUrl || '/default-avatar.svg')} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                                 style={{ width: '40px', height: '40px' }}
                                             />
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -5764,7 +5791,7 @@ export default function Dashboard() {
                                             onMouseLeave={(e) => { if (!selectedUsers.includes(u._id)) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
                                         >
                                             <AvatarWrapper>
-                                                <Avatar src={u.avatarUrl} style={{ width: '40px', height: '40px', border: selectedUsers.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
+                                                <Avatar src={u.avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedUsers.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
                                                 {activeUsers.includes(u._id) && <OnlineDot style={{ width: '12px', height: '12px', bottom: '-2px', right: '-2px', border: '2.5px solid var(--colors-bg)' }} />}
                                             </AvatarWrapper>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -5835,7 +5862,7 @@ export default function Dashboard() {
                                             onMouseLeave={(e) => { if (!selectedUsers.includes(u._id)) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
                                         >
                                             <AvatarWrapper>
-                                                <Avatar src={u.avatarUrl} style={{ width: '40px', height: '40px', border: selectedUsers.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
+                                                <Avatar src={u.avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedUsers.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
                                                 {activeUsers.includes(u._id) && <OnlineDot style={{ width: '12px', height: '12px', bottom: '-2px', right: '-2px', border: '2.5px solid var(--colors-bg)' }} />}
                                             </AvatarWrapper>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -6010,7 +6037,7 @@ export default function Dashboard() {
                                         onMouseLeave={(e) => { if (!selectedMembersToAdd.includes(u._id)) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
                                     >
                                         <AvatarWrapper>
-                                            <Avatar src={u.avatarUrl} style={{ width: '40px', height: '40px', border: selectedMembersToAdd.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
+                                            <Avatar src={u.avatarUrl || '/default-avatar.svg'} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedMembersToAdd.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
                                             {activeUsers.includes(u._id) && <OnlineDot style={{ width: '12px', height: '12px', bottom: '-2px', right: '-2px', border: '2.5px solid var(--colors-bg)' }} />}
                                         </AvatarWrapper>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
@@ -6111,8 +6138,9 @@ export default function Dashboard() {
                                             <AvatarWrapper style={{ flexShrink: 0 }}>
                                                 <Avatar
                                                     src={isGroup
-                                                        ? (c.avatarUrl || `https://ui-avatars.com/api/?name=${c.name}&background=06B6D4&color=fff`)
-                                                        : (otherParticipant?.avatarUrl || `https://ui-avatars.com/api/?name=${otherParticipant?.displayName || 'User'}&background=06B6D4&color=fff`)}
+                                                        ? (c.avatarUrl || '/default-avatar.svg')
+                                                        : (otherParticipant?.avatarUrl || '/default-avatar.svg')}
+                                                    onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                                     style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none' }}
                                                 />
                                             </AvatarWrapper>
@@ -6384,17 +6412,12 @@ export default function Dashboard() {
             {incomingMessageNotification && (
                 <IncomingMessageNotification aria-label="New message notification" aria-live="polite">
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                        {incomingMessageNotification.sender?.avatarUrl ? (
-                            <img 
-                                src={incomingMessageNotification.sender.avatarUrl} 
-                                alt="" 
-                                style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }} 
-                            />
-                        ) : (
-                            <div style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: '#00a884', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
-                                {(incomingMessageNotification.sender?.displayName || 'N')[0].toUpperCase()}
-                            </div>
-                        )}
+                        <img 
+                            src={incomingMessageNotification.sender?.avatarUrl || '/default-avatar.svg'} 
+                            alt="" 
+                            onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                            style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }} 
+                        />
                         <div style={{ minWidth: 0, flex: 1, marginTop: '2px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <strong style={{ fontSize: '1rem', color: '#e9edef', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

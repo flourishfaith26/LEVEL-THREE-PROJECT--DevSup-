@@ -660,17 +660,16 @@ const CallOverlay = ({
     const callerAvatar = callConfig.isReceiving
         ? (callConfig.callerData?.callerInfo?.avatarUrl
             || otherAvatarUrl
-            || `https://ui-avatars.com/api/?name=${encodeURIComponent(callerName)}&background=06B6D4&color=fff`)
+            || '/default-avatar.svg')
         : (otherAvatarUrl
-            || `https://ui-avatars.com/api/?name=${encodeURIComponent(callerName)}&background=06B6D4&color=fff`);
+            || '/default-avatar.svg');
 
     const myName = currentUserData?.displayName || 'You';
-    const myAvatar = currentUserData?.avatarUrl
-        || `https://ui-avatars.com/api/?name=${encodeURIComponent(myName)}&background=06B6D4&color=fff`;
+    const myAvatar = currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg';
 
     const isVideoCall = callConfig.callType === 'video';
 
-    const avatarFallback = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=06B6D4&color=fff`;
+    const avatarFallback = () => '/default-avatar.svg';
 
     return (
         <OverlayContainer>
@@ -799,7 +798,7 @@ const CallOverlay = ({
                             {activeConversation?.participants?.filter(p => p._id !== mongoUserId).map(p => (
                                 <div key={p._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: 'rgba(15, 23, 42, 0.6)', borderRadius: '12px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <img src={p.avatarUrl} alt={p.displayName} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} onError={e => { e.target.src = avatarFallback(p.displayName || 'U'); }} />
+                                        <img src={p.avatarUrl || '/default-avatar.svg'} alt={p.displayName} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} onError={e => { e.currentTarget.src = '/default-avatar.svg'; }} />
                                         <span style={{ fontWeight: '500', fontSize: '0.95rem' }}>{p.displayName}</span>
                                     </div>
                                     <button onClick={() => { setToastMsg(`Ringing ${p.displayName}…`); setIsAddingPerson(false); }} style={{ backgroundColor: '#06B6D4', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontWeight: '500', fontSize: '0.85rem' }}>Add</button>
