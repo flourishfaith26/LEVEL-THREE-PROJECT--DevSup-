@@ -3,7 +3,7 @@ export const svgToDataUri = (svgString) => {
 };
 
 export const techDoodlesSvg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" opacity="0.05">
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" opacity="0.30">
   <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <!-- Code Brackets -->
     <path d="M 50 50 L 30 70 L 50 90" />

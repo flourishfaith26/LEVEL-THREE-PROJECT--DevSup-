@@ -35,6 +35,7 @@ import { useNavigate } from 'react-router-dom';
 import { normalizeUsername } from '../utils/username.js';
 import DevSupLogo from '../components/DevSupLogo.jsx';
 import { getAvatarUrl } from '../utils/defaultAvatar.js';
+import { applyTheme } from '../utils/theme.js';
 
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
@@ -518,7 +519,7 @@ const MessageList = styled('div', {
     position: 'relative',
     backgroundColor: 'var(--wallpaper-bg-color, #0b141a)',
     backgroundImage: `
-        linear-gradient(rgba(11, 20, 26, calc(0.92 + var(--wallpaper-darken, 0) * 0.08)), rgba(11, 20, 26, calc(0.92 + var(--wallpaper-darken, 0) * 0.08))),
+        linear-gradient(rgba(11, 20, 26, calc(0.48 + var(--wallpaper-darken, 0) * 0.45)), rgba(11, 20, 26, calc(0.48 + var(--wallpaper-darken, 0) * 0.45))),
         var(--wallpaper-url, url("/chat-bg.jpg"))
     `,
     backgroundSize: '100% 100%, var(--wallpaper-size, 380px)',
@@ -1700,6 +1701,7 @@ export default function Dashboard() {
 
     useEffect(() => {
         localStorage.setItem('appSettings', JSON.stringify(appSettings));
+        applyTheme(appSettings.theme);
     }, [appSettings]);
 
     const activeConversationIdRef = useRef(activeConversationId);
@@ -3363,9 +3365,14 @@ export default function Dashboard() {
                         <div style={{ padding: '16px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
                                 <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    {isCallLogsSelectionMode
-                                        ? `${selectedCallLogs.length} selected`
-                                        : <><MobileOnlyText>DevSup</MobileOnlyText><DesktopOnlyText>Recent Calls</DesktopOnlyText></>}
+                                    {isCallLogsSelectionMode ? (
+                                        `${selectedCallLogs.length} selected`
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <DevSupLogo size={24} />
+                                            <span style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--colors-textMain)', letterSpacing: '-0.3px' }}>DevSup</span>
+                                        </div>
+                                    )}
                                 </h2>
                                 {isCallLogsSelectionMode ? (
                                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -3469,9 +3476,14 @@ export default function Dashboard() {
                         <div style={{ padding: '16px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
                                 <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    {isChatsSelectionMode
-                                        ? `${selectedChats.length} selected`
-                                        : <><MobileOnlyText>DevSup</MobileOnlyText><DesktopOnlyText>Chats</DesktopOnlyText></>}
+                                    {isChatsSelectionMode ? (
+                                        `${selectedChats.length} selected`
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <DevSupLogo size={24} />
+                                            <span style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--colors-textMain)', letterSpacing: '-0.3px' }}>DevSup</span>
+                                        </div>
+                                    )}
                                 </h2>
                                 {isChatsSelectionMode ? (
                                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -3613,12 +3625,12 @@ export default function Dashboard() {
                                             setContextMenu({ visible: true, x: e.pageX, y: e.pageY, message: null, callLog: null, conversation: conv });
                                         }}
                                         style={{
-                                            padding: '8px 16px',
+                                            padding: '6px 14px',
                                             borderRadius: 0,
                                             gap: '12px',
                                             alignItems: 'center',
                                             margin: 0,
-                                            minHeight: '68px',
+                                            minHeight: '62px',
                                             boxSizing: 'border-box',
                                             borderBottom: 'none',
                                             backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : (activeConversationId === conv._id ? 'rgba(255, 255, 255, 0.08)' : undefined)
@@ -3670,19 +3682,19 @@ export default function Dashboard() {
                                             {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
                                         </AvatarWrapper>
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                                                <span style={{ fontSize: '0.96rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', padding: '2px 0', borderBottom: 'none' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px' }}>
+                                                <span style={{ fontSize: '0.96rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.25' }}>
                                                     {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
                                                 </span>
                                                 {conv.lastMessage && (
-                                                    <span style={{ fontSize: '0.74rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal' }}>
+                                                    <span style={{ fontSize: '0.74rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: '1.25' }}>
                                                         {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                     </span>
                                                 )}
                                             </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.84rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1px' }}>
+                                                <span style={{ fontSize: '0.84rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.25' }}>
                                                     {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                                 </span>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3717,9 +3729,14 @@ export default function Dashboard() {
                         <div style={{ padding: '16px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
                                 <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    {isChatsSelectionMode
-                                        ? `${selectedChats.length} selected`
-                                        : <><MobileOnlyText>DevSup</MobileOnlyText><DesktopOnlyText>Communities</DesktopOnlyText></>}
+                                    {isChatsSelectionMode ? (
+                                        `${selectedChats.length} selected`
+                                    ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <DevSupLogo size={24} />
+                                            <span style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--colors-textMain)', letterSpacing: '-0.3px' }}>DevSup</span>
+                                        </div>
+                                    )}
                                 </h2>
                                 {isChatsSelectionMode ? (
                                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -3842,12 +3859,12 @@ export default function Dashboard() {
                                         setContextMenu({ visible: true, x: e.pageX, y: e.pageY, message: null, callLog: null, conversation: conv });
                                     }}
                                     style={{
-                                        padding: '8px 16px',
+                                        padding: '6px 14px',
                                         borderRadius: 0,
                                         gap: '12px',
                                         alignItems: 'center',
                                         margin: 0,
-                                        minHeight: '68px',
+                                        minHeight: '62px',
                                         boxSizing: 'border-box',
                                         borderBottom: 'none',
                                         backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : (activeConversationId === conv._id ? 'rgba(255, 255, 255, 0.08)' : undefined)
@@ -3883,19 +3900,19 @@ export default function Dashboard() {
                                         />
                                     </AvatarWrapper>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                                            <span style={{ fontSize: '0.96rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', padding: '2px 0', borderBottom: 'none' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px' }}>
+                                            <span style={{ fontSize: '0.96rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.25' }}>
                                                 {conv.name}
                                             </span>
                                             {conv.lastMessage && (
-                                                <span style={{ fontSize: '0.74rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal' }}>
+                                                <span style={{ fontSize: '0.74rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: '1.25' }}>
                                                     {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                 </span>
                                             )}
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '0.84rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1px' }}>
+                                            <span style={{ fontSize: '0.84rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.25' }}>
                                                 {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                             </span>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4007,8 +4024,10 @@ export default function Dashboard() {
                         <div style={{ padding: '16px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                                 <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    <MobileOnlyText>DevSup</MobileOnlyText>
-                                    <DesktopOnlyText>Status</DesktopOnlyText>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <DevSupLogo size={24} />
+                                        <span style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--colors-textMain)', letterSpacing: '-0.3px' }}>DevSup</span>
+                                    </div>
                                 </h2>
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                     <IconButton title="New Status" onClick={() => setIsStatusModalOpen(true)} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
@@ -4471,7 +4490,7 @@ export default function Dashboard() {
                                         ref={messageListRef}
                                         onScroll={handleMessageListScroll}
                                         style={{
-                                        '--wallpaper-url': appSettings.wallpaperUrl ? `url("${appSettings.wallpaperUrl}")` : 'url("/chat-bg.jpg")',
+                                        '--wallpaper-url': appSettings.wallpaperUrl === '' ? 'none' : (appSettings.wallpaperUrl ? `url("${appSettings.wallpaperUrl}")` : 'url("/chat-bg.jpg")'),
                                         '--wallpaper-darken': 1 - (appSettings.wallpaperBrightness !== undefined ? appSettings.wallpaperBrightness : 100) / 100,
                                         '--wallpaper-size': appSettings.wallpaperType === 'custom' ? 'cover' : '380px',
                                         '--wallpaper-bg-color': appSettings.wallpaperBgColor || '#0b141a',
@@ -5205,7 +5224,7 @@ export default function Dashboard() {
                                 }}>
                                     {activeTab === 'communities' ? 
                                         <Users size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} /> : 
-                                        <MessageSquare size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} />
+                                        <DevSupLogo size={70} />
                                     }
                                 </div>
                                 <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.5rem', marginBottom: '16px', fontWeight: '500', letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>

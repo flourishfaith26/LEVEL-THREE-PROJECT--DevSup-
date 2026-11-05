@@ -3,6 +3,7 @@ import { styled, keyframes } from '../stitches.config.js';
 import { MessageSquare, Bell, Monitor, HelpCircle, ChevronLeft, Trash2, Camera, Edit2, Check, Image as ImageIcon, Volume2, EyeOff, Shield, Smartphone, Globe, Moon, Type, DownloadCloud, AlertCircle } from 'lucide-react';
 import { techDoodlesSvg, svgToDataUri, wallpaperColors } from '../utils/wallpapers.js';
 import { normalizeUsername, validateUsernameFormat } from '../utils/username.js';
+import { applyTheme } from '../utils/theme.js';
 
 const slideIn = keyframes({
     '0%': { transform: 'translateX(10px)', opacity: 0 },
@@ -383,7 +384,7 @@ export const ChatsPane = ({ onBack, settings, updateSetting, getAccessTokenSilen
     const [isUploading, setIsUploading] = React.useState(false);
     const fileInputRef = React.useRef(null);
     const techDoodlesUri = svgToDataUri(techDoodlesSvg);
-    const hasDoodles = settings.wallpaperUrl === techDoodlesUri;
+    const hasDoodles = settings.wallpaperUrl !== '';
 
     const handleWallpaperUpload = async (e) => {
         const file = e.target.files[0];
@@ -416,7 +417,7 @@ export const ChatsPane = ({ onBack, settings, updateSetting, getAccessTokenSilen
         updateSetting('wallpaperBgColor', color);
         updateSetting('wallpaperType', 'solid');
         if (hasDoodles) {
-            updateSetting('wallpaperUrl', techDoodlesUri);
+            updateSetting('wallpaperUrl', '/chat-bg.jpg');
         } else {
             updateSetting('wallpaperUrl', '');
         }
@@ -424,13 +425,18 @@ export const ChatsPane = ({ onBack, settings, updateSetting, getAccessTokenSilen
 
     const toggleDoodles = (checked) => {
         if (checked) {
-            updateSetting('wallpaperUrl', techDoodlesUri);
+            updateSetting('wallpaperUrl', '/chat-bg.jpg');
             if (!settings.wallpaperBgColor || settings.wallpaperBgColor === 'transparent') {
                 updateSetting('wallpaperBgColor', wallpaperColors[0]);
             }
         } else {
             updateSetting('wallpaperUrl', '');
         }
+    };
+
+    const handleThemeChange = (newTheme) => {
+        updateSetting('theme', newTheme);
+        applyTheme(newTheme);
     };
 
     return (
@@ -448,12 +454,14 @@ export const ChatsPane = ({ onBack, settings, updateSetting, getAccessTokenSilen
                             <SettingLabel>Theme</SettingLabel>
                         </SettingText>
                         <StyledSelect 
-                            value={settings.theme} 
-                            onChange={(e) => updateSetting('theme', e.target.value)}
+                            value={settings.theme || 'dark'} 
+                            onChange={(e) => handleThemeChange(e.target.value)}
                         >
-                            <option value="system">System Default</option>
+                            <option value="dark">Dark (DevSup Default)</option>
+                            <option value="emerald">WhatsApp Emerald</option>
+                            <option value="midnight">Midnight OLED</option>
                             <option value="light">Light</option>
-                            <option value="dark">Dark</option>
+                            <option value="system">System Default</option>
                         </StyledSelect>
                     </SettingRow>
                 </SectionCard>
