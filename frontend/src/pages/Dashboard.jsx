@@ -3581,11 +3581,11 @@ export default function Dashboard() {
                                                 onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                             />
                                         </AvatarWrapper>
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                                            <span style={{ fontSize: '1rem', color: log.status === 'missed' ? '#EF4444' : 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '36px', justifyContent: 'space-between', boxSizing: 'border-box' }}>
+                                            <span style={{ fontSize: '0.94rem', color: log.status === 'missed' ? '#EF4444' : 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                 {log.contactName}
                                             </span>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--colors-textMuted)', lineHeight: 1.15 }}>
                                                 {log.direction === 'incoming' ? (
                                                     <svg viewBox="0 0 24 24" width="14" height="14" fill={log.status === 'missed' ? '#EF4444' : '#10B981'}><path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41L20 5.41z"></path></svg>
                                                 ) : (
@@ -3815,24 +3815,24 @@ export default function Dashboard() {
                                             {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
                                         </AvatarWrapper>
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', padding: '2px 0', borderBottom: 'none' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px' }}>
-                                                <span style={{ fontSize: '0.96rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.25' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '42px', justifyContent: 'space-between', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15, marginBottom: '0px' }}>
+                                                <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                     {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
                                                 </span>
                                                 {conv.lastMessage && (
-                                                    <span style={{ fontSize: '0.74rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: '1.25' }}>
+                                                    <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.15 }}>
                                                         {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                     </span>
                                                 )}
                                             </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1px' }}>
-                                                <span style={{ fontSize: '0.84rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.25' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15 }}>
+                                                <span style={{ fontSize: '0.82rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                     {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                                 </span>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     {conv.unreadCount > 0 && (
-                                                        <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center' }}>
+                                                        <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center', lineHeight: 1.2 }}>
                                                             {conv.unreadCount}
                                                         </div>
                                                     )}
@@ -4026,24 +4026,24 @@ export default function Dashboard() {
                                         />
                                     </AvatarWrapper>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', padding: '2px 0', borderBottom: 'none' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0px' }}>
-                                            <span style={{ fontSize: '0.96rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.25' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '42px', justifyContent: 'space-between', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15, marginBottom: '0px' }}>
+                                            <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                 {conv.name}
                                             </span>
                                             {conv.lastMessage && (
-                                                <span style={{ fontSize: '0.74rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: '1.25' }}>
+                                                <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.15 }}>
                                                     {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                 </span>
                                             )}
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1px' }}>
-                                            <span style={{ fontSize: '0.84rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.25' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15 }}>
+                                            <span style={{ fontSize: '0.82rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                 {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                             </span>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {conv.unreadCount > 0 && (
-                                                    <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center' }}>
+                                                    <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center', lineHeight: 1.2 }}>
                                                         {conv.unreadCount}
                                                     </div>
                                                 )}
