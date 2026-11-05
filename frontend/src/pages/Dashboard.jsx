@@ -4651,11 +4651,13 @@ export default function Dashboard() {
                                                         (typeof msg.attachmentName === 'string' && msg.attachmentName.toLowerCase().includes('whiteboard')) ||
                                                         (typeof msg.caption === 'string' && msg.caption.toLowerCase().includes('mock-up'))
                                                     );
+                                                    const isImageMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && isImageUrl(msg.content, msg.attachmentType);
+                                                    const isVideoMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && isVideoUrl(msg.content, msg.attachmentType);
+                                                    const hasVisualMedia = isImageMsg || isVideoMsg;
                                                     const isMediaMessage = !msg.isDeletedForEveryone && !isWhiteboardMessage && (
-                                                        msg.isCodeSnippet ||
-                                                        (isOnlyUrl && (isImageUrl(msg.content, msg.attachmentType) || isVideoUrl(msg.content, msg.attachmentType)))
+                                                        msg.isCodeSnippet || hasVisualMedia
                                                     );
-                                                    const isImageWithCaption = isMediaMessage && !msg.isCodeSnippet && !!msg.caption;
+                                                    const isImageWithCaption = hasVisualMedia && !!msg.caption;
 
                                                     const renderStatusTicks = () => {
                                                         if (!isOwnMessage) return null;
@@ -4807,13 +4809,13 @@ export default function Dashboard() {
                                                                 )}
                                                                 <ChatBubble
                                                                 isOwn={isOwnMessage}
-                                                                mediaOnly={isMediaMessage && !msg.caption}
+                                                                mediaOnly={hasVisualMedia && !msg.caption}
                                                                 embedOnly={isEmbedOnly}
-                                                                style={isWhiteboardMessage ? {
-                                                                    width: 'fit-content',
-                                                                    maxWidth: '360px',
-                                                                    padding: '10px 10px 10px 10px',
-                                                                } : {}}
+                                                                style={
+                                                                    hasVisualMedia
+                                                                        ? { padding: msg.caption ? '3px 3px 6px 3px' : '3px' }
+                                                                        : (isWhiteboardMessage ? { width: 'fit-content', maxWidth: '360px', padding: '10px 10px 10px 10px' } : {})
+                                                                }
                                                                 onContextMenu={(e) => {
                                                                     if (!msg.isDeletedForEveryone) handleContextMenu(e, 'message', msg);
                                                                 }}
@@ -4827,7 +4829,7 @@ export default function Dashboard() {
                                                                 {showSenderName && (
                                                                     <SenderName style={{
                                                                         color: activeConversation?.type === 'group' ? getDailyUserColor(msg.sender?._id) : undefined,
-                                                                        ...(isMediaMessage ? { padding: '6px 8px 0 8px' } : {})
+                                                                        ...(hasVisualMedia ? { padding: '4px 6px 2px 6px' } : {})
                                                                     }}>
                                                                         {msg.sender?.displayName || 'Unknown User'}
                                                                         {msg.sender?.username && (
@@ -4838,7 +4840,7 @@ export default function Dashboard() {
                                                                     </SenderName>
                                                                 )}
 
-                                                                <div style={{ wordBreak: 'break-word', marginTop: showSenderName && !isMediaMessage ? '2px' : '0', maxWidth: isImageWithCaption ? '300px' : isWhiteboardMessage ? '340px' : 'none' }}>
+                                                                <div style={{ wordBreak: 'break-word', marginTop: showSenderName && !hasVisualMedia ? '2px' : '0', maxWidth: hasVisualMedia ? '320px' : isWhiteboardMessage ? '340px' : 'none' }}>
                                                                     {msg.isDeletedForEveryone ? (
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--colors-textMuted)', fontStyle: 'italic' }}>
                                                                             <Trash2 size={14} />
@@ -5123,7 +5125,7 @@ export default function Dashboard() {
                                                                                 )}
 
                                                                                 {isVideoUrl(msg.content, msg.attachmentType) && (
-                                                                                    <div style={{ position: 'relative', width: 'fit-content', maxWidth: '100%', marginTop: shouldShowText ? '8px' : '0' }}>
+                                                                                    <div style={{ position: 'relative', width: 'fit-content', maxWidth: '100%', margin: 0, lineHeight: 0 }}>
                                                                                         <video
                                                                                             src={msg.content}
                                                                                             controls
@@ -5135,7 +5137,7 @@ export default function Dashboard() {
                                                                                             onClick={() => openMediaViewer(msg.content, 'video', msg.attachmentName || 'Video')}
                                                                                             aria-label="View video fullscreen"
                                                                                             title="View fullscreen"
-                                                                                            style={{ position: 'absolute', top: '8px', right: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', border: 'none', borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.65)', color: '#fff', cursor: 'pointer' }}
+                                                                                            style={{ position: 'absolute', top: '8px', right: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', border: 'none', borderRadius: '50%', backgroundColor: 'rgba(0,0,0,0.65)', color: '#fff', cursor: 'pointer', zIndex: 3 }}
                                                                                         >
                                                                                             <Maximize2 size={18} />
                                                                                         </button>
@@ -5144,15 +5146,19 @@ export default function Dashboard() {
                                                                                 )}
 
                                                                                 {isImageUrl(msg.content, msg.attachmentType) && !isWhiteboardMessage && (
-                                                                                    <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+                                                                                    <div style={{ position: 'relative', display: 'block', width: '100%', lineHeight: 0 }}>
                                                                                         <button
                                                                                             type="button"
                                                                                             onClick={() => openMediaViewer(msg.content, 'image', msg.attachmentName || 'Photo')}
                                                                                             aria-label="View photo fullscreen"
                                                                                             title="View fullscreen"
-                                                                                            style={{ display: 'block', marginTop: isMediaMessage ? '0' : '8px', padding: 0, border: 0, background: 'transparent', cursor: 'zoom-in' }}
+                                                                                            style={{ display: 'block', width: '100%', margin: 0, padding: 0, border: 0, background: 'transparent', cursor: 'zoom-in', lineHeight: 0 }}
                                                                                         >
-                                                                                            <AttachmentImage src={msg.content} alt="User attachment" style={isMediaMessage ? { width: '100%', height: 'auto', objectFit: 'cover', borderRadius: '8px' } : {}} />
+                                                                                            <AttachmentImage
+                                                                                                src={msg.content}
+                                                                                                alt="User attachment"
+                                                                                                style={{ width: '100%', height: 'auto', objectFit: 'cover', borderRadius: '8px', display: 'block' }}
+                                                                                            />
                                                                                         </button>
                                                                                         {!msg.caption && renderOverlayTimestamp()}
                                                                                     </div>
@@ -5228,7 +5234,7 @@ export default function Dashboard() {
                                                                                 )}
 
                                                                                 {msg.caption && !isWhiteboardMessage && (
-                                                                                    <div style={{ whiteSpace: 'pre-wrap', marginTop: '6px', padding: isMediaMessage ? '4px 6px 2px 6px' : '4px 0', borderTop: isMediaMessage ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>
+                                                                                    <div style={{ whiteSpace: 'pre-wrap', marginTop: hasVisualMedia ? '4px' : '6px', padding: hasVisualMedia ? '2px 6px 0px 6px' : '4px 0', fontSize: '0.93rem', lineHeight: '1.35', color: 'inherit' }}>
                                                                                         <span>{msg.caption}</span>
                                                                                         {renderInlineTimestamp('12px')}
                                                                                     </div>
