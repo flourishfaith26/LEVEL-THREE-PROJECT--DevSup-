@@ -33,6 +33,7 @@ const StatusUploadModal = lazy(() => import('../components/StatusUploadModal'));
 const EventsView = lazy(() => import('../components/EventsView'));
 import { useNavigate } from 'react-router-dom';
 import { normalizeUsername } from '../utils/username.js';
+import DevSupLogo from '../components/DevSupLogo.jsx';
 
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
@@ -99,6 +100,23 @@ const NavRail = styled('nav', {
         padding: '0 $2 env(safe-area-inset-bottom, 0px) $2',
         borderRight: 'none',
         borderTop: '1px solid $border',
+    }
+});
+
+const NavRailLogo = styled('div', {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '40px',
+    height: '40px',
+    marginBottom: '8px',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease',
+    '&:hover': {
+        transform: 'scale(1.08)',
+    },
+    '@media (max-width: 768px)': {
+        display: 'none',
     }
 });
 
@@ -3180,6 +3198,9 @@ export default function Dashboard() {
         <AppContainer>
             <NavRail className={showChatArea ? 'mobile-hidden' : ''}>
                 <NavRailTop>
+                    <NavRailLogo title="DevSup">
+                        <DevSupLogo size={28} />
+                    </NavRailLogo>
                     <NavRailItem active={activeTab === 'chats'} onClick={() => handleTabChange('chats')} title="Chats">
                         <MessageSquare size={22} />
                     </NavRailItem>
@@ -6280,7 +6301,7 @@ export default function Dashboard() {
                             boxShadow: '0 0 30px rgba(6, 182, 212, 0.2), inset 0 0 15px rgba(6, 182, 212, 0.1)',
                             position: 'relative', zIndex: 1
                         }}>
-                            {premiumModal.type === 'hackathon' ? <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> : <img src="/favicon.svg" alt="DevSup Logo" style={{ width: '40px', height: '40px', filter: 'drop-shadow(0 0 8px rgba(6, 182, 212, 0.5))' }} />}
+                            {premiumModal.type === 'hackathon' ? <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> : <DevSupLogo size={42} />}
                         </div>
                         <h2 style={{ fontSize: '1.8rem', fontWeight: '500', color: 'var(--colors-textMain)', margin: 0, letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textAlign: 'center' }}>{premiumModal.title}</h2>
                         <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.05rem', textAlign: 'center', margin: '0 0 24px 0', lineHeight: 1.6, position: 'relative', zIndex: 1 }}>
@@ -6484,7 +6505,7 @@ export default function Dashboard() {
                             boxShadow: '0 0 30px rgba(6, 182, 212, 0.2), inset 0 0 15px rgba(6, 182, 212, 0.1)',
                             position: 'relative', zIndex: 1
                         }}>
-                            <img src="/favicon.svg" alt="DevSup Logo" style={{ width: '40px', height: '40px', filter: 'drop-shadow(0 0 8px rgba(6, 182, 212, 0.5))' }} />
+                            <DevSupLogo size={42} />
                         </div>
                         <h2 style={{ fontSize: '1.8rem', fontWeight: '500', color: 'var(--colors-textMain)', margin: 0, letterSpacing: '-0.5px', position: 'relative', zIndex: 1 }}>Log out of DevSup?</h2>
                         <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.05rem', textAlign: 'center', margin: '0 0 24px 0', lineHeight: 1.6, position: 'relative', zIndex: 1 }}>

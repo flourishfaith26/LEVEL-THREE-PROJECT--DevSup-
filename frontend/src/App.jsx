@@ -2,18 +2,14 @@ import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
-import { styled, keyframes } from './stitches.config.js';
+import { styled } from './stitches.config.js';
+import DevSupPumpLoader from './components/DevSupPumpLoader.jsx';
 const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProfileSetup = lazy(() => import('./pages/ProfileSetup'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 
-const spin = keyframes({
-  '0%': { transform: 'rotate(0deg)' },
-  '100%': { transform: 'rotate(360deg)' },
-});
-
-// Custom Stitches loading container
+// Custom Stitches error container
 const LoadingContainer = styled('div', {
   height: '100vh',
   minHeight: '100dvh',
@@ -25,38 +21,6 @@ const LoadingContainer = styled('div', {
   color: '$textMain',
   fontFamily: 'system-ui, sans-serif'
 });
-
-const AppSpinner = styled('div', {
-  width: '56px',
-  height: '56px',
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginBottom: '16px',
-});
-
-const AppSpinnerRing = styled('div', {
-  position: 'absolute',
-  inset: 0,
-  borderRadius: '50%',
-  border: '3px solid rgba(6, 182, 212, 0.18)',
-  borderTopColor: '$accent',
-  borderRightColor: '$accent',
-  animation: `${spin} 0.8s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite`,
-});
-
-function FullPageLoader({ message = 'Loading DevSup...' }) {
-  return (
-    <LoadingContainer>
-      <AppSpinner>
-        <AppSpinnerRing />
-        <img src="/favicon.svg" alt="DevSup" style={{ width: '26px', height: '26px', filter: 'drop-shadow(0 0 8px rgba(6, 182, 212, 0.5))' }} />
-      </AppSpinner>
-      <span style={{ fontSize: '1rem', fontWeight: '500', color: 'var(--colors-textMuted)' }}>{message}</span>
-    </LoadingContainer>
-  );
-}
 
 const SESSION_TIMEOUT_MS = 48 * 60 * 60 * 1000;
 const SESSION_ACTIVITY_KEY_PREFIX = 'devsup:last-active:';
@@ -165,11 +129,11 @@ function AppRoutes() {
   }
 
   if (isLoading) {
-    return <FullPageLoader message="Loading DevSup..." />;
+    return <DevSupPumpLoader />;
   }
 
   return (
-    <Suspense fallback={<FullPageLoader message="Loading DevSup..." />}>
+    <Suspense fallback={<DevSupPumpLoader />}>
       <Routes>
         <Route 
           path="/" 

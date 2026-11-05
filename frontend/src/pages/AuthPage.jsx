@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { styled, keyframes } from '../stitches.config.js';
 import { Terminal, Code, Mail, Lock, User, AlertCircle, Eye, EyeOff, Check } from 'lucide-react';
+import DevSupLogo from '../components/DevSupLogo.jsx';
+import DevSupPumpLoader from '../components/DevSupPumpLoader.jsx';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
@@ -10,83 +12,6 @@ const float = keyframes({
     '0%': { transform: 'translateY(0px)' },
     '50%': { transform: 'translateY(-10px)' },
     '100%': { transform: 'translateY(0px)' },
-});
-
-const spin = keyframes({
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' },
-});
-
-const fadeIn = keyframes({
-    '0%': { opacity: 0 },
-    '100%': { opacity: 1 },
-});
-
-const TransitOverlay = styled('div', {
-    position: 'fixed',
-    inset: 0,
-    zIndex: 9999,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    backdropFilter: 'blur(8px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '24px',
-    animation: `${fadeIn} 0.2s ease-out`,
-});
-
-const TransitCard = styled('div', {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    padding: '32px 36px',
-    borderRadius: '16px',
-    backgroundColor: '$surface',
-    border: '1px solid $border',
-    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(6, 182, 212, 0.15)',
-    textAlign: 'center',
-    minWidth: '280px',
-});
-
-const TransitLogo = styled('div', {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '64px',
-    height: '64px',
-    marginBottom: '8px',
-});
-
-const SpinnerRing = styled('div', {
-    position: 'absolute',
-    inset: 0,
-    borderRadius: '50%',
-    border: '3px solid rgba(6, 182, 212, 0.18)',
-    borderTopColor: '$accent',
-    borderRightColor: '$accent',
-    animation: `${spin} 0.8s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite`,
-});
-
-const TransitLogoImg = styled('img', {
-    width: '28px',
-    height: '28px',
-    filter: 'drop-shadow(0 0 10px rgba(6, 182, 212, 0.5))',
-});
-
-const TransitText = styled('p', {
-    color: '$textMain',
-    fontSize: '1.1rem',
-    fontWeight: '600',
-    letterSpacing: '-0.2px',
-    margin: 0,
-});
-
-const TransitSubtext = styled('span', {
-    color: '$textMuted',
-    fontSize: '0.88rem',
 });
 
 const PageContainer = styled('div', {
@@ -420,7 +345,7 @@ export default function AuthPage() {
         <PageContainer>
             <LeftPanel>
                 <LogoContainer>
-                    <img src="/favicon.svg" alt="DevSup Logo" style={{ width: '48px', height: '48px' }} />
+                    <DevSupLogo size={48} />
                     <span style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>DevSup</span>
                 </LogoContainer>
                 <h2 style={{ fontSize: '3rem', fontWeight: '900', marginBottom: '1rem', background: 'linear-gradient(to right, #fff, #94A3B8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
@@ -586,22 +511,7 @@ export default function AuthPage() {
                 </AuthBox>
             </RightPanel>
 
-            {isResolving && (
-                <TransitOverlay role="status" aria-live="polite">
-                    <TransitCard>
-                        <TransitLogo>
-                            <SpinnerRing />
-                            <TransitLogoImg src="/favicon.svg" alt="DevSup" />
-                        </TransitLogo>
-                        <TransitText>
-                            {isSignup ? 'Creating your account...' : 'Signing you in...'}
-                        </TransitText>
-                        <TransitSubtext>
-                            Taking you to your workspace
-                        </TransitSubtext>
-                    </TransitCard>
-                </TransitOverlay>
-            )}
+            {isResolving && <DevSupPumpLoader overlay size={72} />}
         </PageContainer>
     );
 }

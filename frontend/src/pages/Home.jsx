@@ -2,6 +2,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import { styled, keyframes } from '../stitches.config.js';
 import { Terminal, Code, Layers, Zap, MessageSquare, LayoutTemplate, PenTool } from 'lucide-react';
+import DevSupLogo from '../components/DevSupLogo.jsx';
 
 const scroll = keyframes({
     '0%': { transform: 'translateX(0)' },
@@ -258,7 +259,7 @@ export default function Home() {
         <HomeContainer>
             <HeroSection>
                 <GlowBackground />
-                <img src="/logo.png" alt="DevSup Logo" style={{ width: '120px', height: '120px', marginBottom: '16px', zIndex: 1 }} />
+                <DevSupLogo size={110} style={{ marginBottom: '16px', zIndex: 1 }} />
                 <Title>Code Meets Conversation</Title>
                 <Subtitle>
                     DevSup is a developer-centric chat application engineered to bridge the gap between casual communication and heavy-duty technical collaboration. No more context switching.
