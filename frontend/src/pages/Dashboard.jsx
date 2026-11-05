@@ -509,12 +509,6 @@ const IncomingMessageNotification = styled('section', {
     }
 });
 
-const floatDoodle = keyframes({
-    '0%': { backgroundPosition: 'center, 0px 0px, 0% 50%' },
-    '50%': { backgroundPosition: 'center, 200px 200px, 100% 50%' },
-    '100%': { backgroundPosition: 'center, 400px 400px, 0% 50%' },
-});
-
 const MessageList = styled('div', {
     flex: 1,
     minHeight: 0,
@@ -524,22 +518,22 @@ const MessageList = styled('div', {
     position: 'relative',
     backgroundColor: 'var(--wallpaper-bg-color, #0b141a)',
     backgroundImage: `
-        linear-gradient(rgba(0, 0, 0, var(--wallpaper-darken, 0)), rgba(0, 0, 0, var(--wallpaper-darken, 0))),
-        var(--wallpaper-url, url("/chat-bg.jpg")),
-        radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.05), transparent 50%),
-        radial-gradient(circle at 80% 70%, rgba(0, 0, 0, 0.15), transparent 50%)
+        linear-gradient(rgba(11, 20, 26, calc(0.92 + var(--wallpaper-darken, 0) * 0.08)), rgba(11, 20, 26, calc(0.92 + var(--wallpaper-darken, 0) * 0.08))),
+        var(--wallpaper-url, url("/chat-bg.jpg"))
     `,
-    backgroundSize: '100% 100%, var(--wallpaper-size, 400px), 100% 100%, 100% 100%',
-    backgroundRepeat: 'no-repeat, repeat, no-repeat, no-repeat',
-    backgroundBlendMode: 'normal, color-dodge, normal, normal',
-    backgroundAttachment: 'fixed, scroll, fixed, fixed',
-    animation: `${floatDoodle} 60s linear infinite`,
+    backgroundSize: '100% 100%, var(--wallpaper-size, 380px)',
+    backgroundRepeat: 'no-repeat, repeat',
+    backgroundBlendMode: 'normal, luminosity',
+    backgroundAttachment: 'fixed, scroll',
+    '@media (max-width: 576px)': {
+        padding: '6px 4px',
+    },
 });
 
 const ChatBubbleWrapper = styled('div', {
     display: 'flex',
     width: '100%',
-    marginBottom: '8px',
+    marginBottom: '4px',
     variants: {
         isOwn: {
             true: { justifyContent: 'flex-end' },
@@ -550,17 +544,23 @@ const ChatBubbleWrapper = styled('div', {
 
 const ChatBubble = styled('div', {
     maxWidth: '65%',
-    minWidth: '90px',
+    minWidth: '70px',
     padding: '8px 12px 10px 12px',
     borderRadius: '12px',
     position: 'relative',
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
+    fontSize: '0.93rem',
+    lineHeight: '1.4',
+    wordBreak: 'break-word',
     '@media (max-width: 992px)': {
         maxWidth: '75%',
     },
     '@media (max-width: 576px)': {
-        maxWidth: '85%',
+        maxWidth: '82%',
+        padding: '6px 8px 16px 8px',
+        fontSize: '0.86rem',
+        borderRadius: '8px',
     },
     variants: {
         isOwn: {
@@ -4471,9 +4471,9 @@ export default function Dashboard() {
                                         ref={messageListRef}
                                         onScroll={handleMessageListScroll}
                                         style={{
-                                        '--wallpaper-url': appSettings.wallpaperUrl ? `url("${appSettings.wallpaperUrl}")` : 'none',
+                                        '--wallpaper-url': appSettings.wallpaperUrl ? `url("${appSettings.wallpaperUrl}")` : 'url("/chat-bg.jpg")',
                                         '--wallpaper-darken': 1 - (appSettings.wallpaperBrightness !== undefined ? appSettings.wallpaperBrightness : 100) / 100,
-                                        '--wallpaper-size': appSettings.wallpaperType === 'custom' ? 'cover' : '400px',
+                                        '--wallpaper-size': appSettings.wallpaperType === 'custom' ? 'cover' : '380px',
                                         '--wallpaper-bg-color': appSettings.wallpaperBgColor || '#0b141a',
                                         flex: 1
                                     }}>
@@ -4544,9 +4544,9 @@ export default function Dashboard() {
                                                             display: 'flex', 
                                                             flexDirection: isOwnMessage ? 'row-reverse' : 'row', 
                                                             alignItems: 'center', 
-                                                            gap: '12px', 
+                                                            gap: isMobileViewport ? '6px' : '12px', 
                                                             width: '100%',
-                                                            padding: '4px 8px',
+                                                            padding: isMobileViewport ? '1px 2px' : '4px 8px',
                                                             borderRadius: '8px',
                                                             backgroundColor: selectedMessages.includes(msg._id || msg.createdAt)
                                                                 ? 'rgba(0, 168, 132, 0.16)'

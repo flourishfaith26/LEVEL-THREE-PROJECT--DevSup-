@@ -31,6 +31,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     select: false
   },
+  passwordResetToken: {
+    type: String,
+    select: false
+  },
+  passwordResetExpiry: {
+    type: Date,
+    select: false
+  },
   avatarUrl: { 
     type: String,
     default: '/default-avatar.svg'

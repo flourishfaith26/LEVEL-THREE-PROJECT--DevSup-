@@ -1,6 +1,8 @@
+import crypto from 'crypto';
 import User from '../models/User.js';
 import { hashPassword, verifyPassword, generateToken } from '../utils/nativeAuth.js';
 import { normalizeUsername } from '../utils/username.js';
+import { sendPasswordResetEmail } from '../utils/mailer.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -168,6 +170,106 @@ export const getMe = async (req, res) => {
     } catch (error) {
         console.error('Error fetching current user:', error);
         return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email || typeof email !== 'string') {
+            return res.status(400).json({ message: 'Email address is required.' });
+        }
+
+        const cleanEmail = email.trim().toLowerCase();
+        if (!EMAIL_REGEX.test(cleanEmail)) {
+            return res.status(400).json({ message: 'Please enter a valid email address.' });
+        }
+
+        const user = await User.findOne({ email: cleanEmail }).select('+passwordResetToken +passwordResetExpiry');
+        if (!user) {
+            // Return success anyway to avoid account enumeration
+            return res.status(200).json({
+                success: true,
+                message: 'If an account exists with this email, a password reset link has been sent.'
+            });
+        }
+
+        // Generate unhashed reset token to email to the user
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        // Store hashed token in DB
+        const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+        user.passwordResetToken = hashedToken;
+        user.passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        await user.save();
+
+        const frontendUrl = process.env.FRONTEND_URL || 'https://frontend-tjte.vercel.app';
+        const cleanFrontendUrl = frontendUrl.replace(/\/+$/, '');
+        const resetUrl = `${cleanFrontendUrl}/reset-password?token=${resetToken}`;
+
+        const emailResult = await sendPasswordResetEmail({
+            toEmail: user.email,
+            displayName: user.displayName,
+            resetUrl
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'A password reset link has been sent to your email address.',
+            // Return resetUrl only if email couldn't be sent via SMTP so users aren't locked out during dev/testing
+            ...(emailResult.sent ? {} : { resetUrl, note: 'Email SMTP not configured on server; reset link provided directly.' })
+        });
+    } catch (error) {
+        console.error('Error in forgotPassword:', error);
+        return res.status(500).json({ message: 'Internal server error processing password reset.' });
+    }
+};
+
+export const resetPassword = async (req, res) => {
+    try {
+        const { token, password } = req.body;
+
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ message: 'Reset token is required.' });
+        }
+        if (!password || typeof password !== 'string') {
+            return res.status(400).json({ message: 'New password is required.' });
+        }
+        if (password.length < 7) {
+            return res.status(400).json({ message: 'Password must be at least 7 characters long.' });
+        }
+        if (!/[a-z]/.test(password)) {
+            return res.status(400).json({ message: 'Password must contain at least one lowercase letter.' });
+        }
+        if (!/[0-9]/.test(password)) {
+            return res.status(400).json({ message: 'Password must contain at least one number.' });
+        }
+
+        const hashedToken = crypto.createHash('sha256').update(token.trim()).digest('hex');
+
+        const user = await User.findOne({
+            passwordResetToken: hashedToken,
+            passwordResetExpiry: { $gt: new Date() }
+        }).select('+passwordHash +passwordSalt +passwordResetToken +passwordResetExpiry');
+
+        if (!user) {
+            return res.status(400).json({ message: 'Password reset link is invalid or has expired.' });
+        }
+
+        const { hash, salt } = hashPassword(password);
+        user.passwordHash = hash;
+        user.passwordSalt = salt;
+        user.passwordResetToken = undefined;
+        user.passwordResetExpiry = undefined;
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Your password has been successfully reset. You can now log in.'
+        });
+    } catch (error) {
+        console.error('Error in resetPassword:', error);
+        return res.status(500).json({ message: 'Internal server error while resetting password.' });
     }
 };
 

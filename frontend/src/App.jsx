@@ -9,6 +9,7 @@ const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProfileSetup = lazy(() => import('./pages/ProfileSetup'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
 const slideDown = keyframes({
   '0%': { transform: 'translateY(-100%)', opacity: 0 },
@@ -207,6 +208,10 @@ function AppRoutes() {
         <Route 
           path="/login" 
           element={!isAuthenticated ? <AuthPage /> : <Navigate to="/dashboard" replace />} 
+        />
+        <Route 
+          path="/reset-password" 
+          element={<ResetPasswordPage />} 
         />
         <Route 
           path="/dashboard" 

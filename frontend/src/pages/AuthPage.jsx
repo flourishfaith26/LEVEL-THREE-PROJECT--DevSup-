@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { styled, keyframes } from '../stitches.config.js';
-import { Terminal, Code, Mail, Lock, User, AlertCircle, Eye, EyeOff, Check } from 'lucide-react';
+import { Terminal, Code, Mail, Lock, User, AlertCircle, Eye, EyeOff, Check, CheckCircle2 } from 'lucide-react';
 import DevSupLogo from '../components/DevSupLogo.jsx';
 import DevSupPumpLoader from '../components/DevSupPumpLoader.jsx';
 
@@ -258,13 +258,16 @@ export const validatePassword = (password) => {
 export default function AuthPage() {
     const navigate = useNavigate();
     const { loginNative, signupNative, loginWithRedirect } = useAuth();
-    const [isSignup, setIsSignup] = useState(false);
+    const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup' | 'forgot' | 'forgot-sent'
+    const isSignup = authMode === 'signup';
     const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         identifier: '',
         password: ''
     });
+    const [forgotEmail, setForgotEmail] = useState('');
+    const [forgotResult, setForgotResult] = useState(null);
     const [authError, setAuthError] = useState('');
     const [isResolving, setIsResolving] = useState(false);
 
@@ -281,6 +284,40 @@ export default function AuthPage() {
             authorizationParams.screen_hint = 'signup';
         }
         loginWithRedirect({ authorizationParams });
+    };
+
+    const handleForgotPasswordSubmit = async (e) => {
+        e.preventDefault();
+        setAuthError('');
+
+        const cleanEmail = forgotEmail.trim().toLowerCase();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+            setAuthError('Please enter a valid email address.');
+            return;
+        }
+
+        setIsResolving(true);
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/auth/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: cleanEmail })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.message || 'Failed to send reset link.');
+            }
+
+            setForgotResult(data);
+            setAuthMode('forgot-sent');
+        } catch (err) {
+            console.error('Forgot password error:', err);
+            setAuthError(err.message || 'Failed to send password reset link. Please try again.');
+        } finally {
+            setIsResolving(false);
+        }
     };
 
     const handleFormSubmit = async (e) => {
@@ -333,7 +370,7 @@ export default function AuthPage() {
 
     const toggleAuthMode = () => {
         setAuthError('');
-        setIsSignup(prev => !prev);
+        setAuthMode(prev => prev === 'signup' ? 'login' : 'signup');
     };
 
     const handleChange = (e) => {
@@ -361,153 +398,276 @@ export default function AuthPage() {
 
             <RightPanel>
                 <AuthBox>
-                    <div>
-                        <Title>{isSignup ? 'Create Account' : 'Welcome Back'}</Title>
-                        <Subtitle>{isSignup ? 'Join DevSup to start collaborating.' : 'Log in to DevSup with your username or email and password.'}</Subtitle>
-                    </div>
+                    {authMode === 'forgot' ? (
+                        <>
+                            <div>
+                                <Title>Forgot Password</Title>
+                                <Subtitle>Enter your registered email address and we'll send you a password reset link.</Subtitle>
+                            </div>
 
-                    {authError && (
-                        <div style={{ 
-                            padding: '12px 16px', 
-                            borderRadius: '8px', 
-                            backgroundColor: 'rgba(239, 68, 68, 0.12)', 
-                            border: '1px solid rgba(239, 68, 68, 0.3)', 
-                            color: '#ef4444', 
-                            fontSize: '0.88rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                        }}>
-                            <AlertCircle size={18} style={{ flexShrink: 0 }} />
-                            <span>{authError}</span>
-                        </div>
-                    )}
+                            {authError && (
+                                <div style={{ 
+                                    padding: '12px 16px', 
+                                    borderRadius: '8px', 
+                                    backgroundColor: 'rgba(239, 68, 68, 0.12)', 
+                                    border: '1px solid rgba(239, 68, 68, 0.3)', 
+                                    color: '#ef4444', 
+                                    fontSize: '0.88rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px'
+                                }}>
+                                    <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                                    <span>{authError}</span>
+                                </div>
+                            )}
 
-                    <Form onSubmit={handleFormSubmit}>
-                        {isSignup && (
-                            <InputGroup>
-                                <Label>Full Name</Label>
-                                <InputWrapper>
-                                    <InputIcon><User size={18} /></InputIcon>
-                                    <Input 
-                                        type="text" 
-                                        name="name" 
-                                        placeholder="John Doe" 
-                                        required 
-                                        value={formData.name}
-                                        onChange={handleChange}
-                                    />
-                                </InputWrapper>
-                            </InputGroup>
-                        )}
+                            <Form onSubmit={handleForgotPasswordSubmit}>
+                                <InputGroup>
+                                    <Label>Email Address</Label>
+                                    <InputWrapper>
+                                        <InputIcon><Mail size={18} /></InputIcon>
+                                        <Input 
+                                            type="email" 
+                                            name="forgotEmail" 
+                                            placeholder="developer@example.com" 
+                                            required 
+                                            value={forgotEmail}
+                                            onChange={(e) => { setAuthError(''); setForgotEmail(e.target.value); }}
+                                            autoCapitalize="none"
+                                            autoCorrect="off"
+                                        />
+                                    </InputWrapper>
+                                </InputGroup>
 
-                        <InputGroup>
-                            <Label>{isSignup ? 'Email Address' : 'Username or Email'}</Label>
-                            <InputWrapper>
-                                <InputIcon>
-                                    {isSignup || (formData.identifier.includes('@') && formData.identifier.includes('.')) 
-                                        ? <Mail size={18} /> 
-                                        : <User size={18} />}
-                                </InputIcon>
-                                <Input 
-                                    type="text" 
-                                    name="identifier" 
-                                    placeholder={isSignup ? "developer@example.com" : "e.g. blossom123 or dev@example.com"} 
-                                    required 
-                                    value={formData.identifier}
-                                    onChange={handleChange}
-                                    autoCapitalize="none"
-                                    autoCorrect="off"
-                                />
-                            </InputWrapper>
-                        </InputGroup>
+                                <AuthButton type="submit" variant="primary" style={{ marginTop: '8px' }} disabled={isResolving}>
+                                    Send Reset Link
+                                </AuthButton>
+                            </Form>
 
-                        <InputGroup>
-                            <Label>Password</Label>
-                            <InputWrapper>
-                                <InputIcon><Lock size={18} /></InputIcon>
-                                <Input 
-                                    type={showPassword ? "text" : "password"} 
-                                    name="password" 
-                                    placeholder="••••••••" 
-                                    required 
-                                    minLength={7}
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    style={{ paddingRight: '40px' }}
-                                />
-                                <PasswordToggle 
+                            <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                                <AuthButton 
                                     type="button" 
-                                    onClick={() => setShowPassword(prev => !prev)}
-                                    title={showPassword ? "Hide password" : "Show password"}
+                                    variant="ghost" 
+                                    onClick={() => { setAuthError(''); setAuthMode('login'); }}
+                                    style={{ display: 'inline', width: 'auto', padding: 0 }}
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </PasswordToggle>
-                            </InputWrapper>
-                            <RequirementList>
-                                <RequirementItem met={hasMinLength}>
-                                    {hasMinLength ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
-                                    <span>At least 7 characters</span>
-                                </RequirementItem>
-                                <RequirementItem met={hasLowercase}>
-                                    {hasLowercase ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
-                                    <span>At least one lowercase letter</span>
-                                </RequirementItem>
-                                <RequirementItem met={hasNumber}>
-                                    {hasNumber ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
-                                    <span>At least one number</span>
-                                </RequirementItem>
-                            </RequirementList>
-                        </InputGroup>
+                                    Back to Log In
+                                </AuthButton>
+                            </div>
+                        </>
+                    ) : authMode === 'forgot-sent' ? (
+                        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px', padding: '10px 0' }}>
+                            <div style={{ display: 'inline-flex', padding: '16px', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#10B981', margin: '0 auto' }}>
+                                <CheckCircle2 size={42} />
+                            </div>
+                            <div>
+                                <Title style={{ fontSize: '1.6rem' }}>Check Your Email</Title>
+                                <Subtitle style={{ marginTop: '6px' }}>
+                                    {forgotResult?.message || 'If an account exists with this email, a password reset link has been sent.'}
+                                </Subtitle>
+                            </div>
 
-                        <AuthButton type="submit" variant="primary" style={{ marginTop: '8px' }} disabled={isResolving}>
-                            {isSignup ? 'Sign Up' : 'Log In'}
-                        </AuthButton>
-                    </Form>
+                            {forgotResult?.resetUrl && (
+                                <a 
+                                    href={forgotResult.resetUrl}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '12px 20px',
+                                        borderRadius: '8px',
+                                        backgroundColor: 'var(--colors-accent)',
+                                        color: '#ffffff',
+                                        textDecoration: 'none',
+                                        fontWeight: '600',
+                                        fontSize: '0.95rem',
+                                        marginTop: '4px'
+                                    }}
+                                >
+                                    Reset Password Now
+                                </a>
+                            )}
 
-                    <Divider>or continue with</Divider>
+                            <AuthButton 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => { setAuthError(''); setForgotResult(null); setAuthMode('login'); }}
+                                style={{ marginTop: '8px' }}
+                            >
+                                Back to Log In
+                            </AuthButton>
+                        </div>
+                    ) : (
+                        <>
+                            <div>
+                                <Title>{isSignup ? 'Create Account' : 'Welcome Back'}</Title>
+                                <Subtitle>{isSignup ? 'Join DevSup to start collaborating.' : 'Log in to DevSup with your username or email and password.'}</Subtitle>
+                            </div>
 
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        <AuthButton 
-                            type="button" 
-                            variant="outline" 
-                            onClick={() => handleSocialLogin('github')} 
-                            style={{ padding: '12px', flex: 1, justifyContent: 'center' }}
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-                            </svg>
-                            <span>GitHub</span>
-                        </AuthButton>
-                        <AuthButton 
-                            type="button" 
-                            variant="outline" 
-                            onClick={() => handleSocialLogin('google-oauth2')} 
-                            style={{ padding: '12px', flex: 1, justifyContent: 'center' }}
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                            </svg>
-                            <span>Google</span>
-                        </AuthButton>
-                    </div>
+                            {authError && (
+                                <div style={{ 
+                                    padding: '12px 16px', 
+                                    borderRadius: '8px', 
+                                    backgroundColor: 'rgba(239, 68, 68, 0.12)', 
+                                    border: '1px solid rgba(239, 68, 68, 0.3)', 
+                                    color: '#ef4444', 
+                                    fontSize: '0.88rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px'
+                                }}>
+                                    <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                                    <span>{authError}</span>
+                                </div>
+                            )}
 
-                    <div style={{ textAlign: 'center', marginTop: '8px' }}>
-                        <span style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
-                            {isSignup ? 'Already have an account? ' : "Don't have an account? "}
-                        </span>
-                        <AuthButton 
-                            type="button" 
-                            variant="ghost" 
-                            onClick={toggleAuthMode}
-                            style={{ display: 'inline', width: 'auto', padding: 0 }}
-                        >
-                            {isSignup ? 'Log in' : 'Sign up'}
-                        </AuthButton>
-                    </div>
+                            <Form onSubmit={handleFormSubmit}>
+                                {isSignup && (
+                                    <InputGroup>
+                                        <Label>Full Name</Label>
+                                        <InputWrapper>
+                                            <InputIcon><User size={18} /></InputIcon>
+                                            <Input 
+                                                type="text" 
+                                                name="name" 
+                                                placeholder="John Doe" 
+                                                required 
+                                                value={formData.name}
+                                                onChange={handleChange}
+                                            />
+                                        </InputWrapper>
+                                    </InputGroup>
+                                )}
+
+                                <InputGroup>
+                                    <Label>{isSignup ? 'Email Address' : 'Username or Email'}</Label>
+                                    <InputWrapper>
+                                        <InputIcon>
+                                            {isSignup || (formData.identifier.includes('@') && formData.identifier.includes('.')) 
+                                                ? <Mail size={18} /> 
+                                                : <User size={18} />}
+                                        </InputIcon>
+                                        <Input 
+                                            type="text" 
+                                            name="identifier" 
+                                            placeholder={isSignup ? "developer@example.com" : "e.g. blossom123 or dev@example.com"} 
+                                            required 
+                                            value={formData.identifier}
+                                            onChange={handleChange}
+                                            autoCapitalize="none"
+                                            autoCorrect="off"
+                                        />
+                                    </InputWrapper>
+                                </InputGroup>
+
+                                <InputGroup>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Label>Password</Label>
+                                        {!isSignup && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setAuthError(''); setAuthMode('forgot'); }}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--colors-accent)',
+                                                    fontSize: '0.82rem',
+                                                    fontWeight: '500',
+                                                    cursor: 'pointer',
+                                                    padding: 0
+                                                }}
+                                            >
+                                                Forgot password?
+                                            </button>
+                                        )}
+                                    </div>
+                                    <InputWrapper>
+                                        <InputIcon><Lock size={18} /></InputIcon>
+                                        <Input 
+                                            type={showPassword ? "text" : "password"} 
+                                            name="password" 
+                                            placeholder="••••••••" 
+                                            required 
+                                            minLength={7}
+                                            value={formData.password}
+                                            onChange={handleChange}
+                                            style={{ paddingRight: '40px' }}
+                                        />
+                                        <PasswordToggle 
+                                            type="button" 
+                                            onClick={() => setShowPassword(prev => !prev)}
+                                            title={showPassword ? "Hide password" : "Show password"}
+                                        >
+                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </PasswordToggle>
+                                    </InputWrapper>
+                                    <RequirementList>
+                                        <RequirementItem met={hasMinLength}>
+                                            {hasMinLength ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
+                                            <span>At least 7 characters</span>
+                                        </RequirementItem>
+                                        <RequirementItem met={hasLowercase}>
+                                            {hasLowercase ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
+                                            <span>At least one lowercase letter</span>
+                                        </RequirementItem>
+                                        <RequirementItem met={hasNumber}>
+                                            {hasNumber ? <Check size={12} strokeWidth={3} /> : <span style={{ width: 12, textAlign: 'center', lineHeight: 1 }}>•</span>}
+                                            <span>At least one number</span>
+                                        </RequirementItem>
+                                    </RequirementList>
+                                </InputGroup>
+
+                                <AuthButton type="submit" variant="primary" style={{ marginTop: '8px' }} disabled={isResolving}>
+                                    {isSignup ? 'Sign Up' : 'Log In'}
+                                </AuthButton>
+                            </Form>
+
+                            <Divider>or continue with</Divider>
+
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <AuthButton 
+                                    type="button" 
+                                    variant="outline" 
+                                    onClick={() => handleSocialLogin('github')} 
+                                    style={{ padding: '12px', flex: 1, justifyContent: 'center' }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+                                    </svg>
+                                    <span>GitHub</span>
+                                </AuthButton>
+                                <AuthButton 
+                                    type="button" 
+                                    variant="outline" 
+                                    onClick={() => handleSocialLogin('google-oauth2')} 
+                                    style={{ padding: '12px', flex: 1, justifyContent: 'center' }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                                    </svg>
+                                    <span>Google</span>
+                                </AuthButton>
+                            </div>
+
+                            <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                                <span style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
+                                    {isSignup ? 'Already have an account? ' : "Don't have an account? "}
+                                </span>
+                                <AuthButton 
+                                    type="button" 
+                                    variant="ghost" 
+                                    onClick={toggleAuthMode}
+                                    style={{ display: 'inline', width: 'auto', padding: 0 }}
+                                >
+                                    {isSignup ? 'Log in' : 'Sign up'}
+                                </AuthButton>
+                            </div>
+                        </>
+                    )}
                 </AuthBox>
             </RightPanel>
 
