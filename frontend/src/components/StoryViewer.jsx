@@ -358,7 +358,8 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                                 actualViewers.map(viewer => (
                                     <div key={viewer._id || viewer} style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                         <img 
-                                            src={viewer.avatarUrl || 'https://via.placeholder.com/40'} 
+                                            src={viewer.avatarUrl || '/default-avatar.svg'} 
+                                            onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                             alt="avatar" 
                                             style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} 
                                         />

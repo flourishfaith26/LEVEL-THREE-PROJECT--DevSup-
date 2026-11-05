@@ -3225,12 +3225,12 @@ export default function Dashboard() {
                 <NavRailBottom>
                     <AvatarWrapper title={currentUserData?.displayName || user?.name || user?.nickname || user?.email}>
                         <Avatar
-                            src={currentUserData?.avatarUrl || user?.picture}
+                            src={currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg'}
                             alt={user?.name || user?.nickname || 'User'}
-                            onClick={() => openMediaViewer(currentUserData?.avatarUrl || user?.picture, 'image', currentUserData?.displayName || user?.name || 'Profile picture')}
+                            onClick={() => openMediaViewer(currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg', 'image', currentUserData?.displayName || user?.name || 'Profile picture')}
                             style={{ width: '32px', height: '32px', cursor: 'zoom-in' }}
                             onError={(e) => {
-                                e.target.src = `https://ui-avatars.com/api/?name=${user?.name || user?.nickname || 'User'}&background=06B6D4&color=fff`;
+                                e.target.src = '/default-avatar.svg';
                             }}
                         />
                         <OnlineDot style={{ width: '10px', height: '10px' }} />
@@ -3436,7 +3436,30 @@ export default function Dashboard() {
                             const convName = isGroup ? c.name : (otherParticipant?.displayName || '');
                             return convName.toLowerCase().includes(chatSearchQuery.toLowerCase());
                         }).length === 0 ? (
-                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>Chat not found.</div>
+                            chatSearchQuery.trim() ? (
+                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', padding: '16px 20px', textAlign: 'center' }}>
+                                    Chat not found.
+                                </div>
+                            ) : (
+                                <div 
+                                    onClick={openCreateModal}
+                                    style={{ 
+                                        color: 'var(--colors-accent)', 
+                                        fontSize: '0.9rem', 
+                                        padding: '16px 20px', 
+                                        textAlign: 'center', 
+                                        cursor: 'pointer',
+                                        fontWeight: '500',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    <Plus size={16} />
+                                    <span>Start chat</span>
+                                </div>
+                            )
                         ) : (
                             [...conversations].filter(c => {
                                 if (!chatSearchQuery) return true;
@@ -3660,7 +3683,30 @@ export default function Dashboard() {
                             if (!chatSearchQuery) return true;
                             return c.name.toLowerCase().includes(chatSearchQuery.toLowerCase());
                         }).length === 0 ? (
-                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>Group not found.</div>
+                            chatSearchQuery.trim() ? (
+                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', padding: '16px 20px', textAlign: 'center' }}>
+                                    Group not found.
+                                </div>
+                            ) : (
+                                <div 
+                                    onClick={() => { setConvType('group'); setIsModalOpen(true); }}
+                                    style={{ 
+                                        color: 'var(--colors-accent)', 
+                                        fontSize: '0.9rem', 
+                                        padding: '16px 20px', 
+                                        textAlign: 'center', 
+                                        cursor: 'pointer',
+                                        fontWeight: '500',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    <Plus size={16} />
+                                    <span>Start community</span>
+                                </div>
+                            )
                         ) : (
                             [...conversations].filter(c => {
                                 if (c.type !== 'group') return false;

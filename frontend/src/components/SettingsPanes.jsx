@@ -767,8 +767,9 @@ export const ProfilePane = ({ onBack, currentUser, onUpdateProfile, getAccessTok
             <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '40px' }}>
                 <div style={{ position: 'relative', width: '180px', height: '180px' }}>
                     <img 
-                        src={currentUser?.avatarUrl || 'https://via.placeholder.com/200'} 
+                        src={currentUser?.avatarUrl || '/default-avatar.svg'} 
                         alt="Profile" 
+                        onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                         onClick={() => onViewProfilePicture?.(currentUser?.avatarUrl)}
                         style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 8px 16px rgba(0,0,0,0.2)', border: '4px solid var(--colors-surface)', cursor: 'zoom-in' }}
                     />

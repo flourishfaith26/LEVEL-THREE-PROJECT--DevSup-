@@ -27,3 +27,4 @@ export default function DevSupLogo({ size = 48, className, style, glow = true, s
     </svg>
   );
 }
+

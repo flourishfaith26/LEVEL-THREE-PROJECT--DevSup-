@@ -473,8 +473,9 @@ export default function ProfileSetup() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '32px' }}>
             <div style={{ position: 'relative', width: '120px', height: '120px' }}>
               <img 
-                src={formData.avatarUrl || 'https://via.placeholder.com/120'} 
+                src={formData.avatarUrl || '/default-avatar.svg'} 
                 alt="Profile Avatar" 
+                onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                 style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 8px 16px rgba(0,0,0,0.2)', border: '4px solid var(--colors-surface)' }}
               />
               <div 
