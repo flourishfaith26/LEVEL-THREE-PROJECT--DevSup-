@@ -235,7 +235,7 @@ const Sidebar = styled('aside', {
     borderRight: '1px solid $border',
     display: 'flex',
     flexDirection: 'column',
-    padding: '$3',
+    padding: 0,
     flexShrink: 0,
     overflowY: 'auto',
     '@media (min-width: 1400px)': {
@@ -251,7 +251,7 @@ const Sidebar = styled('aside', {
         width: '100%',
         flex: 1,
         minHeight: 0,
-        padding: '16px',
+        padding: 0,
         borderRight: 'none',
     }
 });
@@ -386,17 +386,17 @@ const MobileOnlyOverlay = styled('div', {
 });
 
 const ChannelItem = styled('div', {
-    padding: '$2',
-    borderRadius: '$1',
+    padding: '8px 16px',
+    borderRadius: 0,
     color: '$textMuted',
     cursor: 'pointer',
-    marginBottom: '4px',
-    transition: 'all 0.2s',
+    marginBottom: 0,
+    transition: 'all 0.15s ease',
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
+    gap: '12px',
     '&:hover': {
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
         color: '$textMain',
     },
     variants: {
@@ -3115,6 +3115,8 @@ export default function Dashboard() {
                         conversationId: activeConversationId,
                         senderId: mongoUserId,
                         content: data.fileUrl,
+                        attachmentName: 'voice_note.webm',
+                        attachmentType: 'audio/webm',
                         isCodeSnippet: false,
                         language: 'plaintext'
                     };
@@ -3162,15 +3164,91 @@ export default function Dashboard() {
     const isSelectingCurrentMessages = isSelectingMessages && messageSelectionConversationId === activeConversationId;
     const showChatArea = !!activeConversationId || (activeTab === 'settings' && !!activeSettingTab);
 
-    const isImageUrl = (url, mimeType) => (mimeType && (mimeType.startsWith('image/') || mimeType === 'whiteboard'))
-        ? true
-        : typeof url === 'string' && (url.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$|blob:/i) != null || url.startsWith('data:image/'));
-    const isAudioUrl = (url, mimeType) => mimeType
-        ? mimeType.startsWith('audio/')
-        : typeof url === 'string' && url.match(/\.(webm|mp3|wav|ogg|m4a)(\?.*)?$/i) != null;
-    const isVideoUrl = (url, mimeType) => mimeType
-        ? mimeType.startsWith('video/')
-        : typeof url === 'string' && (url.match(/\.(mp4|mov|avi|mkv)(\?.*)?$/i) != null || (url.includes('/video/upload/') && !/\.webm(\?.*)?$/i.test(url)));
+    const isAudioUrl = (url, mimeType) => {
+        if (mimeType) {
+            if (mimeType.startsWith('audio/') || mimeType === 'audio') return true;
+            if (mimeType.startsWith('video/') || mimeType.startsWith('image/')) return false;
+        }
+        if (typeof url !== 'string') return false;
+        if (url.match(/\.(webm|mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i) != null) return true;
+        if (url.includes('res.cloudinary') && (url.includes('voice_note') || url.includes('/audio/'))) return true;
+        return false;
+    };
+
+    const isVideoUrl = (url, mimeType) => {
+        if (isAudioUrl(url, mimeType)) return false;
+        if (mimeType) {
+            if (mimeType.startsWith('video/') || mimeType === 'video') return true;
+            if (mimeType.startsWith('audio/') || mimeType.startsWith('image/')) return false;
+        }
+        if (typeof url !== 'string') return false;
+        if (url.match(/\.(mp4|mov|avi|mkv|3gp|flv|wmv)(\?.*)?$/i) != null) return true;
+        if (url.includes('/video/upload/') && !/\.(webm|mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i.test(url) && !url.includes('voice_note')) return true;
+        return false;
+    };
+
+    const isImageUrl = (url, mimeType) => {
+        if (mimeType) {
+            if (mimeType.startsWith('image/') || mimeType === 'image' || mimeType === 'photo' || mimeType === 'whiteboard') return true;
+            if (mimeType.startsWith('video/') || mimeType.startsWith('audio/')) return false;
+        }
+        if (typeof url !== 'string') return false;
+        if (url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i) != null || url.startsWith('data:image/')) return true;
+        if (url.includes('/image/upload/') && !/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip)(\?.*)?$/i.test(url)) return true;
+        return false;
+    };
+
+    const isDocumentUrl = (url, mimeType, attachmentName = '') => {
+        if (isAudioUrl(url, mimeType) || isVideoUrl(url, mimeType) || isImageUrl(url, mimeType)) return false;
+        if (mimeType) {
+            if (mimeType.startsWith('application/') || mimeType.startsWith('text/') || mimeType === 'document' || mimeType === 'file') return true;
+        }
+        const checkStr = `${attachmentName || ''} ${url || ''}`;
+        if (/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|7z|tar|gz)(\?.*)?$/i.test(checkStr)) return true;
+        if (typeof url === 'string' && (url.includes('/raw/upload/') || url.includes('res.cloudinary.com'))) return true;
+        return false;
+    };
+
+    const formatLastMessagePreview = (lastMsg, currentUserId) => {
+        if (!lastMsg) return 'No messages yet';
+        if (lastMsg.isDeletedForEveryone) return 'This message was deleted';
+
+        const isOwn = String(lastMsg.sender?._id || lastMsg.sender) === String(currentUserId);
+        const prefix = isOwn ? 'You: ' : '';
+
+        if (lastMsg.attachmentType === 'whiteboard' || lastMsg.caption === 'View the mock-up' || (typeof lastMsg.content === 'string' && lastMsg.content.startsWith('data:image/'))) {
+            return prefix + '🎨 Whiteboard Mock-up';
+        }
+
+        const content = typeof lastMsg.content === 'string' ? lastMsg.content : '';
+        const mime = lastMsg.attachmentType || '';
+        const name = lastMsg.attachmentName || '';
+        const caption = lastMsg.caption?.trim() ? ` ${lastMsg.caption.trim()}` : '';
+
+        if (isAudioUrl(content, mime) || /\.(mp3|wav|ogg|m4a|aac|flac|opus|webm)$/i.test(name)) {
+            return prefix + '🎤 Audio';
+        }
+
+        if (isVideoUrl(content, mime) || /\.(mp4|mov|avi|mkv|3gp|flv|wmv)$/i.test(name)) {
+            return prefix + (caption ? `🎥${caption}` : '🎥 Video');
+        }
+
+        if (isImageUrl(content, mime) || /\.(jpeg|jpg|png|gif|webp|svg)$/i.test(name)) {
+            return prefix + (caption ? `📷${caption}` : '📷 Photo');
+        }
+
+        if (isDocumentUrl(content, mime, name)) {
+            const docLabel = name || (lastMsg.caption?.trim() || 'Document');
+            return prefix + '📄 ' + docLabel;
+        }
+
+        if (content) {
+            return prefix + content;
+        }
+
+        return prefix + 'No messages yet';
+    };
+
     const isCloudinaryUrl = (url) => typeof url === 'string' && url.includes('res.cloudinary.com');
     const openMediaViewer = (src, type = 'image', title = '') => {
         if (src) setMediaViewer({ src, type, title });
@@ -3319,8 +3397,10 @@ export default function Dashboard() {
                                         active={selectedCallLogs.includes(log.id)}
                                         style={{
                                             height: 'auto',
-                                            padding: '12px 16px',
-                                            gap: '16px',
+                                            padding: '10px 16px',
+                                            gap: '14px',
+                                            margin: 0,
+                                            borderBottom: 'none',
                                             backgroundColor: selectedCallLogs.includes(log.id) ? 'rgba(0, 168, 132, 0.16)' : undefined
                                         }}
                                         onClick={() => {
@@ -3533,13 +3613,15 @@ export default function Dashboard() {
                                             setContextMenu({ visible: true, x: e.pageX, y: e.pageY, message: null, callLog: null, conversation: conv });
                                         }}
                                         style={{
-                                            padding: '12px 20px',
+                                            padding: '8px 16px',
                                             borderRadius: 0,
-                                            gap: '16px',
+                                            gap: '12px',
                                             alignItems: 'center',
                                             margin: 0,
+                                            minHeight: '68px',
+                                            boxSizing: 'border-box',
                                             borderBottom: 'none',
-                                            backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : undefined
+                                            backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : (activeConversationId === conv._id ? 'rgba(255, 255, 255, 0.08)' : undefined)
                                         }}
                                         onMouseEnter={(e) => {
                                             const btn = e.currentTarget.querySelector('.conv-delete-btn');
@@ -3565,7 +3647,7 @@ export default function Dashboard() {
                                             </SelectionCheck>
                                         )}
                                         <AvatarWrapper 
-                                            style={{ flexShrink: 0, padding: showStatusRing ? '2px' : '0', border: showStatusRing ? '2px solid var(--colors-accent)' : 'none', cursor: showStatusRing ? 'pointer' : 'default', width: showStatusRing ? '56px' : '48px', height: showStatusRing ? '56px' : '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}
+                                            style={{ flexShrink: 0, padding: showStatusRing ? '2px' : '0', border: showStatusRing ? '2px solid var(--colors-accent)' : 'none', cursor: showStatusRing ? 'pointer' : 'default', width: showStatusRing ? '52px' : '48px', height: showStatusRing ? '52px' : '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}
                                             onClick={(e) => {
                                                 if (isChatsSelectionMode) {
                                                     e.stopPropagation();
@@ -3588,33 +3670,24 @@ export default function Dashboard() {
                                             {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
                                         </AvatarWrapper>
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                                                <span style={{ fontSize: '0.95rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                <span style={{ fontSize: '0.96rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                     {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
                                                 </span>
                                                 {conv.lastMessage && (
-                                                    <span style={{ fontSize: '0.75rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal' }}>
+                                                    <span style={{ fontSize: '0.74rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal' }}>
                                                         {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                     </span>
                                                 )}
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.85rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {conv.lastMessage
-                                                        ? (conv.lastMessage.isDeletedForEveryone
-                                                            ? 'This message was deleted'
-                                                            : ((conv.lastMessage.sender === mongoUserId ? 'You: ' : '') +
-                                                                (conv.lastMessage.attachmentType === 'whiteboard' || conv.lastMessage.content?.startsWith('data:image/') || conv.lastMessage.caption === 'View the mock-up'
-                                                                    ? '🎨 Whiteboard Mock-up'
-                                                                    : conv.lastMessage.content?.includes('res.cloudinary')
-                                                                        ? (conv.lastMessage.content.includes('video') ? '🎥 Video' : '📷 Photo')
-                                                                        : conv.lastMessage.content)))
-                                                        : 'No messages yet'}
+                                                <span style={{ fontSize: '0.84rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                                 </span>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     {conv.unreadCount > 0 && (
-                                                        <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center' }}>
+                                                        <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center' }}>
                                                             {conv.unreadCount}
                                                         </div>
                                                     )}
@@ -3769,13 +3842,15 @@ export default function Dashboard() {
                                         setContextMenu({ visible: true, x: e.pageX, y: e.pageY, message: null, callLog: null, conversation: conv });
                                     }}
                                     style={{
-                                        padding: '12px 20px',
+                                        padding: '8px 16px',
                                         borderRadius: 0,
-                                        gap: '16px',
+                                        gap: '12px',
                                         alignItems: 'center',
                                         margin: 0,
+                                        minHeight: '68px',
+                                        boxSizing: 'border-box',
                                         borderBottom: 'none',
-                                        backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : undefined
+                                        backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : (activeConversationId === conv._id ? 'rgba(255, 255, 255, 0.08)' : undefined)
                                     }}
                                     onMouseEnter={(e) => {
                                         const btn = e.currentTarget.querySelector('.conv-delete-btn');
@@ -3808,29 +3883,24 @@ export default function Dashboard() {
                                         />
                                     </AvatarWrapper>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                                            <span style={{ fontSize: '0.95rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <span style={{ fontSize: '0.96rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                 {conv.name}
                                             </span>
                                             {conv.lastMessage && (
-                                                <span style={{ fontSize: '0.75rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal' }}>
+                                                <span style={{ fontSize: '0.74rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal' }}>
                                                     {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                 </span>
                                             )}
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '0.85rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {conv.lastMessage
-                                                    ? (conv.lastMessage.isDeletedForEveryone
-                                                        ? 'This message was deleted'
-                                                        : ((conv.lastMessage.sender === mongoUserId ? 'You: ' : '') +
-                                                            (conv.lastMessage.content?.includes('res.cloudinary') ? (conv.lastMessage.content.includes('video') ? '🎥 Video' : '📷 Photo') : conv.lastMessage.content)))
-                                                    : 'No messages yet'}
+                                            <span style={{ fontSize: '0.84rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                             </span>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {conv.unreadCount > 0 && (
-                                                    <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center' }}>
+                                                    <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center' }}>
                                                         {conv.unreadCount}
                                                     </div>
                                                 )}
@@ -3855,7 +3925,7 @@ export default function Dashboard() {
                 )}
 
                 {activeTab === 'settings' && (
-                    <>
+                    <div style={{ padding: '16px 20px' }}>
                         <SidebarHeader>
                             <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Settings</h2>
                         </SidebarHeader>
@@ -3929,7 +3999,7 @@ export default function Dashboard() {
                                 ))}
                             </div>
                         </div>
-                    </>
+                    </div>
                 )}
 
                 {activeTab === 'status' && (
@@ -3977,7 +4047,7 @@ export default function Dashboard() {
                             } else {
                                 setIsStatusModalOpen(true);
                             }
-                        }} style={{ height: 'auto', padding: '12px 8px', gap: '16px' }}>
+                        }} style={{ height: 'auto', padding: '10px 16px', gap: '14px', margin: 0 }}>
                             <AvatarWrapper style={{ flexShrink: 0, width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', border: myGroupedStatuses && myGroupedStatuses.statuses.length > 0 ? `2px solid ${myGroupedStatuses.statuses.every(s => s.viewers && s.viewers.some(v => (v === mongoUserId || v._id === mongoUserId))) ? 'rgba(128, 128, 128, 0.4)' : 'var(--colors-accent)'}` : 'none', padding: myGroupedStatuses && myGroupedStatuses.statuses.length > 0 ? '2px' : '0' }}>
                                 {myGroupedStatuses && myGroupedStatuses.statuses.length > 0 ? (
                                     (() => {
@@ -4018,7 +4088,7 @@ export default function Dashboard() {
                                 const allViewed = group.statuses.every(s => s.viewers && s.viewers.some(v => (v === mongoUserId || v._id === mongoUserId)));
                                 const borderColor = allViewed ? 'rgba(128, 128, 128, 0.4)' : 'var(--colors-accent)';
                                 return (
-                                <ChannelItem key={group.user._id} onClick={() => setStoryViewerInitialUserIndex(groupedStatuses.findIndex(g => g.user._id === group.user._id))} style={{ height: 'auto', padding: '12px 8px', gap: '16px' }}>
+                                <ChannelItem key={group.user._id} onClick={() => setStoryViewerInitialUserIndex(groupedStatuses.findIndex(g => g.user._id === group.user._id))} style={{ height: 'auto', padding: '10px 16px', gap: '14px', margin: 0 }}>
                                     <AvatarWrapper style={{ flexShrink: 0, border: `2px solid ${borderColor}`, padding: '2px', width: '52px', height: '52px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
                                         {(() => {
                                             const last = group.statuses[group.statuses.length - 1];
