@@ -60,3 +60,4 @@ export const sendPasswordResetEmail = async ({ toEmail, displayName, resetUrl })
         return { sent: false, error: err.message };
     }
 };
+
