@@ -559,7 +559,7 @@ const ChatBubble = styled('div', {
     },
     '@media (max-width: 576px)': {
         maxWidth: '82%',
-        padding: '6px 8px 16px 8px',
+        padding: '4px 8px 8px 8px',
         fontSize: '0.86rem',
         borderRadius: '8px',
     },
@@ -603,10 +603,15 @@ const MessageTime = styled('span', {
     color: 'rgba(255,255,255,0.6)',
     position: 'absolute',
     bottom: '4px',
-    right: '10px',
+    right: '8px',
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
+    gap: '3px',
+    '@media (max-width: 576px)': {
+        fontSize: '0.62rem',
+        bottom: '2px',
+        right: '6px',
+    },
     variants: {
         isOwn: {
             true: {
@@ -4721,9 +4726,9 @@ export default function Dashboard() {
                                                                         return (
                                                                             <>
                                                                                 {shouldShowText && (
-                                                                                    <div style={{ whiteSpace: 'pre-wrap' }}>
+                                                                                    <span style={{ whiteSpace: 'pre-wrap', display: 'inline' }}>
                                                                                         {msg.content}
-                                                                                    </div>
+                                                                                    </span>
                                                                                 )}
 
                                                                                 {isWhiteboardMessage && (
@@ -4951,7 +4956,7 @@ export default function Dashboard() {
                                                                     })()}
                                                                     </>
                                                                     )}
-                                                                    <span style={{ display: 'inline-block', width: msg.isEdited ? '80px' : '50px', height: '10px' }}>&#8203;</span>
+                                                                    <span style={{ display: 'inline-block', width: msg.isEdited ? (isMobileViewport ? '60px' : '76px') : (isMobileViewport ? (isOwnMessage ? '44px' : '36px') : '48px'), height: isMobileViewport ? '0px' : '4px' }}>&#8203;</span>
                                                                 </div>
 
                                                                 <MessageTime isOwn={isOwnMessage}>
