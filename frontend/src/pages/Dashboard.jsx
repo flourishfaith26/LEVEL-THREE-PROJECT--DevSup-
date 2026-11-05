@@ -3581,7 +3581,7 @@ export default function Dashboard() {
                                                 onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                             />
                                         </AvatarWrapper>
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '36px', justifyContent: 'space-between', boxSizing: 'border-box' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: isMobileViewport ? '32px' : '36px', justifyContent: isMobileViewport ? 'center' : 'space-between', gap: isMobileViewport ? '2px' : 0, boxSizing: 'border-box' }}>
                                             <span style={{ fontSize: '0.94rem', color: log.status === 'missed' ? '#EF4444' : 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                 {log.contactName}
                                             </span>
@@ -3815,7 +3815,7 @@ export default function Dashboard() {
                                             {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
                                         </AvatarWrapper>
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '42px', justifyContent: 'space-between', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: isMobileViewport ? '34px' : '42px', justifyContent: isMobileViewport ? 'center' : 'space-between', gap: isMobileViewport ? '2px' : 0, padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15, marginBottom: '0px' }}>
                                                 <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                     {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
@@ -4026,7 +4026,7 @@ export default function Dashboard() {
                                         />
                                     </AvatarWrapper>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '42px', justifyContent: 'space-between', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: isMobileViewport ? '34px' : '42px', justifyContent: isMobileViewport ? 'center' : 'space-between', gap: isMobileViewport ? '2px' : 0, padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.15, marginBottom: '0px' }}>
                                             <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
                                                 {conv.name}
