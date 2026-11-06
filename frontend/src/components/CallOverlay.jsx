@@ -255,6 +255,7 @@ const CallOverlay = ({
     const [isAddingPerson, setIsAddingPerson] = useState(false);
     const [toastMsg, setToastMsg] = useState(null);
     const [isAnswering, setIsAnswering] = useState(false);
+    const [callDialog, setCallDialog] = useState(null);
 
     const localStream = useRef(null);
     const remoteStream = useRef(null);
@@ -508,8 +509,13 @@ const CallOverlay = ({
             // must not tear down a call that connected just fine.
             if (!callAcceptedRef.current) {
                 console.error('Unable to start call:', error);
-                alert(error.message || 'Could not connect the call. Please try again.');
-                handleEndCallRef.current?.(false);
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
+                setCallDialog({
+                    title: 'Call unavailable',
+                    message: `${otherDisplayName} is not connected or online right now. You can leave them a message or try calling again later.`
+                });
             }
         }
     };
@@ -552,8 +558,13 @@ const CallOverlay = ({
         } catch (err) {
             console.error('answerCall error:', err);
             if (!callAcceptedRef.current) {
-                alert(err.message || 'Could not access camera or microphone.');
-                handleEndCallRef.current?.(true);
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
+                setCallDialog({
+                    title: 'Permissions needed',
+                    message: err.message || 'Could not access camera or microphone. Please check your browser permissions.'
+                });
             }
         }
     };
@@ -583,7 +594,15 @@ const CallOverlay = ({
                 }, 30000);
             } catch (err) {
                 console.error('initMedia error:', err);
-                if (!cancelled) { alert(err.message || 'Could not access camera/microphone.'); handleEndCallRef.current?.(); }
+                if (!cancelled) { 
+                    ringtoneRef.current?.stop?.();
+                    ringtoneRef.current?.pause?.();
+                    ringtoneRef.current = null;
+                    setCallDialog({
+                        title: 'Permissions needed',
+                        message: err.message || 'Could not access camera/microphone. Please check your browser permissions.'
+                    });
+                }
             }
         })();
         return () => { cancelled = true; };
@@ -609,8 +628,13 @@ const CallOverlay = ({
                 // If the call is already accepted and running, don't kill it over a
                 // duplicate or late call_accepted event.
                 if (!callAcceptedRef.current) {
-                    alert('Could not connect the call. Please try again.');
-                    handleEndCall(true);
+                    ringtoneRef.current?.stop?.();
+                    ringtoneRef.current?.pause?.();
+                    ringtoneRef.current = null;
+                    setCallDialog({
+                        title: 'Call unavailable',
+                        message: 'Could not connect the call. Please try again later.'
+                    });
                 }
             }
         };
@@ -816,6 +840,115 @@ const CallOverlay = ({
             {toastMsg && (
                 <div style={{ position: 'fixed', top: '32px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#06B6D4', color: '#fff', padding: '10px 22px', borderRadius: '30px', fontWeight: '500', boxShadow: '0 10px 25px rgba(6, 182, 212, 0.4)', zIndex: 10001 }}>
                     {toastMsg}
+                </div>
+            )}
+
+            {/* WhatsApp Call Unavailable Dialog */}
+            {callDialog && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10002,
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        backgroundColor: '#1f2c34',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '20px',
+                        width: '100%',
+                        maxWidth: '360px',
+                        padding: '28px 24px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        textAlign: 'center',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+                        color: '#e9edef'
+                    }}>
+                        <div style={{ position: 'relative', marginBottom: '16px' }}>
+                            <img
+                                src={callerAvatar}
+                                alt={callerName}
+                                onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '-2px',
+                                right: '-2px',
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '50%',
+                                backgroundColor: '#ef4444',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '2px solid #1f2c34'
+                            }}>
+                                <PhoneOff size={13} color="#fff" />
+                            </div>
+                        </div>
+
+                        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 600, color: '#e9edef' }}>
+                            {callDialog.title}
+                        </h3>
+                        <p style={{ margin: '0 0 24px 0', fontSize: '0.88rem', color: '#8696a0', lineHeight: 1.45 }}>
+                            {callDialog.message}
+                        </p>
+
+                        <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCallDialog(null);
+                                    handleEndCallRef.current?.(false);
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px 16px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '24px',
+                                    color: '#e9edef',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCallDialog(null);
+                                    handleEndCallRef.current?.(false);
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px 16px',
+                                    backgroundColor: '#00a884',
+                                    border: 'none',
+                                    borderRadius: '24px',
+                                    color: '#111b21',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                Message
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </OverlayContainer>

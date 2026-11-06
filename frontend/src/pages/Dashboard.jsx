@@ -32,6 +32,7 @@ const StoryViewer = lazy(() => import('../components/StoryViewer'));
 import { motion } from 'framer-motion';
 const StatusUploadModal = lazy(() => import('../components/StatusUploadModal'));
 const EventsView = lazy(() => import('../components/EventsView'));
+const LiveCodingWorkspace = lazy(() => import('../components/LiveCodingWorkspace'));
 import { useNavigate } from 'react-router-dom';
 import { normalizeUsername } from '../utils/username.js';
 import DevSupLogo from '../components/DevSupLogo.jsx';
@@ -1712,6 +1713,8 @@ export default function Dashboard() {
     const [mobileWhiteboardDesign, setMobileWhiteboardDesign] = useState(null);
     const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth <= 768);
     const [communityTab, setCommunityTab] = useState('chat');
+    const [isLiveCodingOpen, setIsLiveCodingOpen] = useState(false);
+    const [isHackathonOpen, setIsHackathonOpen] = useState(false);
     const [mediaViewer, setMediaViewer] = useState(null);
     const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
 
@@ -1722,6 +1725,9 @@ export default function Dashboard() {
             if (isMobile) {
                 setIsWhiteboardOpen(false);
                 sessionStorage.removeItem('isWhiteboardOpen');
+                setCommunityTab('chat');
+                setIsLiveCodingOpen(false);
+                setIsHackathonOpen(false);
             }
         };
 
@@ -3866,7 +3872,7 @@ export default function Dashboard() {
                                         onClick={() => {
                                             if (consumeSuppressedSelectionClick()) return;
                                             if (isChatsSelectionMode) toggleChatSelection(conv._id);
-                                            else setActiveConversationId(conv._id);
+                                            else { setActiveConversationId(conv._id); setIsLiveCodingOpen(false); setIsHackathonOpen(false); }
                                         }}
                                         onTouchStart={(e) => handleSelectableTouchStart(e, 'chat', conv)}
                                         onTouchMove={handleTouchMove}
@@ -4104,7 +4110,7 @@ export default function Dashboard() {
                                     onClick={() => {
                                         if (consumeSuppressedSelectionClick()) return;
                                         if (isChatsSelectionMode) toggleChatSelection(conv._id);
-                                        else { setActiveConversationId(conv._id); setCommunityTab('chat'); }
+                                        else { setActiveConversationId(conv._id); setCommunityTab('chat'); setIsLiveCodingOpen(false); setIsHackathonOpen(false); }
                                     }}
                                     onTouchStart={(e) => handleSelectableTouchStart(e, 'chat', conv)}
                                     onTouchMove={handleTouchMove}
@@ -4639,21 +4645,34 @@ export default function Dashboard() {
                                                         <Video size={18} style={{ opacity: 0.8 }} />
                                                         {activeConversation.type === 'group' ? 'Group calls' : 'Calls'}
                                                     </ContextMenuItem>
-                                                    <ContextMenuItem onClick={() => { 
-                                                        setIsWhiteboardOpen(true);
-                                                        showToast('Live Whiteboard & Collaborative Canvas started');
-                                                        setIsHeaderMenuOpen(false); 
-                                                    }}>
-                                                        <Code2 size={18} style={{ opacity: 0.8 }} />
-                                                        Live coding features
-                                                    </ContextMenuItem>
-                                                    <ContextMenuItem onClick={() => { 
-                                                        setPremiumModal({ title: 'Hackathons & Competitions', subtitle: 'Join live coding battles or organize an event for this group.', type: 'hackathon' });
-                                                        setIsHeaderMenuOpen(false); 
-                                                    }}>
-                                                        <Rocket size={18} style={{ opacity: 0.8 }} />
-                                                        Hackathon
-                                                    </ContextMenuItem>
+                                                    {!isMobileViewport && (
+                                                        <>
+                                                            <ContextMenuItem onClick={() => { 
+                                                                if (activeTab === 'communities') {
+                                                                    setCommunityTab('live coding');
+                                                                } else {
+                                                                    setIsLiveCodingOpen(true);
+                                                                    setIsHackathonOpen(false);
+                                                                }
+                                                                setIsHeaderMenuOpen(false); 
+                                                            }}>
+                                                                <Code2 size={18} style={{ opacity: 0.8 }} />
+                                                                Live coding features
+                                                            </ContextMenuItem>
+                                                            <ContextMenuItem onClick={() => { 
+                                                                if (activeTab === 'communities') {
+                                                                    setCommunityTab('hackathons');
+                                                                } else {
+                                                                    setIsHackathonOpen(true);
+                                                                    setIsLiveCodingOpen(false);
+                                                                }
+                                                                setIsHeaderMenuOpen(false); 
+                                                            }}>
+                                                                <Rocket size={18} style={{ opacity: 0.8 }} />
+                                                                Hackathon
+                                                            </ContextMenuItem>
+                                                        </>
+                                                    )}
                                                     <ContextMenuItem onClick={() => { 
                                                         if (isSelectingCurrentMessages) {
                                                             cancelMessageSelection();
@@ -4725,7 +4744,7 @@ export default function Dashboard() {
                                 </div>
                             </ChatHeader>
 
-                            {activeTab === 'communities' && activeConversation.type === 'group' && (
+                            {!isMobileViewport && activeTab === 'communities' && activeConversation.type === 'group' && (
                                 <div style={{ display: 'flex', gap: '24px', padding: '0 24px', borderBottom: '1px solid var(--colors-border)', backgroundColor: 'var(--colors-surface)', flexShrink: 0 }}>
                                     {['chat', 'live coding', 'hackathons', 'competitions'].map(tab => (
                                         <div
@@ -4748,7 +4767,38 @@ export default function Dashboard() {
                                 </div>
                             )}
 
-                            {(!activeConversation || activeTab === 'chats' || (activeTab === 'communities' && communityTab === 'chat')) ? (
+                            {isLiveCodingOpen ? (
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: 0 }}>
+                                    <Suspense fallback={null}>
+                                        <LiveCodingWorkspace
+                                            onClose={() => setIsLiveCodingOpen(false)}
+                                            onSendToChat={(codeSnippet) => {
+                                                sendMessage({
+                                                    conversationId: activeConversationId,
+                                                    senderId: mongoUserId,
+                                                    content: codeSnippet,
+                                                    isCodeSnippet: true,
+                                                    language: 'javascript'
+                                                });
+                                                setIsLiveCodingOpen(false);
+                                            }}
+                                            activeConversationName={activeConversation.name || (otherParticipant?.displayName) || 'Chat'}
+                                        />
+                                    </Suspense>
+                                </div>
+                            ) : isHackathonOpen ? (
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid var(--colors-border)', background: 'var(--colors-surface)' }}>
+                                        <span style={{ fontWeight: 600, color: 'var(--colors-textMain)' }}>Hackathons &amp; Competitions</span>
+                                        <button onClick={() => setIsHackathonOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--colors-textMuted)', cursor: 'pointer' }}>
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+                                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                                        <Suspense fallback={null}><EventsView type="hackathons" /></Suspense>
+                                    </div>
+                                </div>
+                            ) : (!activeConversation || activeTab === 'chats' || (activeTab === 'communities' && communityTab === 'chat')) ? (
                                 <>
                                     <MessageList
                                         ref={messageListRef}
@@ -5586,26 +5636,22 @@ export default function Dashboard() {
                                 </>
                             ) : communityTab === 'live coding' ? (
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: 0 }}>
-                                    <Suspense fallback={null}><Whiteboard
-                                        socket={socket}
-                                        conversationId={activeConversationId}
-                                        mongoUserId={mongoUserId}
-                                        onClose={() => setCommunityTab('chat')}
-                                        onSendToChat={(dataUrl) => {
-                                            sendMessage({
-                                                conversationId: activeConversationId,
-                                                senderId: mongoUserId,
-                                                content: dataUrl,
-                                                attachmentType: 'whiteboard',
-                                                attachmentName: 'Whiteboard Mock-up',
-                                                caption: 'View the mock-up',
-                                                isCodeSnippet: false,
-                                                language: 'plaintext'
-                                            });
-                                            setCommunityTab('chat');
-                                        }}
-                                        embedded={true}
-                                    /></Suspense>
+                                    <Suspense fallback={null}>
+                                        <LiveCodingWorkspace
+                                            onClose={() => setCommunityTab('chat')}
+                                            onSendToChat={(codeSnippet) => {
+                                                sendMessage({
+                                                    conversationId: activeConversationId,
+                                                    senderId: mongoUserId,
+                                                    content: codeSnippet,
+                                                    isCodeSnippet: true,
+                                                    language: 'javascript'
+                                                });
+                                                setCommunityTab('chat');
+                                            }}
+                                            activeConversationName={activeConversation.name}
+                                        />
+                                    </Suspense>
                                 </div>
                             ) : (
                                 <Suspense fallback={null}><EventsView type={communityTab} /></Suspense>
