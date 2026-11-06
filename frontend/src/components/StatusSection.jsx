@@ -12,6 +12,26 @@ export const isSameUser = (u1, u2) => {
     return id1 !== '' && id1 === id2;
 };
 
+export const formatStatusTime = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((startOfToday.getTime() - startOfDate.getTime()) / (1000 * 3600 * 24));
+    const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+    
+    if (diffDays === 0) {
+        return `Today at ${timeStr}`;
+    } else if (diffDays === 1) {
+        return `Yesterday at ${timeStr}`;
+    } else {
+        const dateStr = date.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' });
+        return `${dateStr} at ${timeStr}`;
+    }
+};
+
 /**
  * WhatsApp Segmented SVG Status Ring
  * Divides circle into segments based on status count.
@@ -511,7 +531,7 @@ export default function StatusSection({
                             </span>
                             <span style={{ fontSize: '0.82rem', color: 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
                                 {myTotalStatuses > 0 
-                                    ? (lastMyStatus ? formatMessageTime?.(lastMyStatus.createdAt, true) : 'Tap to view status')
+                                    ? (lastMyStatus ? formatStatusTime(lastMyStatus.createdAt) : 'Tap to view status')
                                     : 'Tap to add status update'}
                             </span>
                         </div>
@@ -600,7 +620,7 @@ export default function StatusSection({
                 <>
                     <div style={{ padding: '16px 20px 8px' }}>
                         <span style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--colors-textMuted)' }}>
-                            Recent updates
+                            Recent
                         </span>
                     </div>
 
@@ -651,7 +671,7 @@ export default function StatusSection({
                                                 {group.user?.displayName || 'Contact'}
                                             </span>
                                             <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', marginTop: '2px' }}>
-                                                {formatMessageTime?.(lastStatus?.createdAt, true)}
+                                                {formatStatusTime(lastStatus?.createdAt)}
                                             </span>
                                         </div>
                                     </div>
@@ -702,7 +722,7 @@ export default function StatusSection({
                         }}
                     >
                         <span style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--colors-textMuted)' }}>
-                            Viewed updates ({viewedUpdates.length})
+                            Viewed ({viewedUpdates.length})
                         </span>
                         {isViewedExpanded ? <ChevronUp size={18} color="var(--colors-textMuted)" /> : <ChevronDown size={18} color="var(--colors-textMuted)" />}
                     </div>
@@ -749,7 +769,7 @@ export default function StatusSection({
                                             {group.user?.displayName || 'Contact'}
                                         </span>
                                         <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', marginTop: '2px' }}>
-                                            {formatMessageTime?.(lastStatus?.createdAt, true)}
+                                            {formatStatusTime(lastStatus?.createdAt)}
                                         </span>
                                     </div>
                                 </div>
@@ -797,7 +817,7 @@ export default function StatusSection({
                         }}
                     >
                         <span style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--colors-textMuted)' }}>
-                            Muted updates ({mutedUpdates.length})
+                            Muted ({mutedUpdates.length})
                         </span>
                         {isMutedExpanded ? <ChevronUp size={18} color="var(--colors-textMuted)" /> : <ChevronDown size={18} color="var(--colors-textMuted)" />}
                     </div>
@@ -841,7 +861,7 @@ export default function StatusSection({
                                             {group.user?.displayName || 'Contact'}
                                         </span>
                                         <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', marginTop: '2px' }}>
-                                            {formatMessageTime?.(lastStatus?.createdAt, true)}
+                                            {formatStatusTime(lastStatus?.createdAt)}
                                         </span>
                                     </div>
                                 </div>

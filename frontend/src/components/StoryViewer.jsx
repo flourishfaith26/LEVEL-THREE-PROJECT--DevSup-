@@ -6,6 +6,26 @@ const matchesUserId = (target, currentId) => {
     return String(target?._id || target) === String(currentId);
 };
 
+const formatStatusTime = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.round((startOfToday.getTime() - startOfDate.getTime()) / (1000 * 3600 * 24));
+    const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+    
+    if (diffDays === 0) {
+        return `Today at ${timeStr}`;
+    } else if (diffDays === 1) {
+        return `Yesterday at ${timeStr}`;
+    } else {
+        const dateStr = date.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' });
+        return `${dateStr} at ${timeStr}`;
+    }
+};
+
 const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUserId, markViewed, onDelete, onForward, onReshare, readReceipts = true, onReply }) => {
     const [userIndex, setUserIndex] = useState(initialUserIndex);
     const [statusIndex, setStatusIndex] = useState(() => {
@@ -178,6 +198,15 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
         const deltaY = touchCurrentY.current - touchStartY.current;
         if (deltaY > 120) {
             onClose();
+        } else if (deltaY < -50 && isOwnStatus) {
+            // Swipe up to view status viewers! (WhatsApp behavior)
+            if (readReceipts) {
+                setShowViewers(true);
+                setIsPaused(true);
+            }
+            if (containerRef.current) {
+                containerRef.current.style.transform = 'translateY(0)';
+            }
         } else if (containerRef.current) {
             containerRef.current.style.transform = 'translateY(0)';
             containerRef.current.style.transition = 'transform 0.2s ease-out';
@@ -196,10 +225,11 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh', minHeight: '100dvh',
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh', maxHeight: '100dvh',
             backgroundColor: '#000', zIndex: 9999, display: 'flex', flexDirection: 'column',
             fontFamily: 'system-ui, -apple-system, sans-serif',
-            transition: 'transform 0.2s ease-out'
+            transition: 'transform 0.2s ease-out',
+            overflow: 'hidden'
         }}>
             {/* Progress Bars */}
             <div style={{ display: 'flex', gap: '4px', padding: '16px 8px 8px 8px', position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
@@ -334,11 +364,19 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                 
             </div>
 
-            {/* Footer (Viewers count if own) */}
+            {/* Footer (Viewers count if own status) */}
             {isOwnStatus && !showViewers && (
-                <div style={{ position: 'absolute', bottom: '120px', width: '100%', display: 'flex', justifyContent: 'center', zIndex: 10 }}>
-                    <div 
-                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#fff', cursor: 'pointer', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }} 
+                <div style={{ 
+                    position: 'absolute', 
+                    bottom: 'calc(20px + env(safe-area-inset-bottom, 12px))', 
+                    left: 0, 
+                    right: 0, 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    zIndex: 20 
+                }}>
+                    <button
+                        type="button"
                         onClick={(e) => { 
                             e.stopPropagation(); 
                             if (readReceipts) {
@@ -346,63 +384,219 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                                 setIsPaused(true); 
                             }
                         }}
+                        title={readReceipts ? "Swipe up or tap to see who viewed your status" : "Read receipts disabled"}
+                        style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center', 
+                            color: '#fff', 
+                            cursor: readReceipts ? 'pointer' : 'default',
+                            background: 'rgba(0, 0, 0, 0.55)', 
+                            padding: '8px 22px', 
+                            borderRadius: '24px', 
+                            backdropFilter: 'blur(8px)',
+                            WebkitBackdropFilter: 'blur(8px)',
+                            border: '1px solid rgba(255, 255, 255, 0.18)',
+                            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)'
+                        }}
                     >
                         {readReceipts ? (
                             <>
-                                <Eye size={24} />
-                                <span style={{ fontSize: '0.9rem', marginTop: '4px', fontWeight: '500' }}>{actualViewers.length}</span>
+                                <Eye size={22} />
+                                <span style={{ fontSize: '0.85rem', marginTop: '2px', fontWeight: '600', letterSpacing: '0.2px' }}>
+                                    {actualViewers.length}
+                                </span>
                             </>
                         ) : (
                             <>
-                                <EyeOff size={24} />
-                                <span style={{ fontSize: '0.7rem', marginTop: '4px', fontWeight: '500' }}>Disabled</span>
+                                <EyeOff size={22} />
+                                <span style={{ fontSize: '0.72rem', marginTop: '2px', fontWeight: '500' }}>Disabled</span>
                             </>
                         )}
-                    </div>
+                    </button>
                 </div>
             )}
 
-            {/* Viewers Panel Overlay */}
+            {/* Viewers Panel Overlay (WhatsApp-style bottom sheet) */}
             {showViewers && (
                 <div 
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 50 }}
+                    style={{ 
+                        position: 'fixed', 
+                        inset: 0, 
+                        backgroundColor: 'rgba(0,0,0,0.65)', 
+                        backdropFilter: 'blur(4px)', 
+                        WebkitBackdropFilter: 'blur(4px)',
+                        zIndex: 10000,
+                        display: 'flex',
+                        alignItems: 'flex-end',
+                        justifyContent: 'center'
+                    }}
                     onClick={(e) => { e.stopPropagation(); setShowViewers(false); setIsPaused(false); }}
                 >
                     <div 
                         style={{ 
-                            position: 'absolute', bottom: 0, left: 0, right: 0, 
-                            margin: '0 auto', width: '100%', maxWidth: '500px',
-                            backgroundColor: 'var(--colors-surface, #1e293b)', 
-                            borderTopLeftRadius: '16px', borderTopRightRadius: '16px',
-                            maxHeight: '60vh', display: 'flex', flexDirection: 'column',
-                            boxShadow: '0 -4px 20px rgba(0,0,0,0.3)'
+                            position: 'relative', 
+                            width: '100%', 
+                            maxWidth: '520px',
+                            height: '62vh',
+                            minHeight: '360px',
+                            maxHeight: '82dvh',
+                            backgroundColor: 'var(--colors-surface, #18222d)', 
+                            borderTopLeftRadius: '22px', 
+                            borderTopRightRadius: '22px',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderBottom: 'none',
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            boxShadow: '0 -8px 32px rgba(0,0,0,0.7)',
+                            paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 16px))',
+                            boxSizing: 'border-box',
+                            overflow: 'hidden'
                         }}
                         onClick={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
                     >
-                        <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                            <div style={{ fontWeight: '600', fontSize: '1.1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Eye size={20} /> Viewed by {actualViewers.length}
+                        {/* Drag handle */}
+                        <div style={{
+                            width: '38px',
+                            height: '4px',
+                            borderRadius: '2px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                            margin: '10px auto 4px',
+                            flexShrink: 0
+                        }} />
+
+                        {/* Sheet Header */}
+                        <div style={{ 
+                            padding: '12px 18px 14px', 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            borderBottom: '1px solid rgba(255,255,255,0.08)',
+                            flexShrink: 0
+                        }}>
+                            <div style={{ fontWeight: '600', fontSize: '1.05rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Eye size={19} color="var(--colors-accent, #00a884)" /> 
+                                <span>Viewed by {actualViewers.length}</span>
                             </div>
-                            <button onClick={() => { setShowViewers(false); setIsPaused(false); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-                                <X size={24} />
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        setShowViewers(false);
+                                        setIsPaused(true);
+                                        const deleted = await onDelete(currentStatus._id);
+                                        if (deleted) setProgress(0);
+                                        setIsPaused(false);
+                                    }}
+                                    title="Delete status"
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        width: '36px',
+                                        height: '36px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'}
+                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowViewers(false);
+                                        setIsPaused(false);
+                                        onForward(currentStatus);
+                                    }}
+                                    title="Forward status"
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#fff',
+                                        cursor: 'pointer',
+                                        width: '36px',
+                                        height: '36px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <Forward size={18} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowViewers(false); setIsPaused(false); }}
+                                    title="Close"
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'rgba(255,255,255,0.7)',
+                                        cursor: 'pointer',
+                                        width: '36px',
+                                        height: '36px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+
+                        {/* Viewers List */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0', WebkitOverflowScrolling: 'touch' }}>
                             {actualViewers.length === 0 ? (
-                                <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>
-                                    No views yet
+                                <div style={{ padding: '48px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    <Eye size={32} style={{ opacity: 0.3 }} />
+                                    <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>No views yet</span>
+                                    <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>When contacts view this status update, they will appear here.</span>
                                 </div>
                             ) : (
                                 actualViewers.map(viewer => (
-                                    <div key={viewer._id || viewer} style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div 
+                                        key={viewer._id || viewer} 
+                                        style={{ 
+                                            padding: '12px 18px', 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '14px', 
+                                            borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                            transition: 'background 0.15s'
+                                        }}
+                                    >
                                         <img 
                                             src={viewer.avatarUrl || '/default-avatar.svg'} 
                                             onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                             alt="avatar" 
-                                            style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} 
+                                            style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} 
                                         />
-                                        <div style={{ color: '#fff', fontWeight: '500' }}>
-                                            {viewer.displayName || 'Unknown User'}
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                                            <div style={{ color: '#fff', fontWeight: '500', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {viewer.displayName || viewer.username || 'DevSup User'}
+                                            </div>
+                                            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.78rem', marginTop: '2px' }}>
+                                                {formatStatusTime(currentStatus.createdAt)}
+                                            </div>
                                         </div>
                                     </div>
                                 ))

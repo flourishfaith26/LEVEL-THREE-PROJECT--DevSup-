@@ -4437,20 +4437,129 @@ export default function Dashboard() {
                     </div>
                 ) : activeTab === 'status' ? (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative', padding: '24px' }}>
-                        <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                        <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.12, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
+                        
+                        {/* Status Icon matching WhatsApp Web reference */}
                         <div style={{ 
-                            width: '130px', height: '130px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(0, 168, 132, 0.18) 0%, rgba(15, 23, 42, 0.4) 100%)', 
-                            border: '2px solid rgba(0, 168, 132, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '28px', 
-                            boxShadow: '0 0 40px rgba(0, 168, 132, 0.2), inset 0 0 20px rgba(0, 168, 132, 0.15)', position: 'relative', zIndex: 1
+                            width: '84px', 
+                            height: '84px', 
+                            borderRadius: '50%', 
+                            border: '3px dashed var(--colors-textMuted, #8696a0)',
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            marginBottom: '20px', 
+                            opacity: 0.75,
+                            position: 'relative', 
+                            zIndex: 1
                         }}>
-                            <Code2 size={60} color="var(--colors-accent, #00a884)" strokeWidth={1.8} style={{ filter: 'drop-shadow(0 0 8px rgba(0, 168, 132, 0.5))' }} />
+                            <div style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '50%',
+                                border: '2.5px solid var(--colors-accent, #00a884)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <Code2 size={28} color="var(--colors-accent, #00a884)" strokeWidth={2} />
+                            </div>
                         </div>
-                        <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2rem', marginBottom: '12px', fontWeight: '600', letterSpacing: '-0.4px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Status updates</h2>
-                        <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.55', position: 'relative', zIndex: 1, margin: '0 0 24px 0' }}>
-                            Click on a contact to view their status update, or share photos, videos, and code snippets with your developer network.
+
+                        <h2 style={{ color: 'var(--colors-textMain, #e9edef)', fontSize: '1.75rem', marginBottom: '8px', fontWeight: '500', letterSpacing: '-0.3px', position: 'relative', zIndex: 1 }}>
+                            Share statuses
+                        </h2>
+                        <p style={{ color: 'var(--colors-textMuted, #8696a0)', fontSize: '0.95rem', maxWidth: '420px', textAlign: 'center', lineHeight: '1.5', position: 'relative', zIndex: 1, margin: '0 0 28px 0' }}>
+                            Share photos, videos and text that disappear after 24 hours.
                         </p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '24px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', position: 'relative', zIndex: 1 }}>
-                            <Lock size={14} color="var(--colors-accent)" />
+
+                        {/* Circular Action Buttons matching WhatsApp Web Desktop reference */}
+                        <div style={{ display: 'flex', gap: '36px', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+                            {/* Text status */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setStatusUploadMode('text');
+                                        setIsStatusModalOpen(true);
+                                    }}
+                                    title="Text status"
+                                    style={{
+                                        width: '50px',
+                                        height: '50px',
+                                        borderRadius: '50%',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                                        color: 'var(--colors-textMain, #e9edef)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                                    }}
+                                    onMouseEnter={e => {
+                                        e.currentTarget.style.backgroundColor = 'var(--colors-accent, #00a884)';
+                                        e.currentTarget.style.color = '#fff';
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                    }}
+                                    onMouseLeave={e => {
+                                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+                                        e.currentTarget.style.color = 'var(--colors-textMain, #e9edef)';
+                                        e.currentTarget.style.transform = 'none';
+                                    }}
+                                >
+                                    <Edit3 size={20} />
+                                </button>
+                                <span style={{ fontSize: '0.82rem', color: 'var(--colors-textMuted, #8696a0)', fontWeight: 500 }}>
+                                    Text status
+                                </span>
+                            </div>
+
+                            {/* Photo and video */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setStatusUploadMode('media');
+                                        setIsStatusModalOpen(true);
+                                    }}
+                                    title="Photo and video"
+                                    style={{
+                                        width: '50px',
+                                        height: '50px',
+                                        borderRadius: '50%',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                                        color: 'var(--colors-textMain, #e9edef)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                                    }}
+                                    onMouseEnter={e => {
+                                        e.currentTarget.style.backgroundColor = 'var(--colors-accent, #00a884)';
+                                        e.currentTarget.style.color = '#fff';
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                    }}
+                                    onMouseLeave={e => {
+                                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+                                        e.currentTarget.style.color = 'var(--colors-textMain, #e9edef)';
+                                        e.currentTarget.style.transform = 'none';
+                                    }}
+                                >
+                                    <Camera size={21} />
+                                </button>
+                                <span style={{ fontSize: '0.82rem', color: 'var(--colors-textMuted, #8696a0)', fontWeight: 500 }}>
+                                    Photo and video
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '36px', color: 'var(--colors-textMuted)', fontSize: '0.82rem', position: 'relative', zIndex: 1 }}>
+                            <Lock size={13} color="var(--colors-accent)" />
                             <span>Your status updates are end-to-end encrypted</span>
                         </div>
                     </div>
@@ -5670,20 +5779,129 @@ export default function Dashboard() {
                         )}
                         {activeTab === 'status' && (
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative', padding: '24px' }}>
-                                <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                                <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.12, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
+                                
+                                {/* Status Icon matching WhatsApp Web reference */}
                                 <div style={{ 
-                                    width: '130px', height: '130px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(0, 168, 132, 0.18) 0%, rgba(15, 23, 42, 0.4) 100%)', 
-                                    border: '2px solid rgba(0, 168, 132, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '28px', 
-                                    boxShadow: '0 0 40px rgba(0, 168, 132, 0.2), inset 0 0 20px rgba(0, 168, 132, 0.15)', position: 'relative', zIndex: 1
+                                    width: '84px', 
+                                    height: '84px', 
+                                    borderRadius: '50%', 
+                                    border: '3px dashed var(--colors-textMuted, #8696a0)',
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    marginBottom: '20px', 
+                                    opacity: 0.75,
+                                    position: 'relative', 
+                                    zIndex: 1
                                 }}>
-                                    <Code2 size={60} color="var(--colors-accent, #00a884)" strokeWidth={1.8} style={{ filter: 'drop-shadow(0 0 8px rgba(0, 168, 132, 0.5))' }} />
+                                    <div style={{
+                                        width: '56px',
+                                        height: '56px',
+                                        borderRadius: '50%',
+                                        border: '2.5px solid var(--colors-accent, #00a884)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        <Code2 size={28} color="var(--colors-accent, #00a884)" strokeWidth={2} />
+                                    </div>
                                 </div>
-                                <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2rem', marginBottom: '12px', fontWeight: '600', letterSpacing: '-0.4px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Status updates</h2>
-                                <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.55', position: 'relative', zIndex: 1, margin: '0 0 24px 0' }}>
-                                    Click on a contact to view their status update, or share photos, videos, and code snippets with your developer network.
+
+                                <h2 style={{ color: 'var(--colors-textMain, #e9edef)', fontSize: '1.75rem', marginBottom: '8px', fontWeight: '500', letterSpacing: '-0.3px', position: 'relative', zIndex: 1 }}>
+                                    Share statuses
+                                </h2>
+                                <p style={{ color: 'var(--colors-textMuted, #8696a0)', fontSize: '0.95rem', maxWidth: '420px', textAlign: 'center', lineHeight: '1.5', position: 'relative', zIndex: 1, margin: '0 0 28px 0' }}>
+                                    Share photos, videos and text that disappear after 24 hours.
                                 </p>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '24px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', position: 'relative', zIndex: 1 }}>
-                                    <Lock size={14} color="var(--colors-accent)" />
+
+                                {/* Circular Action Buttons matching WhatsApp Web Desktop reference */}
+                                <div style={{ display: 'flex', gap: '36px', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+                                    {/* Text status */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setStatusUploadMode('text');
+                                                setIsStatusModalOpen(true);
+                                            }}
+                                            title="Text status"
+                                            style={{
+                                                width: '50px',
+                                                height: '50px',
+                                                borderRadius: '50%',
+                                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                                border: '1px solid rgba(255, 255, 255, 0.12)',
+                                                color: 'var(--colors-textMain, #e9edef)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                                            }}
+                                            onMouseEnter={e => {
+                                                e.currentTarget.style.backgroundColor = 'var(--colors-accent, #00a884)';
+                                                e.currentTarget.style.color = '#fff';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                            }}
+                                            onMouseLeave={e => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+                                                e.currentTarget.style.color = 'var(--colors-textMain, #e9edef)';
+                                                e.currentTarget.style.transform = 'none';
+                                            }}
+                                        >
+                                            <Edit3 size={20} />
+                                        </button>
+                                        <span style={{ fontSize: '0.82rem', color: 'var(--colors-textMuted, #8696a0)', fontWeight: 500 }}>
+                                            Text status
+                                        </span>
+                                    </div>
+
+                                    {/* Photo and video */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setStatusUploadMode('media');
+                                                setIsStatusModalOpen(true);
+                                            }}
+                                            title="Photo and video"
+                                            style={{
+                                                width: '50px',
+                                                height: '50px',
+                                                borderRadius: '50%',
+                                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                                border: '1px solid rgba(255, 255, 255, 0.12)',
+                                                color: 'var(--colors-textMain, #e9edef)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+                                            }}
+                                            onMouseEnter={e => {
+                                                e.currentTarget.style.backgroundColor = 'var(--colors-accent, #00a884)';
+                                                e.currentTarget.style.color = '#fff';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                            }}
+                                            onMouseLeave={e => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+                                                e.currentTarget.style.color = 'var(--colors-textMain, #e9edef)';
+                                                e.currentTarget.style.transform = 'none';
+                                            }}
+                                        >
+                                            <Camera size={21} />
+                                        </button>
+                                        <span style={{ fontSize: '0.82rem', color: 'var(--colors-textMuted, #8696a0)', fontWeight: 500 }}>
+                                            Photo and video
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '36px', color: 'var(--colors-textMuted)', fontSize: '0.82rem', position: 'relative', zIndex: 1 }}>
+                                    <Lock size={13} color="var(--colors-accent)" />
                                     <span>Your status updates are end-to-end encrypted</span>
                                 </div>
                             </div>
