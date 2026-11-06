@@ -994,6 +994,56 @@ const VoiceRecordingIndicator = ({ time }) => {
     );
 };
 
+// Helper to parse WhatsApp-style status replies (both structured and legacy formats)
+export const parseStatusReply = (content) => {
+    if (!content || typeof content !== 'string') return null;
+
+    // Structured format: $STATUS_REPLY$|{JSON}|replyText
+    if (content.startsWith('$STATUS_REPLY$|')) {
+        const firstPipe = content.indexOf('|');
+        const secondPipe = content.indexOf('|', firstPipe + 1);
+        if (secondPipe !== -1) {
+            try {
+                const metaJson = content.slice(firstPipe + 1, secondPipe);
+                const replyText = content.slice(secondPipe + 1);
+                const meta = JSON.parse(metaJson);
+                return {
+                    statusId: meta.statusId,
+                    type: meta.type || 'image',
+                    thumbnail: meta.type !== 'text' ? meta.content : null,
+                    text: meta.caption || (meta.type === 'text' ? meta.content : (meta.type === 'video' ? 'Video status' : 'Photo status')),
+                    backgroundColor: meta.backgroundColor || '#1E2B3C',
+                    uploaderName: meta.uploaderName || 'Status',
+                    replyText: replyText.trim()
+                };
+            } catch (e) {
+                // fall through
+            }
+        }
+    }
+
+    // Legacy format: "[Status: Photo: Thanks for coming.]\n❤️"
+    if (content.startsWith('[Status:') || content.startsWith('[Status :')) {
+        const lines = content.split('\n');
+        const headerLine = lines[0];
+        const replyText = lines.slice(1).join('\n').trim();
+        const headerMatch = headerLine.match(/^\[Status\s*:\s*(?:(Photo|Video|Text)\s*:\s*)?(.*?)\]/i);
+        if (headerMatch) {
+            const rawType = (headerMatch[1] || 'photo').toLowerCase();
+            const desc = headerMatch[2]?.trim() || '';
+            return {
+                type: rawType === 'video' ? 'video' : rawType === 'text' ? 'text' : 'image',
+                thumbnail: null,
+                text: desc || (rawType === 'video' ? 'Video status' : rawType === 'text' ? 'Text status' : 'Photo status'),
+                uploaderName: 'Status',
+                replyText: replyText
+            };
+        }
+    }
+
+    return null;
+};
+
 // --- Custom Audio Player Component (WhatsApp Voice Note Style) ---
 const WAVEFORM_BAR_HEIGHTS = [
     6, 10, 16, 22, 14, 8, 18, 24, 20, 12,
@@ -1004,10 +1054,101 @@ const WAVEFORM_BAR_HEIGHTS = [
 const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) => {
     const audioRef = useRef(null);
     const waveformRef = useRef(null);
+    const animFrameRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(() => {
+        if (typeof src === 'string') {
+            const match = src.match(/[?&#]duration=([\d.]+)/);
+            if (match && parseFloat(match[1]) > 0) return parseFloat(match[1]);
+        }
+        return 0;
+    });
+
+    // Detect and resolve real duration (fixes Chrome MediaRecorder WebM duration Infinity bug)
+    useEffect(() => {
+        if (!src) return;
+
+        const match = src.match(/[?&#]duration=([\d.]+)/);
+        if (match && parseFloat(match[1]) > 0) {
+            setDuration(parseFloat(match[1]));
+            return;
+        }
+
+        let isCancelled = false;
+        const tempAudio = new Audio();
+        tempAudio.preload = 'metadata';
+        tempAudio.src = src;
+
+        const handleTempLoaded = () => {
+            if (isCancelled) return;
+            if (tempAudio.duration && isFinite(tempAudio.duration) && tempAudio.duration > 0) {
+                setDuration(tempAudio.duration);
+            } else {
+                // Seek to a large timestamp to force browser to calculate true duration
+                const onSeeked = () => {
+                    if (isCancelled) return;
+                    const calculated = tempAudio.duration && isFinite(tempAudio.duration) && tempAudio.duration > 0
+                        ? tempAudio.duration
+                        : tempAudio.currentTime;
+                    if (calculated && isFinite(calculated) && calculated > 0) {
+                        setDuration(calculated);
+                    }
+                    tempAudio.src = '';
+                };
+                tempAudio.addEventListener('seeked', onSeeked, { once: true });
+                try {
+                    tempAudio.currentTime = 1e10;
+                } catch (e) {
+                    // Ignore seek errors on some browsers
+                }
+            }
+        };
+
+        tempAudio.addEventListener('loadedmetadata', handleTempLoaded, { once: true });
+        return () => {
+            isCancelled = true;
+            tempAudio.src = '';
+        };
+    }, [src]);
+
+    // Smooth continuous slider movement at 60fps during playback
+    useEffect(() => {
+        if (!isPlaying) {
+            if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+            return;
+        }
+
+        const tick = () => {
+            const audio = audioRef.current;
+            if (audio) {
+                const cur = audio.currentTime || 0;
+                setCurrentTime(cur);
+
+                let dur = duration;
+                if ((!dur || !isFinite(dur) || dur <= 0) && audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+                    dur = audio.duration;
+                    setDuration(dur);
+                }
+
+                if (dur && isFinite(dur) && dur > 0) {
+                    const pct = Math.min(100, Math.max(0, (cur / dur) * 100));
+                    setProgress(pct);
+                } else if (cur > 0) {
+                    // Fallback while duration resolves: ensure slider moves forward smoothly
+                    const estimatedDur = Math.max(10, cur * 1.25);
+                    setProgress(Math.min(95, (cur / estimatedDur) * 100));
+                }
+            }
+            animFrameRef.current = requestAnimationFrame(tick);
+        };
+
+        animFrameRef.current = requestAnimationFrame(tick);
+        return () => {
+            if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        };
+    }, [isPlaying, duration]);
 
     const togglePlay = () => {
         if (!audioRef.current) return;
@@ -1015,6 +1156,11 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) 
             audioRef.current.pause();
             setIsPlaying(false);
         } else {
+            if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+                audioRef.current.currentTime = 0;
+                setProgress(0);
+                setCurrentTime(0);
+            }
             audioRef.current.play().then(() => {
                 setIsPlaying(true);
             }).catch(() => {
@@ -1025,16 +1171,16 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) 
 
     const handleTimeUpdate = () => {
         if (!audioRef.current) return;
-        const current = audioRef.current.currentTime;
-        const dur = audioRef.current.duration;
+        const current = audioRef.current.currentTime || 0;
         setCurrentTime(current);
+        const dur = (duration > 0 && isFinite(duration)) ? duration : (audioRef.current.duration > 0 && isFinite(audioRef.current.duration)) ? audioRef.current.duration : 0;
         if (dur > 0) {
-            setProgress((current / dur) * 100);
+            setProgress(Math.min(100, Math.max(0, (current / dur) * 100)));
         }
     };
 
     const handleLoadedMetadata = () => {
-        if (audioRef.current && audioRef.current.duration) {
+        if (audioRef.current && audioRef.current.duration && isFinite(audioRef.current.duration) && audioRef.current.duration > 0) {
             setDuration(audioRef.current.duration);
         }
     };
@@ -1044,7 +1190,7 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) 
         const rect = waveformRef.current.getBoundingClientRect();
         const clickX = clientX - rect.left;
         const pct = Math.max(0, Math.min(1, clickX / rect.width));
-        const dur = audioRef.current.duration || duration;
+        const dur = (duration > 0 && isFinite(duration)) ? duration : (audioRef.current.duration > 0 && isFinite(audioRef.current.duration)) ? audioRef.current.duration : 0;
         if (dur > 0) {
             const newTime = pct * dur;
             audioRef.current.currentTime = newTime;
@@ -1158,7 +1304,8 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) 
                             backgroundColor: '#06b6d4',
                             boxShadow: '0 0 6px rgba(6, 182, 212, 0.8)',
                             pointerEvents: 'none',
-                            zIndex: 2
+                            zIndex: 2,
+                            transition: isPlaying ? 'left 0.08s linear' : 'none'
                         }}
                     />
                 </div>
@@ -1542,15 +1689,15 @@ export default function Dashboard() {
         if (!targetUser || !replyText?.trim() || !mongoUserId) return;
         const targetId = String(targetUser._id || targetUser);
 
-        let statusSummary = '';
-        if (status.type === 'text') {
-            statusSummary = status.content ? (status.content.length > 50 ? `${status.content.slice(0, 50)}...` : status.content) : 'Status';
-        } else if (status.type === 'video') {
-            statusSummary = status.caption ? `Video: ${status.caption}` : 'Video status';
-        } else {
-            statusSummary = status.caption ? `Photo: ${status.caption}` : 'Photo status';
-        }
-        const formattedContent = `[Status: ${statusSummary}]\n${replyText.trim()}`;
+        const statusMeta = {
+            statusId: status._id,
+            type: status.type || 'image',
+            content: status.content || '',
+            caption: status.caption || '',
+            backgroundColor: status.backgroundColor || '#1E2B3C',
+            uploaderName: targetUser.displayName || targetUser.name || 'Status'
+        };
+        const formattedContent = `$STATUS_REPLY$|${JSON.stringify(statusMeta)}|${replyText.trim()}`;
 
         try {
             let convId = null;
@@ -3431,11 +3578,13 @@ export default function Dashboard() {
                     if (!res.ok) throw new Error('Failed to upload audio');
 
                     const data = await res.json();
+                    const durSec = Math.max(1, recordingTime);
+                    const finalAudioUrl = data.fileUrl ? `${data.fileUrl}#duration=${durSec}` : '';
 
                     const messagePayload = {
                         conversationId: activeConversationId,
                         senderId: mongoUserId,
-                        content: data.fileUrl,
+                        content: finalAudioUrl,
                         attachmentName: 'voice_note.webm',
                         attachmentType: 'audio/webm',
                         isCodeSnippet: false,
@@ -3545,6 +3694,12 @@ export default function Dashboard() {
         const mime = lastMsg.attachmentType || '';
         const name = lastMsg.attachmentName || '';
         const caption = lastMsg.caption?.trim() ? ` ${lastMsg.caption.trim()}` : '';
+
+        if (content.startsWith('$STATUS_REPLY$|') || content.startsWith('[Status:') || content.startsWith('[Status :')) {
+            const parsed = parseStatusReply(content);
+            const icon = parsed?.type === 'video' ? '🎥' : parsed?.type === 'text' ? '📝' : '📷';
+            return `${prefix}${icon} Status: ${parsed?.replyText || 'Replied to status'}`;
+        }
 
         if (content.startsWith('$CALL_LOG$')) {
             const parts = content.split('|');
@@ -5263,16 +5418,131 @@ export default function Dashboard() {
                                                                         const isOnlyUrl = (msg.content.trim().startsWith('http') || msg.content.trim().startsWith('data:')) && !msg.content.trim().includes(' ');
                                                                         const hasAttachment = embedData || isWhiteboardMessage || isImageUrl(msg.content, msg.attachmentType) || isAudioUrl(msg.content, msg.attachmentType) || isVideoUrl(msg.content, msg.attachmentType) || isCloudinaryUrl(msg.content) || isDocMsg;
                                                                         const shouldShowText = !(isOnlyUrl && hasAttachment) && !isWhiteboardMessage;
+                                                                        const statusReplyData = parseStatusReply(msg.content);
 
                                                                         return (
                                                                             <>
                                                                                 {shouldShowText && (
-                                                                                    <>
-                                                                                        <span style={{ whiteSpace: 'pre-wrap', display: 'inline' }}>
-                                                                                            {msg.content}
-                                                                                        </span>
-                                                                                        {renderInlineTimestamp('12px')}
-                                                                                    </>
+                                                                                    statusReplyData ? (
+                                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '190px', maxWidth: '320px' }}>
+                                                                                            {/* WhatsApp Quoted Status Card */}
+                                                                                            <div 
+                                                                                                onClick={() => {
+                                                                                                    if (statusReplyData.statusId) {
+                                                                                                        const targetIdx = groupedStatuses.findIndex(g => 
+                                                                                                            g.statuses?.some(s => String(s._id) === String(statusReplyData.statusId))
+                                                                                                        );
+                                                                                                        if (targetIdx !== -1) {
+                                                                                                            setStoryViewerInitialUserIndex(targetIdx);
+                                                                                                        }
+                                                                                                    }
+                                                                                                }}
+                                                                                                style={{
+                                                                                                    backgroundColor: isOwnMessage ? 'rgba(0, 0, 0, 0.22)' : 'rgba(0, 0, 0, 0.15)',
+                                                                                                    borderLeft: `4px solid var(--colors-accent, #00a884)`,
+                                                                                                    borderRadius: '6px',
+                                                                                                    padding: '6px 10px',
+                                                                                                    display: 'flex',
+                                                                                                    alignItems: 'center',
+                                                                                                    justifyContent: 'space-between',
+                                                                                                    gap: '10px',
+                                                                                                    cursor: statusReplyData.statusId ? 'pointer' : 'default',
+                                                                                                    userSelect: 'none',
+                                                                                                    overflow: 'hidden'
+                                                                                                }}
+                                                                                            >
+                                                                                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--colors-accent, #00a884)', fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '2px' }}>
+                                                                                                        <Code2 size={13} strokeWidth={2.4} />
+                                                                                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                                                            {statusReplyData.uploaderName || 'Status'}
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                    <div style={{ 
+                                                                                                        fontSize: '0.82rem', 
+                                                                                                        color: isOwnMessage ? 'rgba(255, 255, 255, 0.88)' : 'var(--colors-textMain)', 
+                                                                                                        whiteSpace: 'nowrap', 
+                                                                                                        overflow: 'hidden', 
+                                                                                                        textOverflow: 'ellipsis',
+                                                                                                        display: 'flex',
+                                                                                                        alignItems: 'center',
+                                                                                                        gap: '4px'
+                                                                                                    }}>
+                                                                                                        {statusReplyData.type === 'video' ? <span>🎥</span> : statusReplyData.type === 'text' ? null : <span>📷</span>}
+                                                                                                        <span>{statusReplyData.text || (statusReplyData.type === 'video' ? 'Video' : statusReplyData.type === 'text' ? 'Status' : 'Photo')}</span>
+                                                                                                    </div>
+                                                                                                </div>
+
+                                                                                                {statusReplyData.thumbnail ? (
+                                                                                                    <img 
+                                                                                                        src={statusReplyData.thumbnail} 
+                                                                                                        alt="Status thumbnail"
+                                                                                                        style={{ width: '42px', height: '42px', borderRadius: '4px', objectFit: 'cover', flexShrink: 0, backgroundColor: '#000' }} 
+                                                                                                    />
+                                                                                                ) : statusReplyData.type === 'text' ? (
+                                                                                                    <div style={{ 
+                                                                                                        width: '38px', 
+                                                                                                        height: '38px', 
+                                                                                                        borderRadius: '4px', 
+                                                                                                        backgroundColor: statusReplyData.backgroundColor || '#1E2B3C', 
+                                                                                                        display: 'flex', 
+                                                                                                        alignItems: 'center', 
+                                                                                                        justifyContent: 'center', 
+                                                                                                        flexShrink: 0,
+                                                                                                        padding: '3px',
+                                                                                                        fontSize: '8px',
+                                                                                                        color: '#fff',
+                                                                                                        textAlign: 'center',
+                                                                                                        overflow: 'hidden',
+                                                                                                        lineHeight: 1.1
+                                                                                                    }}>
+                                                                                                        {statusReplyData.text?.slice(0, 15)}
+                                                                                                    </div>
+                                                                                                ) : (
+                                                                                                    <div style={{
+                                                                                                        width: '38px',
+                                                                                                        height: '38px',
+                                                                                                        borderRadius: '4px',
+                                                                                                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                                                                                        display: 'flex',
+                                                                                                        alignItems: 'center',
+                                                                                                        justifyContent: 'center',
+                                                                                                        flexShrink: 0,
+                                                                                                        color: 'var(--colors-accent, #00a884)'
+                                                                                                    }}>
+                                                                                                        <Camera size={18} />
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+
+                                                                                            {/* Reply Message text / emoji */}
+                                                                                            <div style={{ 
+                                                                                                display: 'flex', 
+                                                                                                alignItems: 'baseline', 
+                                                                                                justifyContent: 'space-between', 
+                                                                                                gap: '8px',
+                                                                                                padding: '2px 2px 0 2px'
+                                                                                            }}>
+                                                                                                <span style={{ 
+                                                                                                    fontSize: (/^(\p{Extended_Pictographic}|\p{Emoji_Presentation})+$/u.test(statusReplyData.replyText.trim()) && statusReplyData.replyText.trim().length <= 8) ? '1.5rem' : '0.94rem', 
+                                                                                                    lineHeight: (/^(\p{Extended_Pictographic}|\p{Emoji_Presentation})+$/u.test(statusReplyData.replyText.trim()) && statusReplyData.replyText.trim().length <= 8) ? '1.2' : '1.4', 
+                                                                                                    whiteSpace: 'pre-wrap', 
+                                                                                                    wordBreak: 'break-word',
+                                                                                                    color: 'inherit'
+                                                                                                }}>
+                                                                                                    {statusReplyData.replyText}
+                                                                                                </span>
+                                                                                                {renderInlineTimestamp('0px')}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <span style={{ whiteSpace: 'pre-wrap', display: 'inline' }}>
+                                                                                                {msg.content}
+                                                                                            </span>
+                                                                                            {renderInlineTimestamp('12px')}
+                                                                                        </>
+                                                                                    )
                                                                                 )}
 
                                                                                 {isWhiteboardMessage && (
