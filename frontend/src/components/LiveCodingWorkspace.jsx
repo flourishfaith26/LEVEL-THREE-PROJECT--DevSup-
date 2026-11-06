@@ -89,6 +89,19 @@ export default function LiveCodingWorkspace({ onClose, onSendToChat, activeConve
     const [copied, setCopied] = useState(false);
     const [shared, setShared] = useState(false);
     const editorRef = useRef(null);
+    const preRef = useRef(null);
+    const lineNumRef = useRef(null);
+
+    const handleEditorScroll = (e) => {
+        const { scrollTop, scrollLeft } = e.target;
+        if (preRef.current) {
+            preRef.current.scrollTop = scrollTop;
+            preRef.current.scrollLeft = scrollLeft;
+        }
+        if (lineNumRef.current) {
+            lineNumRef.current.scrollTop = scrollTop;
+        }
+    };
 
     const handleLanguageChange = (newLang) => {
         setLanguage(newLang);
@@ -310,47 +323,112 @@ export default function LiveCodingWorkspace({ onClose, onSendToChat, activeConve
 
             {/* Main Editor & Terminal Split */}
             <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-                {/* Code Editor */}
-                <div style={{ flex: 1.2, display: 'flex', position: 'relative', overflow: 'hidden', borderRight: '1px solid #30363d' }}>
+                {/* Code Editor with VS Code Syntax Highlighting */}
+                <div style={{ flex: 1.2, display: 'flex', position: 'relative', overflow: 'hidden', borderRight: '1px solid #30363d', backgroundColor: '#1e1e1e' }}>
                     {/* Line numbers */}
-                    <div style={{
-                        padding: '16px 8px 16px 12px',
-                        backgroundColor: '#0d1117',
-                        borderRight: '1px solid #21262d',
-                        color: '#484f58',
-                        fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                        fontSize: '0.88rem',
-                        lineHeight: '1.5',
-                        textAlign: 'right',
-                        userSelect: 'none',
-                        minWidth: '40px'
-                    }}>
-                        {linesArr.map(n => <div key={n}>{n}</div>)}
+                    <div
+                        ref={lineNumRef}
+                        style={{
+                            padding: '16px 8px 16px 12px',
+                            backgroundColor: '#1e1e1e',
+                            borderRight: '1px solid #2d2d2d',
+                            color: '#858585',
+                            fontFamily: 'Consolas, "Fira Code", Monaco, monospace',
+                            fontSize: '0.9rem',
+                            lineHeight: '1.5',
+                            textAlign: 'right',
+                            userSelect: 'none',
+                            minWidth: '42px',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        {linesArr.map(n => <div key={n} style={{ height: '1.5em' }}>{n}</div>)}
                     </div>
 
-                    {/* Textarea */}
-                    <textarea
-                        ref={editorRef}
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        spellCheck={false}
-                        style={{
-                            flex: 1,
-                            backgroundColor: '#0d1117',
-                            color: '#e6edf3',
-                            border: 'none',
-                            outline: 'none',
-                            padding: '16px 14px',
-                            fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                            fontSize: '0.88rem',
-                            lineHeight: '1.5',
-                            resize: 'none',
-                            whiteSpace: 'pre',
-                            overflowWrap: 'normal',
-                            overflowX: 'auto'
-                        }}
-                    />
+                    {/* Syntax Highlighted & Editable Code Area */}
+                    <div style={{ position: 'relative', flex: 1, height: '100%', overflow: 'hidden', backgroundColor: '#1e1e1e' }}>
+                        {/* Layer 1: Syntax Highlighted Display (VS Code Dark+ Colors) */}
+                        <div
+                            ref={preRef}
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                overflow: 'hidden',
+                                margin: 0,
+                                padding: '16px 14px',
+                                boxSizing: 'border-box',
+                                pointerEvents: 'none',
+                                userSelect: 'none'
+                            }}
+                        >
+                            <SyntaxHighlighter
+                                language={language === 'typescript' ? 'tsx' : language}
+                                style={vscDarkPlus}
+                                customStyle={{
+                                    margin: 0,
+                                    padding: 0,
+                                    background: 'transparent',
+                                    fontSize: '0.9rem',
+                                    lineHeight: '1.5',
+                                    fontFamily: 'Consolas, "Fira Code", Monaco, monospace',
+                                    whiteSpace: 'pre',
+                                    wordBreak: 'normal',
+                                    overflowWrap: 'normal',
+                                    tabSize: 4
+                                }}
+                                codeTagProps={{
+                                    style: {
+                                        fontFamily: 'Consolas, "Fira Code", Monaco, monospace',
+                                        fontSize: '0.9rem',
+                                        lineHeight: '1.5'
+                                    }
+                                }}
+                            >
+                                {code + (code.endsWith('\n') ? ' ' : '')}
+                            </SyntaxHighlighter>
+                        </div>
+
+                        {/* Layer 2: Transparent Input Textarea */}
+                        <textarea
+                            ref={editorRef}
+                            className="live-code-textarea"
+                            value={code}
+                            onChange={(e) => setCode(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            onScroll={handleEditorScroll}
+                            spellCheck={false}
+                            autoCapitalize="off"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                margin: 0,
+                                padding: '16px 14px',
+                                boxSizing: 'border-box',
+                                background: 'transparent',
+                                color: 'transparent',
+                                caretColor: '#58a6ff',
+                                border: 'none',
+                                outline: 'none',
+                                fontFamily: 'Consolas, "Fira Code", Monaco, monospace',
+                                fontSize: '0.9rem',
+                                lineHeight: '1.5',
+                                resize: 'none',
+                                whiteSpace: 'pre',
+                                overflowWrap: 'normal',
+                                overflow: 'auto',
+                                zIndex: 2,
+                                tabSize: 4
+                            }}
+                        />
+                    </div>
                 </div>
 
                 {/* Output Terminal */}

@@ -1,15 +1,20 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
     Plus, Camera, Edit3, MoreVertical, Search, X, ChevronDown, ChevronUp, 
-    Eye, Trash2, Lock, Shield, VolumeX, Volume2, MessageSquare, Check, Sparkles
+    Eye, Trash2, Lock, Shield, VolumeX, Check
 } from 'lucide-react';
 import { getAvatarUrl } from '../utils/defaultAvatar.js';
 
+export const isSameUser = (u1, u2) => {
+    if (!u1 || !u2) return false;
+    const id1 = String(u1?._id || u1);
+    const id2 = String(u2?._id || u2);
+    return id1 !== '' && id1 === id2;
+};
+
 /**
  * WhatsApp Segmented SVG Status Ring
- * Accurately divides circle into `count` segments with gaps.
- * Colors unviewed segments with vibrant WhatsApp green (#00a884 / var(--colors-accent))
- * and viewed segments with muted grey (#8696a0).
+ * Divides circle into segments based on status count.
  */
 export const SegmentedStatusRing = ({
     count = 1,
@@ -21,7 +26,7 @@ export const SegmentedStatusRing = ({
 }) => {
     if (!count || count <= 0) {
         return (
-            <div style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {children}
             </div>
         );
@@ -33,7 +38,7 @@ export const SegmentedStatusRing = ({
 
     // Single status: continuous circle
     if (count === 1) {
-        const isViewed = statuses[0]?.viewers?.some(v => (v === currentUserId || v?._id === currentUserId));
+        const isViewed = statuses[0]?.viewers?.some(v => isSameUser(v, currentUserId));
         const color = isViewed ? '#8696a0' : 'var(--colors-accent, #00a884)';
         return (
             <div style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -65,7 +70,7 @@ export const SegmentedStatusRing = ({
             <svg width={size} height={size} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', transform: 'rotate(-90deg)' }}>
                 {Array.from({ length: count }).map((_, i) => {
                     const status = statuses[i];
-                    const isViewed = status?.viewers?.some(v => (v === currentUserId || v?._id === currentUserId));
+                    const isViewed = status?.viewers?.some(v => isSameUser(v, currentUserId));
                     const color = isViewed ? '#8696a0' : 'var(--colors-accent, #00a884)';
                     const rotation = i * (arcDeg + gapDeg) + (gapDeg / 2);
 
@@ -104,9 +109,7 @@ export default function StatusSection({
     onReshareStatus,
     formatMessageTime,
     isMobileViewport,
-    showToast,
-    onSelectDesktopStatus,
-    selectedDesktopUserIndex
+    showToast
 }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -134,11 +137,13 @@ export default function StatusSection({
     }, [isSearchOpen]);
 
     const handleToggleMute = (userId, userName) => {
+        if (!userId) return;
+        const uidStr = String(userId);
         setMutedUserIds(prev => {
-            const exists = prev.includes(userId);
-            const next = exists ? prev.filter(id => id !== userId) : [...prev, userId];
+            const exists = prev.includes(uidStr);
+            const next = exists ? prev.filter(id => id !== uidStr) : [...prev, uidStr];
             localStorage.setItem('devsup_muted_status_users', JSON.stringify(next));
-            showToast?.(exists ? `Unmuted ${userName}'s status updates` : `Muted ${userName}'s status updates`);
+            showToast?.(exists ? `Unmuted ${userName || 'contact'}'s status updates` : `Muted ${userName || 'contact'}'s status updates`);
             return next;
         });
     };
@@ -150,13 +155,14 @@ export default function StatusSection({
         showToast?.('Status privacy updated');
     };
 
-    // Filtered lists
+    // Filtered other statuses
     const filteredOtherStatuses = useMemo(() => {
+        if (!Array.isArray(otherGroupedStatuses)) return [];
         if (!searchQuery.trim()) return otherGroupedStatuses;
         const q = searchQuery.toLowerCase();
         return otherGroupedStatuses.filter(g => 
-            g.user?.displayName?.toLowerCase().includes(q) || 
-            g.user?.username?.toLowerCase().includes(q)
+            g?.user?.displayName?.toLowerCase().includes(q) || 
+            g?.user?.username?.toLowerCase().includes(q)
         );
     }, [otherGroupedStatuses, searchQuery]);
 
@@ -167,12 +173,14 @@ export default function StatusSection({
         const muted = [];
 
         filteredOtherStatuses.forEach(group => {
-            if (mutedUserIds.includes(group.user._id)) {
+            if (!group || !group.user) return;
+            const uidStr = String(group.user?._id || group.user);
+            if (mutedUserIds.includes(uidStr)) {
                 muted.push(group);
                 return;
             }
-            const allViewed = group.statuses.every(s => 
-                s.viewers && s.viewers.some(v => (v === mongoUserId || v?._id === mongoUserId))
+            const allViewed = (group.statuses || []).length > 0 && group.statuses.every(s => 
+                s.viewers && s.viewers.some(v => isSameUser(v, mongoUserId))
             );
             if (allViewed) {
                 viewed.push(group);
@@ -188,11 +196,17 @@ export default function StatusSection({
     const myTotalStatuses = myActiveStatuses.length;
     const lastMyStatus = myTotalStatuses > 0 ? myActiveStatuses[myTotalStatuses - 1] : null;
 
+    const myIndexInGrouped = useMemo(() => {
+        return groupedStatuses.findIndex(g => isSameUser(g?.user, mongoUserId));
+    }, [groupedStatuses, mongoUserId]);
+
     return (
         <div style={{
             display: 'flex',
             flexDirection: 'column',
-            height: '100%',
+            flex: 1,
+            minHeight: 0,
+            width: '100%',
             overflowY: 'auto',
             position: 'relative',
             backgroundColor: 'var(--colors-bg)'
@@ -402,7 +416,7 @@ export default function StatusSection({
                 )}
             </div>
 
-            {/* My Status Tile */}
+            {/* My Status Row */}
             <div
                 style={{
                     display: 'flex',
@@ -415,11 +429,8 @@ export default function StatusSection({
                     position: 'relative'
                 }}
                 onClick={() => {
-                    if (myTotalStatuses > 0) {
-                        const myIdx = groupedStatuses.findIndex(g => g.user?._id === mongoUserId);
-                        if (myIdx !== -1) {
-                            onOpenStory?.(myIdx);
-                        }
+                    if (myTotalStatuses > 0 && myIndexInGrouped !== -1) {
+                        onOpenStory?.(myIndexInGrouped);
                     } else {
                         onOpenCreateStatus?.('media');
                     }
@@ -443,20 +454,27 @@ export default function StatusSection({
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                             {myTotalStatuses === 0 && (
-                                <div style={{
-                                    position: 'absolute',
-                                    bottom: 0,
-                                    right: 0,
-                                    width: '18px',
-                                    height: '18px',
-                                    borderRadius: '50%',
-                                    backgroundColor: 'var(--colors-accent, #00a884)',
-                                    border: '2px solid var(--colors-surface, #111b21)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#fff'
-                                }}>
+                                <div
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenCreateStatus?.('media');
+                                    }}
+                                    style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        right: 0,
+                                        width: '18px',
+                                        height: '18px',
+                                        borderRadius: '50%',
+                                        backgroundColor: 'var(--colors-accent, #00a884)',
+                                        border: '2px solid var(--colors-surface, #111b21)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#fff',
+                                        zIndex: 3
+                                    }}
+                                >
                                     <Plus size={12} strokeWidth={3} />
                                 </div>
                             )}
@@ -476,7 +494,7 @@ export default function StatusSection({
                 </div>
 
                 {/* Right side actions for My Status */}
-                {myTotalStatuses > 0 && (
+                {myTotalStatuses > 0 ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
                         <button
                             type="button"
@@ -500,6 +518,26 @@ export default function StatusSection({
                         >
                             <MoreVertical size={16} />
                         </button>
+                    </div>
+                ) : (
+                    <div
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenCreateStatus?.('media');
+                        }}
+                        style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            backgroundColor: 'rgba(0, 168, 132, 0.12)',
+                            color: 'var(--colors-accent, #00a884)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <Plus size={18} strokeWidth={2.5} />
                     </div>
                 )}
             </div>
@@ -536,9 +574,8 @@ export default function StatusSection({
                         {/* My status card */}
                         <div
                             onClick={() => {
-                                if (myTotalStatuses > 0) {
-                                    const myIdx = groupedStatuses.findIndex(g => g.user?._id === mongoUserId);
-                                    if (myIdx !== -1) onOpenStory?.(myIdx);
+                                if (myTotalStatuses > 0 && myIndexInGrouped !== -1) {
+                                    onOpenStory?.(myIndexInGrouped);
                                 } else {
                                     onOpenCreateStatus?.('media');
                                 }
@@ -607,14 +644,18 @@ export default function StatusSection({
 
                         {/* Contacts status cards */}
                         {otherGroupedStatuses.map((group) => {
-                            const lastStatus = group.statuses[group.statuses.length - 1];
-                            const allViewed = group.statuses.every(s => s.viewers && s.viewers.some(v => (v === mongoUserId || v?._id === mongoUserId)));
-                            const groupIndex = groupedStatuses.findIndex(g => g.user?._id === group.user?._id);
+                            const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
+                            const allViewed = (group.statuses || []).length > 0 && group.statuses.every(s => 
+                                s.viewers && s.viewers.some(v => isSameUser(v, mongoUserId))
+                            );
+                            const groupIndex = groupedStatuses.findIndex(g => isSameUser(g?.user, group?.user));
 
                             return (
                                 <div
-                                    key={group.user?._id}
-                                    onClick={() => onOpenStory?.(groupIndex)}
+                                    key={group.user?._id || Math.random()}
+                                    onClick={() => {
+                                        if (groupIndex !== -1) onOpenStory?.(groupIndex);
+                                    }}
                                     style={{
                                         width: '108px',
                                         height: '160px',
@@ -641,7 +682,7 @@ export default function StatusSection({
                                     {lastStatus && (lastStatus.type === 'image' || lastStatus.type === 'video') && (
                                         <img
                                             src={lastStatus.content}
-                                            alt={group.user?.displayName}
+                                            alt={group.user?.displayName || 'Status'}
                                             style={{
                                                 position: 'absolute',
                                                 top: 0, left: 0, width: '100%', height: '100%',
@@ -672,15 +713,15 @@ export default function StatusSection({
 
                                     <div style={{ position: 'relative', zIndex: 2 }}>
                                         <SegmentedStatusRing
-                                            count={group.statuses.length}
-                                            statuses={group.statuses}
+                                            count={group.statuses?.length || 1}
+                                            statuses={group.statuses || []}
                                             currentUserId={mongoUserId}
                                             size={38}
                                             strokeWidth={2}
                                         >
                                             <img
                                                 src={getAvatarUrl(group.user?.avatarUrl)}
-                                                alt={group.user?.displayName}
+                                                alt={group.user?.displayName || 'Avatar'}
                                                 style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
                                             />
                                         </SegmentedStatusRing>
@@ -714,13 +755,15 @@ export default function StatusSection({
                 </div>
             ) : (
                 recentUpdates.map(group => {
-                    const groupIndex = groupedStatuses.findIndex(g => g.user?._id === group.user?._id);
-                    const lastStatus = group.statuses[group.statuses.length - 1];
+                    const groupIndex = groupedStatuses.findIndex(g => isSameUser(g?.user, group?.user));
+                    const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
 
                     return (
                         <div
-                            key={group.user?._id}
-                            onClick={() => onOpenStory?.(groupIndex)}
+                            key={group.user?._id || Math.random()}
+                            onClick={() => {
+                                if (groupIndex !== -1) onOpenStory?.(groupIndex);
+                            }}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -735,22 +778,22 @@ export default function StatusSection({
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
                                 <SegmentedStatusRing
-                                    count={group.statuses.length}
-                                    statuses={group.statuses}
+                                    count={group.statuses?.length || 1}
+                                    statuses={group.statuses || []}
                                     currentUserId={mongoUserId}
                                     size={52}
                                     strokeWidth={2.5}
                                 >
                                     <img
                                         src={getAvatarUrl(group.user?.avatarUrl)}
-                                        alt={group.user?.displayName}
+                                        alt={group.user?.displayName || 'Avatar'}
                                         style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
                                     />
                                 </SegmentedStatusRing>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
                                     <span style={{ fontSize: '0.98rem', fontWeight: '600', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {group.user?.displayName}
+                                        {group.user?.displayName || 'Contact'}
                                     </span>
                                     <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', marginTop: '2px' }}>
                                         {formatMessageTime?.(lastStatus?.createdAt, true)}
@@ -762,7 +805,7 @@ export default function StatusSection({
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    handleToggleMute(group.user?._id, group.user?.displayName);
+                                    handleToggleMute(group.user?._id || group.user, group.user?.displayName);
                                 }}
                                 title="Mute status updates"
                                 style={{
@@ -808,13 +851,15 @@ export default function StatusSection({
                     </div>
 
                     {isViewedExpanded && viewedUpdates.map(group => {
-                        const groupIndex = groupedStatuses.findIndex(g => g.user?._id === group.user?._id);
-                        const lastStatus = group.statuses[group.statuses.length - 1];
+                        const groupIndex = groupedStatuses.findIndex(g => isSameUser(g?.user, group?.user));
+                        const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
 
                         return (
                             <div
-                                key={group.user?._id}
-                                onClick={() => onOpenStory?.(groupIndex)}
+                                key={group.user?._id || Math.random()}
+                                onClick={() => {
+                                    if (groupIndex !== -1) onOpenStory?.(groupIndex);
+                                }}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -829,22 +874,22 @@ export default function StatusSection({
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
                                     <SegmentedStatusRing
-                                        count={group.statuses.length}
-                                        statuses={group.statuses}
+                                        count={group.statuses?.length || 1}
+                                        statuses={group.statuses || []}
                                         currentUserId={mongoUserId}
                                         size={52}
                                         strokeWidth={2.5}
                                     >
                                         <img
                                             src={getAvatarUrl(group.user?.avatarUrl)}
-                                            alt={group.user?.displayName}
+                                            alt={group.user?.displayName || 'Avatar'}
                                             style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', opacity: 0.8 }}
                                         />
                                     </SegmentedStatusRing>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
                                         <span style={{ fontSize: '0.98rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {group.user?.displayName}
+                                            {group.user?.displayName || 'Contact'}
                                         </span>
                                         <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', marginTop: '2px' }}>
                                             {formatMessageTime?.(lastStatus?.createdAt, true)}
@@ -856,7 +901,7 @@ export default function StatusSection({
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleToggleMute(group.user?._id, group.user?.displayName);
+                                        handleToggleMute(group.user?._id || group.user, group.user?.displayName);
                                     }}
                                     title="Mute status updates"
                                     style={{
@@ -901,13 +946,15 @@ export default function StatusSection({
                     </div>
 
                     {isMutedExpanded && mutedUpdates.map(group => {
-                        const groupIndex = groupedStatuses.findIndex(g => g.user?._id === group.user?._id);
-                        const lastStatus = group.statuses[group.statuses.length - 1];
+                        const groupIndex = groupedStatuses.findIndex(g => isSameUser(g?.user, group?.user));
+                        const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
 
                         return (
                             <div
-                                key={group.user?._id}
-                                onClick={() => onOpenStory?.(groupIndex)}
+                                key={group.user?._id || Math.random()}
+                                onClick={() => {
+                                    if (groupIndex !== -1) onOpenStory?.(groupIndex);
+                                }}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -919,24 +966,24 @@ export default function StatusSection({
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
                                     <SegmentedStatusRing
-                                        count={group.statuses.length}
-                                        statuses={group.statuses}
+                                        count={group.statuses?.length || 1}
+                                        statuses={group.statuses || []}
                                         currentUserId={mongoUserId}
                                         size={52}
                                         strokeWidth={2.5}
                                     >
                                         <img
                                             src={getAvatarUrl(group.user?.avatarUrl)}
-                                            alt={group.user?.displayName}
+                                            alt={group.user?.displayName || 'Avatar'}
                                             style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
                                         />
                                     </SegmentedStatusRing>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
                                         <span style={{ fontSize: '0.98rem', fontWeight: '500', color: 'var(--colors-textMain)' }}>
-                                            {group.user?.displayName}
+                                            {group.user?.displayName || 'Contact'}
                                         </span>
-                                        <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', marginTop: '2px' }}>
                                             {formatMessageTime?.(lastStatus?.createdAt, true)}
                                         </span>
                                     </div>
@@ -946,7 +993,7 @@ export default function StatusSection({
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleToggleMute(group.user?._id, group.user?.displayName);
+                                        handleToggleMute(group.user?._id || group.user, group.user?.displayName);
                                     }}
                                     title="Unmute status updates"
                                     style={{
@@ -1104,7 +1151,7 @@ export default function StatusSection({
 
                         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
                             {myActiveStatuses.map((status) => {
-                                const actualViewers = (status.viewers || []).filter(v => (v !== mongoUserId && v?._id !== mongoUserId));
+                                const actualViewers = (status.viewers || []).filter(v => !isSameUser(v, mongoUserId));
 
                                 return (
                                     <div
@@ -1266,7 +1313,7 @@ export default function StatusSection({
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e9edef', fontWeight: 600 }}>
                                 <Eye size={18} color="var(--colors-accent)" />
-                                <span>Viewed by {((viewersModalStatus.viewers || []).filter(v => (v !== mongoUserId && v?._id !== mongoUserId))).length}</span>
+                                <span>Viewed by {((viewersModalStatus.viewers || []).filter(v => !isSameUser(v, mongoUserId))).length}</span>
                             </div>
                             <button
                                 type="button"
@@ -1278,13 +1325,13 @@ export default function StatusSection({
                         </div>
 
                         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
-                            {((viewersModalStatus.viewers || []).filter(v => (v !== mongoUserId && v?._id !== mongoUserId))).length === 0 ? (
+                            {((viewersModalStatus.viewers || []).filter(v => !isSameUser(v, mongoUserId))).length === 0 ? (
                                 <div style={{ padding: '32px 20px', textAlign: 'center', color: '#8696a0', fontSize: '0.88rem' }}>
                                     No views yet. When contacts view your status, they will appear here.
                                 </div>
                             ) : (
                                 (viewersModalStatus.viewers || [])
-                                    .filter(v => (v !== mongoUserId && v?._id !== mongoUserId))
+                                    .filter(v => !isSameUser(v, mongoUserId))
                                     .map(viewer => (
                                         <div
                                             key={viewer._id || viewer}
@@ -1437,4 +1484,3 @@ export default function StatusSection({
         </div>
     );
 }
-

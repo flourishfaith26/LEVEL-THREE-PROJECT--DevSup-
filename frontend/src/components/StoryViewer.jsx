@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Eye, EyeOff, MoreVertical, Forward, RefreshCw, Trash2 } from 'lucide-react';
 
+const matchesUserId = (target, currentId) => {
+    if (!target || !currentId) return false;
+    return String(target?._id || target) === String(currentId);
+};
+
 const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUserId, markViewed, onDelete, onForward, onReshare, readReceipts = true }) => {
     const [userIndex, setUserIndex] = useState(initialUserIndex);
     const [statusIndex, setStatusIndex] = useState(() => {
         const group = groupedStatuses[initialUserIndex];
         if (!group || !group.statuses) return 0;
-        const firstUnviewed = group.statuses.findIndex(s => !s.viewers || !s.viewers.some(v => v === currentUserId || v._id === currentUserId));
+        const firstUnviewed = group.statuses.findIndex(s => !s.viewers || !s.viewers.some(v => matchesUserId(v, currentUserId)));
         return firstUnviewed !== -1 ? firstUnviewed : 0;
     });
     const [isPaused, setIsPaused] = useState(false);
@@ -34,7 +39,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
     const currentStatuses = currentUserGroup?.statuses || [];
     const safeStatusIndex = Math.min(statusIndex, Math.max(0, currentStatuses.length - 1));
     const currentStatus = currentStatuses[safeStatusIndex];
-    const isOwnStatus = currentUserGroup?.user?._id === currentUserId;
+    const isOwnStatus = matchesUserId(currentUserGroup?.user, currentUserId);
 
     // Robust bounds checking for when statuses or groups are deleted/shuffled
     useEffect(() => {
@@ -73,7 +78,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
             setUserIndex(nextUserIndex);
             const nextGroup = groupedStatuses[nextUserIndex];
             if (nextGroup && nextGroup.statuses) {
-                const firstUnviewed = nextGroup.statuses.findIndex(s => !s.viewers || !s.viewers.some(v => v === currentUserId || v._id === currentUserId));
+                const firstUnviewed = nextGroup.statuses.findIndex(s => !s.viewers || !s.viewers.some(v => matchesUserId(v, currentUserId)));
                 setStatusIndex(firstUnviewed !== -1 ? firstUnviewed : 0);
             } else {
                 setStatusIndex(0);
@@ -85,7 +90,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
 
     // Mark as viewed when status changes
     useEffect(() => {
-        if (currentStatus && readReceipts && !currentStatus.viewers.some(v => v === currentUserId || v._id === currentUserId)) {
+        if (currentStatus && readReceipts && !currentStatus.viewers.some(v => matchesUserId(v, currentUserId))) {
             markViewed(currentStatus._id);
         }
     }, [currentStatus, isOwnStatus, currentUserId, markViewed, readReceipts]);
@@ -167,7 +172,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
 
     if (!currentStatus) return null;
 
-    const actualViewers = currentStatus.viewers.filter(v => v !== currentUserId && v._id !== currentUserId);
+    const actualViewers = currentStatus.viewers.filter(v => !matchesUserId(v, currentUserId));
 
     return (
         <>

@@ -86,3 +86,9 @@ body {
         display: none !important;
     }
 }
+
+/* Live Code Editor Selection */
+.live-code-textarea::selection {
+    background: rgba(38, 79, 120, 0.6) !important;
+    color: transparent !important;
+}
