@@ -2200,7 +2200,13 @@ export default function Dashboard() {
                                 const notificationOptions = {
                                     body: appSettingsRef.current?.showPreviews === false
                                         ? 'You received a message'
-                                        : incomingMessage.content || 'You sent an attachment',
+                                        : (typeof incomingMessage.content === 'string' && incomingMessage.content.startsWith('$CALL_LOG$'))
+                                            ? (() => {
+                                                const parts = incomingMessage.content.split('|');
+                                                const cType = parts[1] === 'video' ? 'video call' : 'voice call';
+                                                return parts[2] === 'missed' ? `Missed ${cType}` : (parts[1] === 'video' ? 'Video call' : 'Voice call');
+                                            })()
+                                            : incomingMessage.content || 'You sent an attachment',
                                     icon: '/favicon.svg',
                                     tag: `message-${messageId}`,
                                     data: { conversationId },
@@ -3453,6 +3459,25 @@ export default function Dashboard() {
         const name = lastMsg.attachmentName || '';
         const caption = lastMsg.caption?.trim() ? ` ${lastMsg.caption.trim()}` : '';
 
+        if (content.startsWith('$CALL_LOG$')) {
+            const parts = content.split('|');
+            const callType = parts[1] || 'voice';
+            const callStatus = parts[2] || 'completed';
+            const icon = callType === 'video' ? '📹' : '📞';
+            const typeLabel = callType === 'video' ? 'Video call' : 'Voice call';
+
+            if (callStatus === 'missed') {
+                if (!isOwn) {
+                    return `${icon} Missed ${callType === 'video' ? 'video call' : 'voice call'}`;
+                }
+                return `${prefix}${icon} ${typeLabel}`;
+            }
+            if (callStatus === 'rejected') {
+                return `${prefix}${icon} Declined ${callType === 'video' ? 'video call' : 'voice call'}`;
+            }
+            return `${prefix}${icon} ${typeLabel}`;
+        }
+
         if (isAudioUrl(content, mime) || /\.(mp3|wav|ogg|m4a|aac|flac|opus|webm)$/i.test(name)) {
             return prefix + '🎤 Audio';
         }
@@ -3921,7 +3946,17 @@ export default function Dashboard() {
                                                 )}
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
-                                                <span style={{ fontSize: '0.82rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                                                <span style={{ 
+                                                    fontSize: '0.82rem', 
+                                                    color: (conv.lastMessage?.content?.startsWith('$CALL_LOG$') && conv.lastMessage?.content?.includes('|missed') && String(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) !== String(mongoUserId))
+                                                        ? '#ef4444' 
+                                                        : (conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)'), 
+                                                    fontWeight: (conv.unreadCount > 0 || (conv.lastMessage?.content?.startsWith('$CALL_LOG$') && conv.lastMessage?.content?.includes('|missed') && String(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) !== String(mongoUserId))) ? '600' : 'normal', 
+                                                    whiteSpace: 'nowrap', 
+                                                    overflow: 'hidden', 
+                                                    textOverflow: 'ellipsis', 
+                                                    lineHeight: 1.2 
+                                                }}>
                                                     {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                                 </span>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4133,7 +4168,17 @@ export default function Dashboard() {
                                             )}
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
-                                            <span style={{ fontSize: '0.82rem', color: conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)', fontWeight: conv.unreadCount > 0 ? '500' : 'normal', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                                            <span style={{ 
+                                                fontSize: '0.82rem', 
+                                                color: (conv.lastMessage?.content?.startsWith('$CALL_LOG$') && conv.lastMessage?.content?.includes('|missed') && String(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) !== String(mongoUserId))
+                                                    ? '#ef4444' 
+                                                    : (conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)'), 
+                                                fontWeight: (conv.unreadCount > 0 || (conv.lastMessage?.content?.startsWith('$CALL_LOG$') && conv.lastMessage?.content?.includes('|missed') && String(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) !== String(mongoUserId))) ? '600' : 'normal', 
+                                                whiteSpace: 'nowrap', 
+                                                overflow: 'hidden', 
+                                                textOverflow: 'ellipsis', 
+                                                lineHeight: 1.2 
+                                            }}>
                                                 {formatLastMessagePreview(conv.lastMessage, mongoUserId)}
                                             </span>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -4981,7 +5026,9 @@ export default function Dashboard() {
                                                                             <div style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '250px' }}>
                                                                                 {msg.replyTo.isDeletedForEveryone
                                                                                     ? 'This message was deleted'
-                                                                                    : (msg.replyTo.content || (msg.replyTo.isCodeSnippet ? 'Code Snippet' : 'Media'))}
+                                                                                    : (typeof msg.replyTo.content === 'string' && msg.replyTo.content.startsWith('$CALL_LOG$'))
+                                                                                        ? (msg.replyTo.content.includes('|video') ? '📹 Video call' : '📞 Voice call')
+                                                                                        : (msg.replyTo.content || (msg.replyTo.isCodeSnippet ? 'Code Snippet' : 'Media'))}
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -5017,19 +5064,43 @@ export default function Dashboard() {
                                                                         const isCallLog = msg.content && typeof msg.content === 'string' && msg.content.startsWith('$CALL_LOG$');
                                                                         if (isCallLog) {
                                                                             const parts = msg.content.split('|');
-                                                                            const callType = parts[1];
-                                                                            const callStatus = parts[2];
-                                                                            
+                                                                            const callType = parts[1] || 'voice';
+                                                                            const callStatus = parts[2] || 'completed';
+                                                                            const isMissed = callStatus === 'missed';
+                                                                            const isDeclined = callStatus === 'rejected';
+
+                                                                            let statusText = 'Completed';
+                                                                            if (isMissed) {
+                                                                                statusText = isOwnMessage ? 'Unanswered' : 'Missed';
+                                                                            } else if (isDeclined) {
+                                                                                statusText = 'Declined';
+                                                                            }
+
+                                                                            const isMissedIncoming = !isOwnMessage && isMissed;
+                                                                            const statusColor = isMissedIncoming ? '#ef4444' : 'var(--colors-textMuted)';
+                                                                            const iconColor = isMissedIncoming ? '#ef4444' : 'var(--colors-accent)';
+
                                                                             return (
-                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                                        {callType === 'video' ? <Video size={18} color="rgba(255,255,255,0.7)" /> : <Phone size={18} color="rgba(255,255,255,0.7)" />}
+                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', minWidth: '170px' }}>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                                        <div style={{
+                                                                                            width: '32px',
+                                                                                            height: '32px',
+                                                                                            borderRadius: '50%',
+                                                                                            backgroundColor: isMissedIncoming ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                                                                            display: 'flex',
+                                                                                            alignItems: 'center',
+                                                                                            justifyContent: 'center',
+                                                                                            flexShrink: 0
+                                                                                        }}>
+                                                                                            {callType === 'video' ? <Video size={16} color={iconColor} /> : <Phone size={16} color={iconColor} />}
+                                                                                        </div>
                                                                                         <div>
-                                                                                            <div style={{ fontWeight: '500', color: 'var(--colors-textMain)' }}>
+                                                                                            <div style={{ fontWeight: '600', color: 'var(--colors-textMain)', fontSize: '0.92rem' }}>
                                                                                                 {callType === 'video' ? 'Video call' : 'Voice call'}
                                                                                             </div>
-                                                                                            <div style={{ fontSize: '0.85rem', color: callStatus === 'missed' ? '#ef4444' : 'var(--colors-textMuted)' }}>
-                                                                                                {callStatus === 'missed' ? 'Missed' : callStatus === 'rejected' ? 'Declined' : 'Completed'}
+                                                                                            <div style={{ fontSize: '0.8rem', color: statusColor, fontWeight: isMissedIncoming ? '600' : 'normal' }}>
+                                                                                                {statusText}
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
@@ -6909,7 +6980,13 @@ export default function Dashboard() {
                             <div style={{ marginTop: '4px', color: '#8696a0', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {appSettings.showPreviews === false
                                     ? 'You received a message'
-                                    : incomingMessageNotification.content || 'You sent an attachment'}
+                                    : (typeof incomingMessageNotification.content === 'string' && incomingMessageNotification.content.startsWith('$CALL_LOG$'))
+                                        ? (() => {
+                                            const parts = incomingMessageNotification.content.split('|');
+                                            const cType = parts[1] === 'video' ? 'video call' : 'voice call';
+                                            return parts[2] === 'missed' ? `Missed ${cType}` : (parts[1] === 'video' ? 'Video call' : 'Voice call');
+                                        })()
+                                        : incomingMessageNotification.content || 'You sent an attachment'}
                             </div>
                         </div>
                         <button

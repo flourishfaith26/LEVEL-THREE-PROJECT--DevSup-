@@ -37,3 +37,4 @@ export const playNotificationSound = () => {
         console.warn('Audio playback not permitted or not supported', e);
     }
 };
+
