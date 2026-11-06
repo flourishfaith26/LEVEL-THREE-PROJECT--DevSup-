@@ -4653,11 +4653,21 @@ export default function Dashboard() {
                                                     );
                                                     const isImageMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && isImageUrl(msg.content, msg.attachmentType);
                                                     const isVideoMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && isVideoUrl(msg.content, msg.attachmentType);
-                                                    const hasVisualMedia = isImageMsg || isVideoMsg;
-                                                    const isMediaMessage = !msg.isDeletedForEveryone && !isWhiteboardMessage && (
-                                                        msg.isCodeSnippet || hasVisualMedia
+                                                    const isCodeMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && (
+                                                        !!msg.isCodeSnippet ||
+                                                        (typeof msg.content === 'string' && msg.content.trim().startsWith('```') && msg.content.trim().endsWith('```'))
                                                     );
-                                                    const isImageWithCaption = hasVisualMedia && !!msg.caption;
+                                                    const isDocMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && !isImageMsg && !isVideoMsg && !isCodeMsg && (
+                                                        (isCloudinaryUrl(msg.content) && !isAudioUrl(msg.content, msg.attachmentType)) ||
+                                                        (typeof msg.attachmentName === 'string' && msg.attachmentName.length > 0 && !isAudioUrl(msg.content, msg.attachmentType)) ||
+                                                        (msg.attachmentType && !['whiteboard', 'audio'].some(t => msg.attachmentType.includes(t)) && (msg.attachmentType.includes('pdf') || msg.attachmentType.includes('document') || msg.attachmentType.includes('sheet') || msg.attachmentType.includes('zip') || msg.attachmentType.includes('text') || msg.attachmentType.includes('octet-stream')))
+                                                    );
+                                                    const hasVisualMedia = isImageMsg || isVideoMsg;
+                                                    const hasThinBorder = isImageMsg || isVideoMsg || isCodeMsg || isDocMsg;
+                                                    const isMediaMessage = !msg.isDeletedForEveryone && !isWhiteboardMessage && (
+                                                        isCodeMsg || hasVisualMedia || isDocMsg
+                                                    );
+                                                    const isImageWithCaption = (hasVisualMedia || isDocMsg) && !!msg.caption;
 
                                                     const renderStatusTicks = () => {
                                                         if (!isOwnMessage) return null;
@@ -4812,7 +4822,7 @@ export default function Dashboard() {
                                                                 mediaOnly={hasVisualMedia && !msg.caption}
                                                                 embedOnly={isEmbedOnly}
                                                                 style={
-                                                                    hasVisualMedia
+                                                                    hasThinBorder
                                                                         ? { padding: msg.caption ? '3px 3px 6px 3px' : '3px' }
                                                                         : (isWhiteboardMessage ? { width: 'fit-content', maxWidth: '360px', padding: '10px 10px 10px 10px' } : {})
                                                                 }
@@ -4829,7 +4839,7 @@ export default function Dashboard() {
                                                                 {showSenderName && (
                                                                     <SenderName style={{
                                                                         color: activeConversation?.type === 'group' ? getDailyUserColor(msg.sender?._id) : undefined,
-                                                                        ...(hasVisualMedia ? { padding: '4px 6px 2px 6px' } : {})
+                                                                        ...(hasThinBorder ? { padding: '4px 6px 2px 6px' } : {})
                                                                     }}>
                                                                         {msg.sender?.displayName || 'Unknown User'}
                                                                         {msg.sender?.username && (
@@ -4840,7 +4850,7 @@ export default function Dashboard() {
                                                                     </SenderName>
                                                                 )}
 
-                                                                <div style={{ wordBreak: 'break-word', marginTop: showSenderName && !hasVisualMedia ? '2px' : '0', maxWidth: hasVisualMedia ? '320px' : isWhiteboardMessage ? '340px' : 'none' }}>
+                                                                <div style={{ wordBreak: 'break-word', marginTop: showSenderName && !hasThinBorder ? '2px' : '0', maxWidth: hasVisualMedia ? '320px' : isWhiteboardMessage ? '340px' : isDocMsg ? '320px' : 'none' }}>
                                                                     {msg.isDeletedForEveryone ? (
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--colors-textMuted)', fontStyle: 'italic' }}>
                                                                             <Trash2 size={14} />
@@ -4882,18 +4892,26 @@ export default function Dashboard() {
                                                                     {(() => {
                                                                         const embedData = detectEcosystemLink(msg.content);
 
-                                                                        // If it's a code snippet, just render the code block with right-aligned timestamp
-                                                                        if (msg.isCodeSnippet) {
+                                                                        // If it's a code snippet or pasted code, render the code block with right-aligned timestamp
+                                                                        if (isCodeMsg) {
+                                                                            const rawContent = msg.content || '';
+                                                                            const cleanContent = rawContent.trim().startsWith('```') && rawContent.trim().endsWith('```')
+                                                                                ? rawContent.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '')
+                                                                                : rawContent;
+                                                                            const detectedLang = msg.language && msg.language !== 'plaintext'
+                                                                                ? msg.language
+                                                                                : (rawContent.trim().startsWith('```') ? (rawContent.trim().match(/^```([a-zA-Z]+)/)?.[1] || 'text') : 'text');
+
                                                                             return (
-                                                                                <div>
+                                                                                <div style={{ width: '100%', overflow: 'hidden' }}>
                                                                                     <SyntaxHighlighter
-                                                                                        language={msg.language === 'plaintext' ? 'text' : msg.language}
+                                                                                        language={detectedLang === 'plaintext' ? 'text' : detectedLang}
                                                                                         style={vscDarkPlus}
-                                                                                        customStyle={{ borderRadius: '10px', margin: '0', fontSize: '0.9rem' }}
+                                                                                        customStyle={{ borderRadius: '8px', margin: '0', fontSize: '0.88rem', padding: '8px 12px', lineHeight: '1.4', maxHeight: '420px', overflowX: 'auto' }}
                                                                                     >
-                                                                                        {msg.content}
+                                                                                        {cleanContent}
                                                                                     </SyntaxHighlighter>
-                                                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '2px 4px 1px 0' }}>
                                                                                         {renderInlineTimestamp('0px')}
                                                                                     </div>
                                                                                 </div>
@@ -4926,7 +4944,7 @@ export default function Dashboard() {
 
                                                                         // Check if message is strictly just a URL
                                                                         const isOnlyUrl = (msg.content.trim().startsWith('http') || msg.content.trim().startsWith('data:')) && !msg.content.trim().includes(' ');
-                                                                        const hasAttachment = embedData || isWhiteboardMessage || isImageUrl(msg.content, msg.attachmentType) || isAudioUrl(msg.content, msg.attachmentType) || isVideoUrl(msg.content, msg.attachmentType) || isCloudinaryUrl(msg.content);
+                                                                        const hasAttachment = embedData || isWhiteboardMessage || isImageUrl(msg.content, msg.attachmentType) || isAudioUrl(msg.content, msg.attachmentType) || isVideoUrl(msg.content, msg.attachmentType) || isCloudinaryUrl(msg.content) || isDocMsg;
                                                                         const shouldShowText = !(isOnlyUrl && hasAttachment) && !isWhiteboardMessage;
 
                                                                         return (
@@ -5174,17 +5192,17 @@ export default function Dashboard() {
                                                                                     />
                                                                                 )}
 
-                                                                                {isCloudinaryUrl(msg.content) && !isImageUrl(msg.content, msg.attachmentType) && !isAudioUrl(msg.content, msg.attachmentType) && !isVideoUrl(msg.content, msg.attachmentType) && (
+                                                                                {isDocMsg && (
                                                                                     <div style={{
                                                                                         display: 'flex',
                                                                                         alignItems: 'center',
                                                                                         gap: '12px',
-                                                                                        padding: '10px 12px',
-                                                                                        backgroundColor: isOwnMessage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.25)',
+                                                                                        padding: '8px 10px',
+                                                                                        backgroundColor: isOwnMessage ? 'rgba(0, 0, 0, 0.16)' : 'rgba(0, 0, 0, 0.28)',
                                                                                         borderRadius: '8px',
                                                                                         minWidth: '220px',
                                                                                         maxWidth: '320px',
-                                                                                        marginTop: shouldShowText ? '8px' : '0'
+                                                                                        margin: 0
                                                                                     }}>
                                                                                         <div style={{
                                                                                             width: '40px',
@@ -5234,7 +5252,7 @@ export default function Dashboard() {
                                                                                 )}
 
                                                                                 {msg.caption && !isWhiteboardMessage && (
-                                                                                    <div style={{ whiteSpace: 'pre-wrap', marginTop: hasVisualMedia ? '4px' : '6px', padding: hasVisualMedia ? '2px 6px 0px 6px' : '4px 0', fontSize: '0.93rem', lineHeight: '1.35', color: 'inherit' }}>
+                                                                                    <div style={{ whiteSpace: 'pre-wrap', marginTop: hasThinBorder ? '4px' : '6px', padding: hasThinBorder ? '2px 6px 0px 6px' : '4px 0', fontSize: '0.93rem', lineHeight: '1.35', color: 'inherit' }}>
                                                                                         <span>{msg.caption}</span>
                                                                                         {renderInlineTimestamp('12px')}
                                                                                     </div>
