@@ -425,3 +425,4 @@ export default function LiveCodingWorkspace({ onClose, onSendToChat, activeConve
         </div>
     );
 }
+
