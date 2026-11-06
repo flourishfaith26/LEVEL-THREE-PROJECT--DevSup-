@@ -109,7 +109,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
         return () => clearInterval(timer);
     }, [statusIndex, userIndex, isPaused, showMenu, showViewers, currentStatus, progress, setProgress, handleNext]);
 
-    const handlePrev = () => {
+    const handlePrev = useCallback(() => {
         setProgress(0);
         setTransitionDirection('previous');
         if (statusIndex > 0) {
@@ -120,7 +120,26 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
         } else {
             // At the very beginning, just reset progress
         }
-    };
+    }, [setProgress, statusIndex, userIndex, groupedStatuses]);
+
+    // Keyboard navigation (WhatsApp Web style)
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                onClose();
+            } else if (e.key === 'ArrowRight') {
+                handleNext();
+            } else if (e.key === 'ArrowLeft') {
+                handlePrev();
+            } else if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault();
+                setIsPaused(prev => !prev);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleNext, handlePrev, onClose]);
 
     const handleTouchStart = (e) => {
         touchStartY.current = e.touches[0].clientY;

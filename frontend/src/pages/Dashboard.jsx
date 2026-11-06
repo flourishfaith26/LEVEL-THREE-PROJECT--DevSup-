@@ -33,6 +33,7 @@ import { motion } from 'framer-motion';
 const StatusUploadModal = lazy(() => import('../components/StatusUploadModal'));
 const EventsView = lazy(() => import('../components/EventsView'));
 const LiveCodingWorkspace = lazy(() => import('../components/LiveCodingWorkspace'));
+import StatusSection from '../components/StatusSection.jsx';
 import { useNavigate } from 'react-router-dom';
 import { normalizeUsername } from '../utils/username.js';
 import DevSupLogo from '../components/DevSupLogo.jsx';
@@ -1713,6 +1714,7 @@ export default function Dashboard() {
     const [mobileWhiteboardDesign, setMobileWhiteboardDesign] = useState(null);
     const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth <= 768);
     const [communityTab, setCommunityTab] = useState('chat');
+    const [statusUploadMode, setStatusUploadMode] = useState('text');
     const [isLiveCodingOpen, setIsLiveCodingOpen] = useState(false);
     const [isHackathonOpen, setIsHackathonOpen] = useState(false);
     const [mediaViewer, setMediaViewer] = useState(null);
@@ -3587,7 +3589,7 @@ export default function Dashboard() {
                         <Phone size={22} />
                     </NavRailItem>
                     <NavRailItem active={activeTab === 'status'} onClick={() => handleTabChange('status')} title="Status" style={activeTab === 'status' ? {} : { color: 'var(--colors-textMuted)' }}>
-                        <Code2 size={24} />
+                        <CircleDashed size={24} />
                     </NavRailItem>
                     <NavRailItem active={activeTab === 'settings'} onClick={() => handleTabChange('settings')} title="Settings">
                         <Settings size={22} />
@@ -4293,116 +4295,24 @@ export default function Dashboard() {
                 )}
 
                 {activeTab === 'status' && (
-                    <>
-                        <div style={{ padding: '8px 20px 12px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                <h2 style={{ fontSize: '1.45rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    Status
-                                </h2>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <IconButton title="New Status" onClick={() => setIsStatusModalOpen(true)} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
-                                        <Plus size={20} />
-                                    </IconButton>
-                                    <div style={{ position: 'relative' }}>
-                                        <IconButton title="Menu" onClick={() => setIsChatsMenuOpen(!isChatsMenuOpen)} style={{ backgroundColor: 'transparent', color: 'var(--colors-textMuted)' }}>
-                                            <MoreVertical size={20} />
-                                        </IconButton>
-                                        {isChatsMenuOpen && (
-                                            <>
-                                                <div
-                                                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1999 }}
-                                                    onClick={() => setIsChatsMenuOpen(false)}
-                                                />
-                                                <ContextMenuContainer style={{ top: '100%', right: 0, marginTop: '12px', zIndex: 2000 }}>
-                                                    <ContextMenuItem onClick={() => { handleTabChange('settings'); setIsChatsMenuOpen(false); }}>
-                                                        <Settings size={18} style={{ opacity: 0.8 }} />
-                                                        Settings
-                                                    </ContextMenuItem>
-                                                    <ContextMenuItem onClick={() => { setIsLogoutModalOpen(true); setIsChatsMenuOpen(false); }}>
-                                                        <LogOut size={18} style={{ opacity: 0.8 }} />
-                                                        Log out
-                                                    </ContextMenuItem>
-                                                </ContextMenuContainer>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <ChannelItem active={false} onClick={() => {
-                            if (myGroupedStatuses) {
-                                setStoryViewerInitialUserIndex(groupedStatuses.findIndex(g => g.user._id === mongoUserId));
-                            } else {
-                                setIsStatusModalOpen(true);
-                            }
-                        }} style={{ height: 'auto', padding: '10px 16px', gap: '14px', margin: 0 }}>
-                            <AvatarWrapper style={{ flexShrink: 0, width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', border: myGroupedStatuses && myGroupedStatuses.statuses.length > 0 ? `2px solid ${myGroupedStatuses.statuses.every(s => s.viewers && s.viewers.some(v => (v === mongoUserId || v._id === mongoUserId))) ? 'rgba(128, 128, 128, 0.4)' : 'var(--colors-accent)'}` : 'none', padding: myGroupedStatuses && myGroupedStatuses.statuses.length > 0 ? '2px' : '0' }}>
-                                {myGroupedStatuses && myGroupedStatuses.statuses.length > 0 ? (
-                                    (() => {
-                                        const last = myGroupedStatuses.statuses[myGroupedStatuses.statuses.length - 1];
-                                        if (last.type === 'text') {
-                                            return <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: last.backgroundColor || '#1E2B3C', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', overflow: 'hidden', textAlign: 'center', padding: '4px', boxSizing: 'border-box', flexShrink: 0 }}>
-                                                <span style={{ transform: 'scale(0.8)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{last.content}</span>
-                                            </div>
-                                        } else if (last.type === 'video') {
-                                            return <video src={last.content} style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                                        } else {
-                                            return <Avatar src={last.content} style={{ width: '48px', height: '48px', objectFit: 'cover', flexShrink: 0 }} />
-                                        }
-                                    })()
-                                ) : (
-                                    <Avatar src={getAvatarUrl(currentUserData?.avatarUrl || user?.picture)} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '48px', height: '48px', flexShrink: 0 }} />
-                                )}
-                                <div
-                                    onClick={(e) => { e.stopPropagation(); setIsStatusModalOpen(true); }}
-                                    style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: 'var(--colors-accent)', borderRadius: '50%', padding: '2px', color: 'white', display: 'flex', zIndex: 2 }}
-                                >
-                                    <Plus size={16} />
-                                </div>
-                            </AvatarWrapper>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontSize: '1rem', color: 'var(--colors-textMain)' }}>My status</span>
-                                <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>{myGroupedStatuses ? 'Tap to view your status' : 'Tap to add status update'}</span>
-                            </div>
-                        </ChannelItem>
-
-                        <SectionTitle style={{ marginTop: '16px', marginBottom: '8px' }}>Recent updates</SectionTitle>
-                        {otherGroupedStatuses.length === 0 ? (
-                            <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', textAlign: 'center', marginTop: '32px' }}>
-                                No recent updates to show right now.
-                            </div>
-                        ) : (
-                            otherGroupedStatuses.map((group) => {
-                                const allViewed = group.statuses.every(s => s.viewers && s.viewers.some(v => (v === mongoUserId || v._id === mongoUserId)));
-                                const borderColor = allViewed ? 'rgba(128, 128, 128, 0.4)' : 'var(--colors-accent)';
-                                return (
-                                <ChannelItem key={group.user._id} onClick={() => setStoryViewerInitialUserIndex(groupedStatuses.findIndex(g => g.user._id === group.user._id))} style={{ height: 'auto', padding: '10px 16px', gap: '14px', margin: 0 }}>
-                                    <AvatarWrapper style={{ flexShrink: 0, border: `2px solid ${borderColor}`, padding: '2px', width: '52px', height: '52px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
-                                        {(() => {
-                                            const last = group.statuses[group.statuses.length - 1];
-                                            if (last.type === 'text') {
-                                                return <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: last.backgroundColor || '#1E2B3C', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', overflow: 'hidden', textAlign: 'center', padding: '4px', boxSizing: 'border-box', flexShrink: 0 }}>
-                                                    <span style={{ transform: 'scale(0.8)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{last.content}</span>
-                                                </div>
-                                            } else if (last.type === 'video') {
-                                                return <video src={last.content} style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '50%', flexShrink: 0 }} />
-                                            } else {
-                                                return <Avatar src={last.content} style={{ width: '44px', height: '44px', objectFit: 'cover', flexShrink: 0 }} />
-                                            }
-                                        })()}
-                                    </AvatarWrapper>
-                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                        <span style={{ fontSize: '1rem', color: 'var(--colors-textMain)' }}>{group.user.displayName}</span>
-                                        <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>
-                                            {formatMessageTime(group.statuses[group.statuses.length - 1].createdAt, true)}
-                                        </span>
-                                    </div>
-                                </ChannelItem>
-                                );
-                            })
-                        )}
-                    </>
+                    <StatusSection
+                        groupedStatuses={groupedStatuses}
+                        myGroupedStatuses={myGroupedStatuses}
+                        otherGroupedStatuses={otherGroupedStatuses}
+                        mongoUserId={mongoUserId}
+                        currentUserData={currentUserData}
+                        onOpenStory={(userIndex) => setStoryViewerInitialUserIndex(userIndex)}
+                        onOpenCreateStatus={(mode) => {
+                            setStatusUploadMode(mode || 'text');
+                            setIsStatusModalOpen(true);
+                        }}
+                        onDeleteStatus={handleDeleteStatus}
+                        onForwardStatus={handleForwardStatus}
+                        onReshareStatus={handleReshareStatus}
+                        formatMessageTime={formatMessageTime}
+                        isMobileViewport={isMobileViewport}
+                        showToast={showToast}
+                    />
                 )}
             </Sidebar>
 
@@ -4445,22 +4355,70 @@ export default function Dashboard() {
                         </div>
                     </div>
                 ) : activeTab === 'status' ? (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative', padding: '24px' }}>
                         <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
                         <div style={{ 
-                            width: '140px', height: '140px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0.05) 100%)', 
-                            border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px', 
-                            boxShadow: '0 0 40px rgba(6,182,212,0.15), inset 0 0 20px rgba(6,182,212,0.1)', position: 'relative', zIndex: 1
+                            width: '130px', height: '130px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(0, 168, 132, 0.18) 0%, rgba(15, 23, 42, 0.4) 100%)', 
+                            border: '2px solid rgba(0, 168, 132, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '28px', 
+                            boxShadow: '0 0 40px rgba(0, 168, 132, 0.2), inset 0 0 20px rgba(0, 168, 132, 0.15)', position: 'relative', zIndex: 1
                         }}>
-                            <CircleDashed size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} />
+                            <CircleDashed size={60} color="var(--colors-accent, #00a884)" strokeWidth={1.8} style={{ filter: 'drop-shadow(0 0 8px rgba(0, 168, 132, 0.5))' }} />
                         </div>
-                        <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.5rem', marginBottom: '16px', fontWeight: '500', letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Status</h2>
-                        <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.1rem', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6', position: 'relative', zIndex: 1 }}>
-                            Share ephemeral updates with your developer community. Statuses automatically disappear after 24 hours.
+                        <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2rem', marginBottom: '12px', fontWeight: '600', letterSpacing: '-0.4px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Status updates</h2>
+                        <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.55', position: 'relative', zIndex: 1, margin: '0 0 24px 0' }}>
+                            Click on a contact to view their status update, or share photos, videos, and code snippets with your developer network.
                         </p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '40px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', position: 'relative', zIndex: 1 }}>
-                            <Lock size={14} />
-                            <span>Your updates are secure and private</span>
+                        <div style={{ display: 'flex', gap: '12px', position: 'relative', zIndex: 1 }}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setStatusUploadMode('text');
+                                    setIsStatusModalOpen(true);
+                                }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 18px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                    border: '1px solid var(--colors-border)',
+                                    borderRadius: '24px',
+                                    color: 'var(--colors-textMain)',
+                                    fontSize: '0.88rem',
+                                    fontWeight: 500,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <Edit3 size={16} />
+                                Text status
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setStatusUploadMode('media');
+                                    setIsStatusModalOpen(true);
+                                }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '10px 20px',
+                                    backgroundColor: '#00a884',
+                                    border: 'none',
+                                    borderRadius: '24px',
+                                    color: '#111b21',
+                                    fontSize: '0.88rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <Camera size={16} />
+                                Add media
+                            </button>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '40px', color: 'var(--colors-textMuted)', fontSize: '0.82rem', position: 'relative', zIndex: 1 }}>
+                            <Lock size={13} color="var(--colors-accent)" />
+                            <span>Your status updates are end-to-end encrypted</span>
                         </div>
                     </div>
                 ) : activeTab === 'calls' ? (
@@ -5678,19 +5636,71 @@ export default function Dashboard() {
                             </div>
                         )}
                         {activeTab === 'status' && (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative' }}>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative', padding: '24px' }}>
                                 <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
                                 <div style={{ 
-                                    width: '140px', height: '140px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0.05) 100%)', 
-                                    border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px', 
-                                    boxShadow: '0 0 40px rgba(6,182,212,0.15), inset 0 0 20px rgba(6,182,212,0.1)', position: 'relative', zIndex: 1
+                                    width: '130px', height: '130px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(0, 168, 132, 0.18) 0%, rgba(15, 23, 42, 0.4) 100%)', 
+                                    border: '2px solid rgba(0, 168, 132, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '28px', 
+                                    boxShadow: '0 0 40px rgba(0, 168, 132, 0.2), inset 0 0 20px rgba(0, 168, 132, 0.15)', position: 'relative', zIndex: 1
                                 }}>
-                                    <CircleDashed size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} />
+                                    <CircleDashed size={60} color="var(--colors-accent, #00a884)" strokeWidth={1.8} style={{ filter: 'drop-shadow(0 0 8px rgba(0, 168, 132, 0.5))' }} />
                                 </div>
-                                <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.5rem', marginBottom: '16px', fontWeight: '500', letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Share statuses</h2>
-                                <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.1rem', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6', position: 'relative', zIndex: 1 }}>
-                                    Share photos, videos and text that disappear after 24 hours.
+                                <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2rem', marginBottom: '12px', fontWeight: '600', letterSpacing: '-0.4px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Status updates</h2>
+                                <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.55', position: 'relative', zIndex: 1, margin: '0 0 24px 0' }}>
+                                    Click on a contact to view their status update, or share photos, videos, and code snippets with your developer network.
                                 </p>
+                                <div style={{ display: 'flex', gap: '12px', position: 'relative', zIndex: 1 }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setStatusUploadMode('text');
+                                            setIsStatusModalOpen(true);
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            padding: '10px 18px',
+                                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid var(--colors-border)',
+                                            borderRadius: '24px',
+                                            color: 'var(--colors-textMain)',
+                                            fontSize: '0.88rem',
+                                            fontWeight: 500,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <Edit3 size={16} />
+                                        Text status
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setStatusUploadMode('media');
+                                            setIsStatusModalOpen(true);
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            padding: '10px 20px',
+                                            backgroundColor: '#00a884',
+                                            border: 'none',
+                                            borderRadius: '24px',
+                                            color: '#111b21',
+                                            fontSize: '0.88rem',
+                                            fontWeight: 600,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <Camera size={16} />
+                                        Add media
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '40px', color: 'var(--colors-textMuted)', fontSize: '0.82rem', position: 'relative', zIndex: 1 }}>
+                                    <Lock size={13} color="var(--colors-accent)" />
+                                    <span>Your status updates are end-to-end encrypted</span>
+                                </div>
                             </div>
                         )}
                         {activeTab === 'calls' && (
@@ -6764,6 +6774,7 @@ export default function Dashboard() {
                     BACKEND_URL={BACKEND_URL}
                     getAccessTokenSilently={getAccessTokenSilently}
                     onUpload={handleStatusUpload}
+                    initialMode={statusUploadMode}
                 /></Suspense>
             )}
 

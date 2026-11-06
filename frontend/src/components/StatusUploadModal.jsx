@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Type, Image as ImageIcon, Send, RefreshCw } from 'lucide-react';
 
 const BACKGROUND_COLORS = [
@@ -6,8 +6,8 @@ const BACKGROUND_COLORS = [
     '#2196F3', '#009688', '#4CAF50', '#FF9800', '#FF5722'
 ];
 
-const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilently }) => {
-    const [mode, setMode] = useState('text'); // 'text' or 'media'
+const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilently, initialMode = 'text' }) => {
+    const [mode, setMode] = useState(initialMode); // 'text' or 'media'
     const [textContext, setTextContext] = useState('');
     const [bgColorIndex, setBgColorIndex] = useState(0);
     
@@ -22,6 +22,15 @@ const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilen
 
     const fileInputRef = useRef(null);
     const videoRef = useRef(null);
+
+    useEffect(() => {
+        if (initialMode === 'media' && !mediaFile) {
+            const timer = setTimeout(() => {
+                fileInputRef.current?.click();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [initialMode]);
 
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
