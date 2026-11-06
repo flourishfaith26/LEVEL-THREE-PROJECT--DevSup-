@@ -58,6 +58,13 @@ export const applyTheme = (themeName) => {
         root.style.setProperty('--colors-border', active.border);
         root.style.setProperty('--colors-accent', active.accent);
         root.style.setProperty('--colors-accentHover', active.accentHover);
+
+        root.style.setProperty('--midnight-bg', active.bg);
+        root.style.setProperty('--midnight-surface', active.surface);
+        root.style.setProperty('--midnight-text', active.textMain);
+        root.style.setProperty('--midnight-muted', active.textMuted);
+        root.style.setProperty('--midnight-border', active.border);
+        root.style.setProperty('--midnight-accent', active.accent);
         
         if (document.body) {
             document.body.style.backgroundColor = active.bg;

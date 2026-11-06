@@ -1,4 +1,6 @@
 import User from '../models/User.js';
+import Status from '../models/Status.js';
+import Conversation from '../models/Conversation.js';
 import { normalizeUsername, validateUsernameFormat } from '../utils/username.js';
 
 export const syncUser = async (req, res) => {
@@ -317,5 +319,34 @@ export const lookupUser = async (req, res) => {
     } catch (error) {
         console.error('Error in lookupUser:', error);
         res.status(500).json({ message: 'Internal server error during user lookup' });
+    }
+};
+
+export const deleteAccount = async (req, res) => {
+    try {
+        const auth0Id = req.auth.payload.sub;
+        const currentUser = await User.findOne({ auth0Id });
+        if (!currentUser) return res.status(404).json({ message: 'User not found' });
+
+        const userId = currentUser._id;
+        // Delete user's statuses
+        await Status.deleteMany({ uploader: userId });
+        // Remove from blockedUsers of other users
+        await User.updateMany(
+            { blockedUsers: userId },
+            { $pull: { blockedUsers: userId } }
+        );
+        // Remove user from conversations
+        await Conversation.updateMany(
+            { participants: userId },
+            { $pull: { participants: userId } }
+        );
+        // Delete the user record
+        await User.findByIdAndDelete(userId);
+
+        res.status(200).json({ success: true, message: 'Account permanently deleted' });
+    } catch (error) {
+        console.error('Error deleting account:', error);
+        res.status(500).json({ message: 'Internal server error while deleting account' });
     }
 };

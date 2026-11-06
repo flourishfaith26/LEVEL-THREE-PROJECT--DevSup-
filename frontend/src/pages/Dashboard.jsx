@@ -27,6 +27,7 @@ const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
 import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2 } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
+import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
 import { motion } from 'framer-motion';
 const StatusUploadModal = lazy(() => import('../components/StatusUploadModal'));
@@ -1744,6 +1745,48 @@ export default function Dashboard() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [mediaViewer]);
+
+    useEffect(() => {
+        const handleGlobalShortcuts = (e) => {
+            const tag = e.target?.tagName?.toLowerCase();
+            const isEditing = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+
+            // Ctrl + Alt + , : Open Settings
+            if (e.ctrlKey && e.altKey && e.key === ',') {
+                e.preventDefault();
+                setActiveTab('settings');
+                setActiveSettingTab(null);
+            }
+            // Ctrl + Alt + N : New chat
+            else if (e.ctrlKey && e.altKey && (e.key === 'n' || e.key === 'N')) {
+                e.preventDefault();
+                openCreateModal();
+            }
+            // Ctrl + Alt + / : Search chats
+            else if (e.ctrlKey && e.altKey && e.key === '/') {
+                e.preventDefault();
+                setActiveTab('chats');
+                const searchEl = document.querySelector('input[placeholder*="Search"]');
+                if (searchEl) searchEl.focus();
+            }
+            // Ctrl + Alt + M : Toggle Mute active chat
+            else if (e.ctrlKey && e.altKey && (e.key === 'm' || e.key === 'M') && !isEditing) {
+                if (activeConversationId) {
+                    e.preventDefault();
+                    setMutedConversations(prev => 
+                        prev.includes(activeConversationId) 
+                            ? prev.filter(id => id !== activeConversationId)
+                            : [...prev, activeConversationId]
+                    );
+                    showToast(mutedConversations.includes(activeConversationId) ? 'Chat unmuted' : 'Chat muted');
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalShortcuts);
+        return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+    }, [activeConversationId, mutedConversations]);
+
     const [activeTab, setActiveTab] = useState('chats'); // 'chats', 'status', 'settings'
     const [activeSettingTab, setActiveSettingTab] = useState(null);
     useEffect(() => {
@@ -1900,6 +1943,30 @@ export default function Dashboard() {
     const [convAvatarUrl, setConvAvatarUrl] = useState('');
     const [selectedUsers, setSelectedUsers] = useState([]);
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+    const availableContacts = useMemo(() => {
+        const list = [];
+        const seen = new Set();
+        (conversations || []).forEach(c => {
+            if (!c.isGroup && c.participants) {
+                c.participants.forEach(p => {
+                    const pId = String(p._id || p);
+                    if (pId && pId !== String(mongoUserId) && !seen.has(pId)) {
+                        seen.add(pId);
+                        list.push(p);
+                    }
+                });
+            }
+        });
+        (allUsers || []).forEach(u => {
+            const uId = String(u._id || u);
+            if (uId && uId !== String(mongoUserId) && !seen.has(uId)) {
+                seen.add(uId);
+                list.push(u);
+            }
+        });
+        return list;
+    }, [conversations, allUsers, mongoUserId]);
 
     // Edit/Delete State
     const [editingMessageId, setEditingMessageId] = useState(null);
@@ -2105,27 +2172,31 @@ export default function Dashboard() {
                         if (
                             messageId &&
                             !notifiedMessageIdsRef.current.has(messageId) &&
-                            appSettingsRef.current?.messageAlerts === true &&
                             !mutedConversationsRef.current.includes(conversationId)
                         ) {
-                            notifiedMessageIdsRef.current.add(messageId);
-                            if (notifiedMessageIdsRef.current.size > 200) {
-                                const oldestMessageId = notifiedMessageIdsRef.current.values().next().value;
-                                notifiedMessageIdsRef.current.delete(oldestMessageId);
-                            }
-                            const isConversationOpen = String(activeConversationIdRef.current) === conversationId;
-                            
-                            const nativeNotificationsEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted';
-
-                            if (!isConversationOpen && !nativeNotificationsEnabled) {
-                                setIncomingMessageNotification(incomingMessage);
-                                setNotificationReply('');
+                            if (appSettingsRef.current?.sounds !== false) {
+                                playNotificationSound();
                             }
 
-                            if (
-                                (!isConversationOpen || document.visibilityState !== 'visible') &&
-                                nativeNotificationsEnabled
-                            ) {
+                            if (appSettingsRef.current?.messageAlerts === true) {
+                                notifiedMessageIdsRef.current.add(messageId);
+                                if (notifiedMessageIdsRef.current.size > 200) {
+                                    const oldestMessageId = notifiedMessageIdsRef.current.values().next().value;
+                                    notifiedMessageIdsRef.current.delete(oldestMessageId);
+                                }
+                                const isConversationOpen = String(activeConversationIdRef.current) === conversationId;
+                                
+                                const nativeNotificationsEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+
+                                if (!isConversationOpen && !nativeNotificationsEnabled) {
+                                    setIncomingMessageNotification(incomingMessage);
+                                    setNotificationReply('');
+                                }
+
+                                if (
+                                    (!isConversationOpen || document.visibilityState !== 'visible') &&
+                                    nativeNotificationsEnabled
+                                ) {
                                 const notificationOptions = {
                                     body: appSettingsRef.current?.showPreviews === false
                                         ? 'You received a message'
@@ -2150,6 +2221,7 @@ export default function Dashboard() {
                             }
                         }
                     }
+                }
 
                     setMessages((prev) => {
                         const incomingConvId = String(incomingMessage.conversationId?._id || incomingMessage.conversationId || '');
@@ -2735,6 +2807,28 @@ export default function Dashboard() {
         } catch (e) {
             console.error('Error unblocking user:', e);
             showToast('Error unblocking user');
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        try {
+            const token = await getAccessTokenSilently();
+            const res = await fetch(`${BACKEND_URL}/api/users/account`, {
+                method: 'DELETE',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            if (res.ok) {
+                showToast('Account permanently deleted.');
+                logout({ logoutParams: { returnTo: window.location.origin } });
+            } else {
+                const err = await res.json();
+                showToast(err.message || 'Failed to delete account');
+            }
+        } catch (e) {
+            console.error('Error deleting account:', e);
+            showToast('Error deleting account');
         }
     };
 
@@ -4267,17 +4361,17 @@ export default function Dashboard() {
                         {activeSettingTab === 'Profile' ? (
                             <ProfilePane onBack={() => setActiveSettingTab(null)} currentUser={currentUserData} onUpdateProfile={handleUpdateProfile} getAccessTokenSilently={getAccessTokenSilently} BACKEND_URL={BACKEND_URL} onViewProfilePicture={(image) => openMediaViewer(image, 'image', 'Profile picture')} />
                         ) : activeSettingTab === 'Account' ? (
-                            <AccountPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} />
+                            <AccountPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} currentUser={currentUserData} onDeleteAccount={handleDeleteAccount} showToast={showToast} />
                         ) : activeSettingTab === 'Privacy' ? (
-                            <PrivacyPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} blockedUsers={currentUserData?.blockedUsers || []} onUnblockUser={handleUnblockUser} />
+                            <PrivacyPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} blockedUsers={currentUserData?.blockedUsers || []} onUnblockUser={handleUnblockUser} onBlockUser={handleBlockUser} contacts={availableContacts} showToast={showToast} />
                         ) : activeSettingTab === 'Chats' ? (
-                            <ChatsPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} getAccessTokenSilently={getAccessTokenSilently} BACKEND_URL={BACKEND_URL} />
+                            <ChatsPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} getAccessTokenSilently={getAccessTokenSilently} BACKEND_URL={BACKEND_URL} showToast={showToast} />
                         ) : activeSettingTab === 'Notifications' ? (
-                            <NotificationsPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} />
+                            <NotificationsPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} showToast={showToast} />
                         ) : activeSettingTab === 'Keyboard shortcuts' ? (
                             <KeyboardShortcutsPane onBack={() => setActiveSettingTab(null)} />
                         ) : activeSettingTab === 'Help' ? (
-                            <HelpPane onBack={() => setActiveSettingTab(null)} />
+                            <HelpPane onBack={() => setActiveSettingTab(null)} currentUser={currentUserData} showToast={showToast} />
                         ) : null}
                     </div>
                 ) : activeTab === 'settings' ? (

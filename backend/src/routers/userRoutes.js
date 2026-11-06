@@ -8,7 +8,8 @@ import {
     blockUser,
     unblockUser,
     getBlockedUsers,
-    lookupUser
+    lookupUser,
+    deleteAccount
 } from '../controllers/userController.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -23,5 +24,6 @@ router.get('/check-username', requireAuth, checkUsernameAvailability);
 router.post('/block/:targetUserId', requireAuth, blockUser);
 router.post('/unblock/:targetUserId', requireAuth, unblockUser);
 router.get('/blocked', requireAuth, getBlockedUsers);
+router.delete('/account', requireAuth, deleteAccount);
 
 export default router;
