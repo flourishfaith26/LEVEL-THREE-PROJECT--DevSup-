@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { styled, keyframes } from '../stitches.config.js';
 import { Phone, PhoneOff, Video, Mic, MicOff, VideoOff, UserPlus, X } from 'lucide-react';
+import { playWhatsAppCallSound } from '../utils/audio.js';
 
 const OverlayContainer = styled('div', {
     position: 'fixed',
@@ -308,24 +309,22 @@ const CallOverlay = ({
         if (!callConfig?.active) return;
         if (callAccepted) {
             // Stop ringing once call is accepted
-            ringtoneRef.current?.pause();
+            ringtoneRef.current?.stop?.();
+            ringtoneRef.current?.pause?.();
             ringtoneRef.current = null;
             return;
         }
-        // Create and play ringtone
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.loop = true;
-        audio.volume = 0.5;
-        audio.play().catch((error) => {
-            console.warn('Unable to play call ringtone:', error);
-        });
-        ringtoneRef.current = audio;
+
+        // Play gentle, authentic WhatsApp call sound (Marimba for incoming, soft dual-sine for outgoing)
+        const callSoundController = playWhatsAppCallSound(Boolean(callConfig.isReceiving));
+        ringtoneRef.current = callSoundController;
+
         return () => {
-            audio.pause();
-            audio.currentTime = 0;
+            callSoundController?.stop?.();
+            callSoundController?.pause?.();
             ringtoneRef.current = null;
         };
-    }, [callConfig?.active, callAccepted]);
+    }, [callConfig?.active, callConfig?.isReceiving, callAccepted]);
 
     const buildPeerConnection = useCallback((targetUserId, iceServers) => {
         const pc = new RTCPeerConnection({ iceServers });
@@ -426,7 +425,8 @@ const CallOverlay = ({
             }
         }
         // Stop ringtone
-        ringtoneRef.current?.pause();
+        ringtoneRef.current?.stop?.();
+        ringtoneRef.current?.pause?.();
         ringtoneRef.current = null;
         localStream.current?.getTracks().forEach(t => t.stop());
         localStream.current = null;
