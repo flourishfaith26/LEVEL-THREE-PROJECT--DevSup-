@@ -171,16 +171,42 @@ export default function StatusSection({
         showToast?.('Status privacy updated');
     };
 
-    // Filtered other statuses
+    // Comprehensive search across contacts and status content
     const filteredOtherStatuses = useMemo(() => {
         if (!Array.isArray(otherGroupedStatuses)) return [];
         if (!searchQuery.trim()) return otherGroupedStatuses;
-        const q = searchQuery.toLowerCase();
-        return otherGroupedStatuses.filter(g => 
-            g?.user?.displayName?.toLowerCase().includes(q) || 
-            g?.user?.username?.toLowerCase().includes(q)
-        );
+        const q = searchQuery.toLowerCase().trim();
+        return otherGroupedStatuses.filter(g => {
+            const user = g?.user;
+            const displayName = String(user?.displayName || '').toLowerCase();
+            const name = String(user?.name || '').toLowerCase();
+            const username = String(user?.username || '').toLowerCase();
+            const nickname = String(user?.nickname || '').toLowerCase();
+            const email = String(user?.email || '').toLowerCase();
+            if (displayName.includes(q) || name.includes(q) || username.includes(q) || nickname.includes(q) || email.includes(q)) {
+                return true;
+            }
+            const statuses = Array.isArray(g?.statuses) ? g.statuses : [];
+            return statuses.some(s => 
+                (typeof s?.content === 'string' && s.content.toLowerCase().includes(q)) ||
+                (typeof s?.caption === 'string' && s.caption.toLowerCase().includes(q))
+            );
+        });
     }, [otherGroupedStatuses, searchQuery]);
+
+    const myMatchesSearch = useMemo(() => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase().trim();
+        if ('my status'.includes(q) || 'you'.includes(q) || 'me'.includes(q)) return true;
+        const displayName = String(currentUserData?.displayName || '').toLowerCase();
+        const username = String(currentUserData?.username || '').toLowerCase();
+        if (displayName.includes(q) || username.includes(q)) return true;
+        const statuses = Array.isArray(myGroupedStatuses?.statuses) ? myGroupedStatuses.statuses : [];
+        return statuses.some(s => 
+            (typeof s?.content === 'string' && s.content.toLowerCase().includes(q)) ||
+            (typeof s?.caption === 'string' && s.caption.toLowerCase().includes(q))
+        );
+    }, [searchQuery, currentUserData, myGroupedStatuses]);
 
     // Partition into Recent, Viewed, and Muted
     const { recentUpdates, viewedUpdates, mutedUpdates } = useMemo(() => {
@@ -268,35 +294,11 @@ export default function StatusSection({
                             <Search size={19} />
                         </button>
 
-                        {/* Text Status Button */}
-                        <button
-                            type="button"
-                            onClick={() => onOpenCreateStatus?.('text')}
-                            title="Write text status"
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--colors-textMuted)',
-                                width: '36px',
-                                height: '36px',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.color = 'var(--colors-textMain)'}
-                            onMouseLeave={e => e.currentTarget.style.color = 'var(--colors-textMuted)'}
-                        >
-                            <Edit3 size={19} />
-                        </button>
-
-                        {/* Media Status Button */}
+                        {/* New Status Button */}
                         <button
                             type="button"
                             onClick={() => onOpenCreateStatus?.('media')}
-                            title="Add photo or video status"
+                            title="New status"
                             style={{
                                 background: 'transparent',
                                 border: 'none',
@@ -313,7 +315,7 @@ export default function StatusSection({
                             onMouseEnter={e => e.currentTarget.style.color = 'var(--colors-textMain)'}
                             onMouseLeave={e => e.currentTarget.style.color = 'var(--colors-textMuted)'}
                         >
-                            <Camera size={19} />
+                            <Plus size={20} />
                         </button>
 
                         {/* 3-dots Menu */}
@@ -435,238 +437,181 @@ export default function StatusSection({
             </div>
 
             {/* My Status Row */}
-            <div
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '14px 20px',
-                    borderBottom: '1px solid var(--colors-border)',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                    position: 'relative'
-                }}
-                onClick={() => {
-                    if (myTotalStatuses > 0 && myIndexInGrouped !== -1) {
-                        onOpenStory?.(myIndexInGrouped);
-                    } else {
-                        onOpenCreateStatus?.('media');
-                    }
-                }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
-                    <SegmentedStatusRing
-                        count={myTotalStatuses}
-                        statuses={myActiveStatuses}
-                        currentUserId={mongoUserId}
-                        size={52}
-                        strokeWidth={2.5}
-                    >
-                        <div style={{ position: 'relative', width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden' }}>
-                            <img
-                                src={getAvatarUrl(currentUserData?.avatarUrl)}
-                                alt="My avatar"
-                                onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                            {myTotalStatuses === 0 && (
-                                <div
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onOpenCreateStatus?.('media');
-                                    }}
-                                    style={{
-                                        position: 'absolute',
-                                        bottom: 0,
-                                        right: 0,
-                                        width: '18px',
-                                        height: '18px',
-                                        borderRadius: '50%',
-                                        backgroundColor: 'var(--colors-accent, #00a884)',
-                                        border: '2px solid var(--colors-surface, #111b21)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#fff',
-                                        zIndex: 3
-                                    }}
-                                >
-                                    <Plus size={12} strokeWidth={3} />
-                                </div>
-                            )}
-                        </div>
-                    </SegmentedStatusRing>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--colors-textMain)' }}>
-                            My status
-                        </span>
-                        <span style={{ fontSize: '0.82rem', color: 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
-                            {myTotalStatuses > 0 
-                                ? (lastMyStatus ? formatMessageTime?.(lastMyStatus.createdAt, true) : 'Tap to view status')
-                                : 'Tap to add status update'}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Right side actions for My Status */}
-                {myTotalStatuses > 0 ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
-                        <button
-                            type="button"
-                            onClick={() => setIsMyStatusesModalOpen(true)}
-                            title="Manage my statuses"
-                            style={{
-                                background: 'rgba(255, 255, 255, 0.06)',
-                                border: 'none',
-                                color: 'var(--colors-textMuted)',
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--colors-textMuted)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
-                        >
-                            <MoreVertical size={16} />
-                        </button>
-                    </div>
-                ) : (
-                    <div
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenCreateStatus?.('media');
-                        }}
-                        style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            backgroundColor: 'rgba(0, 168, 132, 0.12)',
-                            color: 'var(--colors-accent, #00a884)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        <Plus size={18} strokeWidth={2.5} />
-                    </div>
-                )}
-            </div>
-
-            {/* WhatsApp Updated Horizontal Status Cards Carousel */}
-            {otherGroupedStatuses.length > 0 && (
-                <div style={{
-                    padding: '16px 20px',
-                    borderBottom: '1px solid var(--colors-border)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.015)'
-                }}>
-                    <div style={{
+            {myMatchesSearch && (
+                <div
+                    style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        marginBottom: '12px'
-                    }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--colors-textMuted)' }}>
-                            Status Updates
-                        </span>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--colors-accent)' }}>
-                            {otherGroupedStatuses.length} contact{otherGroupedStatuses.length !== 1 ? 's' : ''}
-                        </span>
-                    </div>
-
-                    <div style={{
-                        display: 'flex',
-                        gap: '12px',
-                        overflowX: 'auto',
-                        paddingBottom: '6px',
-                        scrollbarWidth: 'none',
-                        msOverflowStyle: 'none'
-                    }}>
-                        {/* My status card */}
-                        <div
-                            onClick={() => {
-                                if (myTotalStatuses > 0 && myIndexInGrouped !== -1) {
-                                    onOpenStory?.(myIndexInGrouped);
-                                } else {
-                                    onOpenCreateStatus?.('media');
-                                }
-                            }}
-                            style={{
-                                width: '108px',
-                                height: '160px',
-                                borderRadius: '16px',
-                                flexShrink: 0,
-                                position: 'relative',
-                                overflow: 'hidden',
-                                cursor: 'pointer',
-                                background: lastMyStatus && lastMyStatus.type === 'text'
-                                    ? (lastMyStatus.backgroundColor || '#1E2B3C')
-                                    : '#1f2c34',
-                                border: '1px solid rgba(255, 255, 255, 0.08)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'space-between',
-                                padding: '10px',
-                                boxSizing: 'border-box',
-                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                boxShadow: '0 4px 14px rgba(0,0,0,0.25)'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
-                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                        >
-                            {lastMyStatus && (lastMyStatus.type === 'image' || lastMyStatus.type === 'video') && (
-                                <img
-                                    src={lastMyStatus.content}
-                                    alt="My status preview"
-                                    style={{
-                                        position: 'absolute',
-                                        top: 0, left: 0, width: '100%', height: '100%',
-                                        objectFit: 'cover'
-                                    }}
-                                />
-                            )}
-                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.75) 100%)' }} />
-
-                            <div style={{ position: 'relative', zIndex: 2 }}>
-                                <SegmentedStatusRing
-                                    count={myTotalStatuses}
-                                    statuses={myActiveStatuses}
-                                    currentUserId={mongoUserId}
-                                    size={38}
-                                    strokeWidth={2}
-                                >
+                        padding: '14px 20px',
+                        borderBottom: '1px solid var(--colors-border)',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        position: 'relative'
+                    }}
+                    onClick={() => {
+                        if (myTotalStatuses > 0 && myIndexInGrouped !== -1) {
+                            onOpenStory?.(myIndexInGrouped);
+                        } else {
+                            onOpenCreateStatus?.('media');
+                        }
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+                        <div style={{ position: 'relative', width: '52px', height: '52px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <SegmentedStatusRing
+                                count={myTotalStatuses}
+                                statuses={myActiveStatuses}
+                                currentUserId={mongoUserId}
+                                size={52}
+                                strokeWidth={2.5}
+                            >
+                                <div style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden' }}>
                                     <img
                                         src={getAvatarUrl(currentUserData?.avatarUrl)}
                                         alt="My avatar"
-                                        style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
+                                        onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                     />
-                                </SegmentedStatusRing>
-                            </div>
-
-                            <div style={{ position: 'relative', zIndex: 2 }}>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    My status
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.75)', marginTop: '2px' }}>
-                                    {myTotalStatuses > 0 ? `${myTotalStatuses} update${myTotalStatuses > 1 ? 's' : ''}` : 'Add update'}
-                                </div>
+                            </SegmentedStatusRing>
+                            <div
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenCreateStatus?.('media');
+                                }}
+                                title="Add status update"
+                                style={{
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    right: 0,
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'var(--colors-accent, #00a884)',
+                                    border: '2px solid var(--colors-surface, #111b21)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#fff',
+                                    zIndex: 10,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.4)'
+                                }}
+                            >
+                                <Plus size={13} strokeWidth={3} />
                             </div>
                         </div>
 
-                        {/* Contacts status cards */}
-                        {otherGroupedStatuses.map((group) => {
-                            const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
-                            const allViewed = (group.statuses || []).length > 0 && group.statuses.every(s => 
-                                s.viewers && s.viewers.some(v => isSameUser(v, mongoUserId))
-                            );
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--colors-textMain)' }}>
+                                My status
+                            </span>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
+                                {myTotalStatuses > 0 
+                                    ? (lastMyStatus ? formatMessageTime?.(lastMyStatus.createdAt, true) : 'Tap to view status')
+                                    : 'Tap to add status update'}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Right side actions for My Status */}
+                    {myTotalStatuses > 0 ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                            <button
+                                type="button"
+                                onClick={() => setIsMyStatusesModalOpen(true)}
+                                title="Manage my statuses"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.06)',
+                                    border: 'none',
+                                    color: 'var(--colors-textMuted)',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.color = 'var(--colors-textMuted)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+                            >
+                                <MoreVertical size={16} />
+                            </button>
+                        </div>
+                    ) : (
+                        <div
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenCreateStatus?.('media');
+                            }}
+                            style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: 'rgba(0, 168, 132, 0.12)',
+                                color: 'var(--colors-accent, #00a884)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <Plus size={18} strokeWidth={2.5} />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Empty Search Results */}
+            {searchQuery.trim() && !myMatchesSearch && recentUpdates.length === 0 && viewedUpdates.length === 0 && mutedUpdates.length === 0 && (
+                <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--colors-textMuted)' }}>
+                    <Search size={36} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                    <div style={{ fontSize: '0.95rem', color: 'var(--colors-textMain)', fontWeight: 500, marginBottom: '4px' }}>
+                        No status updates found
+                    </div>
+                    <div style={{ fontSize: '0.82rem', marginBottom: '16px' }}>
+                        No contacts or updates matching "{searchQuery}"
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        style={{
+                            padding: '6px 14px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            border: 'none',
+                            borderRadius: '16px',
+                            color: 'var(--colors-accent)',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Clear search
+                    </button>
+                </div>
+            )}
+
+            {/* Recent Updates Section */}
+            {(recentUpdates.length > 0 || !searchQuery) && (
+                <>
+                    <div style={{ padding: '16px 20px 8px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--colors-textMuted)' }}>
+                            Recent updates
+                        </span>
+                    </div>
+
+                    {recentUpdates.length === 0 ? (
+                        <div style={{ padding: '16px 20px', color: 'var(--colors-textMuted)', fontSize: '0.88rem', textAlign: 'center' }}>
+                            No recent updates right now.
+                        </div>
+                    ) : (
+                        recentUpdates.map(group => {
                             const groupIndex = groupedStatuses.findIndex(g => isSameUser(g?.user, group?.user));
+                            const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
 
                             return (
                                 <div
@@ -675,176 +620,70 @@ export default function StatusSection({
                                         if (groupIndex !== -1) onOpenStory?.(groupIndex);
                                     }}
                                     style={{
-                                        width: '108px',
-                                        height: '160px',
-                                        borderRadius: '16px',
-                                        flexShrink: 0,
-                                        position: 'relative',
-                                        overflow: 'hidden',
-                                        cursor: 'pointer',
-                                        background: lastStatus?.type === 'text'
-                                            ? (lastStatus.backgroundColor || '#1E2B3C')
-                                            : '#1f2c34',
-                                        border: allViewed ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 168, 132, 0.4)',
                                         display: 'flex',
-                                        flexDirection: 'column',
+                                        alignItems: 'center',
                                         justifyContent: 'space-between',
-                                        padding: '10px',
-                                        boxSizing: 'border-box',
-                                        transition: 'transform 0.2s, box-shadow 0.2s',
-                                        boxShadow: '0 4px 14px rgba(0,0,0,0.25)'
+                                        padding: '10px 20px',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.2s',
+                                        borderBottom: '1px solid rgba(255, 255, 255, 0.03)'
                                     }}
-                                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
-                                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'}
+                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                                 >
-                                    {lastStatus && (lastStatus.type === 'image' || lastStatus.type === 'video') && (
-                                        <img
-                                            src={lastStatus.content}
-                                            alt={group.user?.displayName || 'Status'}
-                                            style={{
-                                                position: 'absolute',
-                                                top: 0, left: 0, width: '100%', height: '100%',
-                                                objectFit: 'cover'
-                                            }}
-                                        />
-                                    )}
-                                    {lastStatus?.type === 'text' && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: 0, left: 0, right: 0, bottom: 0,
-                                            padding: '40px 10px 10px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            textAlign: 'center',
-                                            color: '#fff',
-                                            fontSize: '0.75rem',
-                                            lineHeight: 1.3,
-                                            overflow: 'hidden'
-                                        }}>
-                                            <span style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                                {lastStatus.content}
-                                            </span>
-                                        </div>
-                                    )}
-                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.75) 100%)' }} />
-
-                                    <div style={{ position: 'relative', zIndex: 2 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
                                         <SegmentedStatusRing
                                             count={group.statuses?.length || 1}
                                             statuses={group.statuses || []}
                                             currentUserId={mongoUserId}
-                                            size={38}
-                                            strokeWidth={2}
+                                            size={52}
+                                            strokeWidth={2.5}
                                         >
                                             <img
                                                 src={getAvatarUrl(group.user?.avatarUrl)}
                                                 alt={group.user?.displayName || 'Avatar'}
-                                                style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
+                                                style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
                                             />
                                         </SegmentedStatusRing>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                                            <span style={{ fontSize: '0.98rem', fontWeight: '600', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {group.user?.displayName || 'Contact'}
+                                            </span>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', marginTop: '2px' }}>
+                                                {formatMessageTime?.(lastStatus?.createdAt, true)}
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    <div style={{ position: 'relative', zIndex: 2 }}>
-                                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {group.user?.displayName?.split(' ')[0] || 'Contact'}
-                                        </div>
-                                        <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.75)', marginTop: '2px' }}>
-                                            {formatMessageTime?.(lastStatus?.createdAt, false)}
-                                        </div>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleMute(group.user?._id || group.user, group.user?.displayName);
+                                        }}
+                                        title="Mute status updates"
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--colors-textMuted)',
+                                            cursor: 'pointer',
+                                            padding: '6px',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            opacity: 0.6
+                                        }}
+                                        onMouseEnter={e => { e.currentTarget.style.opacity = 1; e.currentTarget.style.color = '#ef4444'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.opacity = 0.6; e.currentTarget.style.color = 'var(--colors-textMuted)'; }}
+                                    >
+                                        <VolumeX size={16} />
+                                    </button>
                                 </div>
                             );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* Recent Updates Section */}
-            <div style={{ padding: '16px 20px 8px' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--colors-textMuted)' }}>
-                    Recent updates
-                </span>
-            </div>
-
-            {recentUpdates.length === 0 ? (
-                <div style={{ padding: '16px 20px', color: 'var(--colors-textMuted)', fontSize: '0.88rem', textAlign: 'center' }}>
-                    {searchQuery ? 'No status updates matching your search.' : 'No recent updates right now.'}
-                </div>
-            ) : (
-                recentUpdates.map(group => {
-                    const groupIndex = groupedStatuses.findIndex(g => isSameUser(g?.user, group?.user));
-                    const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
-
-                    return (
-                        <div
-                            key={group.user?._id || Math.random()}
-                            onClick={() => {
-                                if (groupIndex !== -1) onOpenStory?.(groupIndex);
-                            }}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '10px 20px',
-                                cursor: 'pointer',
-                                transition: 'background 0.2s',
-                                borderBottom: '1px solid rgba(255, 255, 255, 0.03)'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)'}
-                            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
-                                <SegmentedStatusRing
-                                    count={group.statuses?.length || 1}
-                                    statuses={group.statuses || []}
-                                    currentUserId={mongoUserId}
-                                    size={52}
-                                    strokeWidth={2.5}
-                                >
-                                    <img
-                                        src={getAvatarUrl(group.user?.avatarUrl)}
-                                        alt={group.user?.displayName || 'Avatar'}
-                                        style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
-                                    />
-                                </SegmentedStatusRing>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                                    <span style={{ fontSize: '0.98rem', fontWeight: '600', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {group.user?.displayName || 'Contact'}
-                                    </span>
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)', marginTop: '2px' }}>
-                                        {formatMessageTime?.(lastStatus?.createdAt, true)}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleMute(group.user?._id || group.user, group.user?.displayName);
-                                }}
-                                title="Mute status updates"
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--colors-textMuted)',
-                                    cursor: 'pointer',
-                                    padding: '6px',
-                                    borderRadius: '50%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    opacity: 0.6
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.opacity = 1; e.currentTarget.style.color = '#ef4444'; }}
-                                onMouseLeave={e => { e.currentTarget.style.opacity = 0.6; e.currentTarget.style.color = 'var(--colors-textMuted)'; }}
-                            >
-                                <VolumeX size={16} />
-                            </button>
-                        </div>
-                    );
-                })
+                        })
+                    )}
+                </>
             )}
 
             {/* Viewed Updates Section (Collapsible Accordion) */}
@@ -868,7 +707,7 @@ export default function StatusSection({
                         {isViewedExpanded ? <ChevronUp size={18} color="var(--colors-textMuted)" /> : <ChevronDown size={18} color="var(--colors-textMuted)" />}
                     </div>
 
-                    {isViewedExpanded && viewedUpdates.map(group => {
+                    {(isViewedExpanded || !!searchQuery) && viewedUpdates.map(group => {
                         const groupIndex = groupedStatuses.findIndex(g => isSameUser(g?.user, group?.user));
                         const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
 
@@ -963,7 +802,7 @@ export default function StatusSection({
                         {isMutedExpanded ? <ChevronUp size={18} color="var(--colors-textMuted)" /> : <ChevronDown size={18} color="var(--colors-textMuted)" />}
                     </div>
 
-                    {isMutedExpanded && mutedUpdates.map(group => {
+                    {(isMutedExpanded || !!searchQuery) && mutedUpdates.map(group => {
                         const groupIndex = groupedStatuses.findIndex(g => isSameUser(g?.user, group?.user));
                         const lastStatus = (group.statuses || [])[group.statuses?.length - 1];
 

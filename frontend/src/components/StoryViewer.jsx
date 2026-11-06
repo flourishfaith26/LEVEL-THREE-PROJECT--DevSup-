@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Eye, EyeOff, MoreVertical, Forward, RefreshCw, Trash2 } from 'lucide-react';
+import { X, Eye, EyeOff, MoreVertical, Forward, RefreshCw, Trash2, Send, Check } from 'lucide-react';
 
 const matchesUserId = (target, currentId) => {
     if (!target || !currentId) return false;
     return String(target?._id || target) === String(currentId);
 };
 
-const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUserId, markViewed, onDelete, onForward, onReshare, readReceipts = true }) => {
+const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUserId, markViewed, onDelete, onForward, onReshare, readReceipts = true, onReply }) => {
     const [userIndex, setUserIndex] = useState(initialUserIndex);
     const [statusIndex, setStatusIndex] = useState(() => {
         const group = groupedStatuses[initialUserIndex];
@@ -19,11 +19,25 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
     const [showMenu, setShowMenu] = useState(false);
     const [showViewers, setShowViewers] = useState(false);
     const [transitionDirection, setTransitionDirection] = useState('next');
+    const [replyText, setReplyText] = useState('');
+    const [replySentNotice, setReplySentNotice] = useState(false);
     
     const touchStartY = useRef(0);
     const touchCurrentY = useRef(0);
     const containerRef = useRef(null);
     const videoRef = useRef(null);
+
+    const handleSendReply = (textToSend) => {
+        const text = (typeof textToSend === 'string' ? textToSend : replyText || '').trim();
+        if (!text || !currentUserGroup?.user || !currentStatus) return;
+        onReply?.(currentUserGroup.user, text, currentStatus);
+        setReplyText('');
+        setReplySentNotice(true);
+        setTimeout(() => {
+            setReplySentNotice(false);
+            setIsPaused(false);
+        }, 1800);
+    };
 
     useEffect(() => {
         if (videoRef.current) {
@@ -270,7 +284,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                 type="button"
                 aria-label="Previous status"
                 className="story-nav-area left-nav"
-                style={{ position: 'absolute', top: 0, left: 0, width: '50%', height: '100%', zIndex: 5, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+                style={{ position: 'absolute', top: 0, left: 0, width: '50%', height: isOwnStatus ? '100%' : 'calc(100% - 130px)', zIndex: 5, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                 onClick={handlePrev}
                 onMouseDown={() => setIsPaused(true)}
                 onMouseUp={() => setIsPaused(false)}
@@ -281,7 +295,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                 type="button"
                 aria-label="Next status"
                 className="story-nav-area right-nav"
-                style={{ position: 'absolute', top: 0, right: 0, width: '50%', height: '100%', zIndex: 5, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+                style={{ position: 'absolute', top: 0, right: 0, width: '50%', height: isOwnStatus ? '100%' : 'calc(100% - 130px)', zIndex: 5, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                 onClick={handleNext}
                 onMouseDown={() => setIsPaused(true)}
                 onMouseUp={() => setIsPaused(false)}
@@ -404,13 +418,13 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                     bottom: 0,
                     left: 0,
                     width: '100%',
-                    padding: '80px 24px 80px 24px', // extra padding bottom to clear the footer
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+                    padding: isOwnStatus ? '80px 24px 80px 24px' : '20px 24px 140px 24px',
+                    background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'flex-end',
                     pointerEvents: 'none',
-                    zIndex: 20 // Below viewers panel (50) and menu (100)
+                    zIndex: 20
                 }}>
                     <span style={{
                         color: '#fff',
@@ -424,6 +438,134 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                     }}>
                         {currentStatus.caption}
                     </span>
+                </div>
+            )}
+
+            {/* WhatsApp Status Reply Bar (When viewing another contact's status) */}
+            {!isOwnStatus && !showMenu && (
+                <div 
+                    style={{ 
+                        position: 'absolute', 
+                        bottom: 0, 
+                        left: 0, 
+                        right: 0, 
+                        padding: '16px 20px', 
+                        background: 'linear-gradient(to top, rgba(11, 20, 26, 0.95) 0%, rgba(11, 20, 26, 0.6) 70%, transparent 100%)',
+                        zIndex: 35,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    {/* Quick emoji reaction strip */}
+                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', maxWidth: '100%', padding: '2px 4px', scrollbarWidth: 'none' }}>
+                        {['❤️', '😂', '😮', '😢', '🙏', '👏', '🔥', '🎉'].map(emoji => (
+                            <button
+                                key={emoji}
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSendReply(emoji);
+                                }}
+                                title={`React ${emoji}`}
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.12)',
+                                    backdropFilter: 'blur(10px)',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    borderRadius: '20px',
+                                    padding: '6px 12px',
+                                    fontSize: '1.25rem',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.15s, background-color 0.15s',
+                                    userSelect: 'none'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.25)'; e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.22)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)'; }}
+                            >
+                                {emoji}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Reply input and Send button */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', maxWidth: '520px' }}>
+                        <div style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255, 255, 255, 0.22)',
+                            borderRadius: '24px',
+                            padding: '10px 18px',
+                            transition: 'border-color 0.2s'
+                        }}>
+                            <input
+                                type="text"
+                                value={replyText}
+                                onChange={e => setReplyText(e.target.value)}
+                                onFocus={() => setIsPaused(true)}
+                                onBlur={() => {
+                                    if (!replyText.trim() && !replySentNotice) setIsPaused(false);
+                                }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSendReply(replyText);
+                                    }
+                                }}
+                                placeholder={`Reply to ${currentUserGroup?.user?.displayName || currentUserGroup?.user?.name || 'status'}...`}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    outline: 'none',
+                                    color: '#fff',
+                                    fontSize: '0.95rem',
+                                    width: '100%'
+                                }}
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => handleSendReply(replyText)}
+                            disabled={!replyText.trim()}
+                            title="Send reply"
+                            style={{
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '50%',
+                                backgroundColor: replyText.trim() ? 'var(--colors-accent, #00a884)' : 'rgba(255, 255, 255, 0.12)',
+                                color: replyText.trim() ? '#111b21' : 'rgba(255, 255, 255, 0.4)',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: replyText.trim() ? 'pointer' : 'default',
+                                transition: 'all 0.2s',
+                                flexShrink: 0
+                            }}
+                        >
+                            <Send size={18} />
+                        </button>
+                    </div>
+
+                    {/* Temporary Sent Notification */}
+                    {replySentNotice && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: 'var(--colors-accent, #00a884)',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            animation: 'story-next 0.2s ease'
+                        }}>
+                            <Check size={16} strokeWidth={3} />
+                            <span>Reply sent</span>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

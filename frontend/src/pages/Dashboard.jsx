@@ -1538,6 +1538,63 @@ export default function Dashboard() {
         });
     };
 
+    const handleReplyStatus = async (targetUser, replyText, status) => {
+        if (!targetUser || !replyText?.trim() || !mongoUserId) return;
+        const targetId = String(targetUser._id || targetUser);
+
+        let statusSummary = '';
+        if (status.type === 'text') {
+            statusSummary = status.content ? (status.content.length > 50 ? `${status.content.slice(0, 50)}...` : status.content) : 'Status';
+        } else if (status.type === 'video') {
+            statusSummary = status.caption ? `Video: ${status.caption}` : 'Video status';
+        } else {
+            statusSummary = status.caption ? `Photo: ${status.caption}` : 'Photo status';
+        }
+        const formattedContent = `[Status: ${statusSummary}]\n${replyText.trim()}`;
+
+        try {
+            let convId = null;
+            const existing = conversations.find(c =>
+                c.type === 'direct' &&
+                c.participants &&
+                c.participants.some(p => String(p._id || p) === targetId)
+            );
+            if (existing) {
+                convId = existing._id;
+            } else {
+                const token = await getAccessTokenSilently();
+                const res = await fetch(`${BACKEND_URL}/api/conversations`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: 'direct',
+                        participantIds: [mongoUserId, targetId]
+                    })
+                });
+                if (res.ok) {
+                    const newConv = await res.json();
+                    convId = newConv._id;
+                    setConversations(prev => [newConv, ...prev]);
+                }
+            }
+
+            if (convId) {
+                sendMessage({
+                    conversationId: convId,
+                    senderId: mongoUserId,
+                    content: formattedContent
+                });
+                showToast('Reply sent');
+            }
+        } catch (err) {
+            console.error('Failed to reply to status:', err);
+            showToast('Failed to send reply');
+        }
+    };
+
     // New 3-Pane Layout Drawer State
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
@@ -4392,56 +4449,8 @@ export default function Dashboard() {
                         <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.55', position: 'relative', zIndex: 1, margin: '0 0 24px 0' }}>
                             Click on a contact to view their status update, or share photos, videos, and code snippets with your developer network.
                         </p>
-                        <div style={{ display: 'flex', gap: '12px', position: 'relative', zIndex: 1 }}>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setStatusUploadMode('text');
-                                    setIsStatusModalOpen(true);
-                                }}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '10px 18px',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid var(--colors-border)',
-                                    borderRadius: '24px',
-                                    color: 'var(--colors-textMain)',
-                                    fontSize: '0.88rem',
-                                    fontWeight: 500,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <Edit3 size={16} />
-                                Text status
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setStatusUploadMode('media');
-                                    setIsStatusModalOpen(true);
-                                }}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '10px 20px',
-                                    backgroundColor: '#00a884',
-                                    border: 'none',
-                                    borderRadius: '24px',
-                                    color: '#111b21',
-                                    fontSize: '0.88rem',
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <Camera size={16} />
-                                Add media
-                            </button>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '40px', color: 'var(--colors-textMuted)', fontSize: '0.82rem', position: 'relative', zIndex: 1 }}>
-                            <Lock size={13} color="var(--colors-accent)" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '24px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', position: 'relative', zIndex: 1 }}>
+                            <Lock size={14} color="var(--colors-accent)" />
                             <span>Your status updates are end-to-end encrypted</span>
                         </div>
                     </div>
@@ -5673,56 +5682,8 @@ export default function Dashboard() {
                                 <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.55', position: 'relative', zIndex: 1, margin: '0 0 24px 0' }}>
                                     Click on a contact to view their status update, or share photos, videos, and code snippets with your developer network.
                                 </p>
-                                <div style={{ display: 'flex', gap: '12px', position: 'relative', zIndex: 1 }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setStatusUploadMode('text');
-                                            setIsStatusModalOpen(true);
-                                        }}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            padding: '10px 18px',
-                                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                            border: '1px solid var(--colors-border)',
-                                            borderRadius: '24px',
-                                            color: 'var(--colors-textMain)',
-                                            fontSize: '0.88rem',
-                                            fontWeight: 500,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        <Edit3 size={16} />
-                                        Text status
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setStatusUploadMode('media');
-                                            setIsStatusModalOpen(true);
-                                        }}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            padding: '10px 20px',
-                                            backgroundColor: '#00a884',
-                                            border: 'none',
-                                            borderRadius: '24px',
-                                            color: '#111b21',
-                                            fontSize: '0.88rem',
-                                            fontWeight: 600,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        <Camera size={16} />
-                                        Add media
-                                    </button>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '40px', color: 'var(--colors-textMuted)', fontSize: '0.82rem', position: 'relative', zIndex: 1 }}>
-                                    <Lock size={13} color="var(--colors-accent)" />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '24px', color: 'var(--colors-textMuted)', fontSize: '0.85rem', position: 'relative', zIndex: 1 }}>
+                                    <Lock size={14} color="var(--colors-accent)" />
                                     <span>Your status updates are end-to-end encrypted</span>
                                 </div>
                             </div>
@@ -6813,6 +6774,7 @@ export default function Dashboard() {
                     onForward={handleForwardStatus}
                     onReshare={handleReshareStatus}
                     readReceipts={appSettings.readReceipts}
+                    onReply={handleReplyStatus}
                 /></Suspense>
             )}
 
