@@ -3815,7 +3815,7 @@ export default function Dashboard() {
                                             {!isGroup && isOtherUserOnline && <OnlineDot style={{ width: '12px', height: '12px', bottom: '2px', right: '2px' }} />}
                                         </AvatarWrapper>
 
-                                        <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '38px', justifyContent: 'space-between', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
+                                        <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', alignSelf: 'center', gap: '4px', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
                                                 <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                     {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
@@ -3837,6 +3837,7 @@ export default function Dashboard() {
                                                         </div>
                                                     )}
                                                     {!isChatsSelectionMode && <IconButton
+                                                        desktopOnly
                                                         className="conv-delete-btn"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -4026,7 +4027,7 @@ export default function Dashboard() {
                                         />
                                     </AvatarWrapper>
 
-                                    <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '38px', justifyContent: 'space-between', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
+                                    <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', alignSelf: 'center', gap: '4px', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
                                             <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                 {conv.name}
@@ -4048,6 +4049,7 @@ export default function Dashboard() {
                                                     </div>
                                                 )}
                                                 {!isChatsSelectionMode && <IconButton
+                                                    desktopOnly
                                                     className="conv-delete-btn"
                                                     onClick={(e) => {
                                                         e.stopPropagation();

@@ -68,7 +68,21 @@ body {
 .chat-item-text {
     display: flex !important;
     flex-direction: column !important;
-    justify-content: space-between !important;
-    height: 38px !important;
+    justify-content: center !important;
+    align-self: center !important;
+    gap: 4px !important;
+    height: auto !important;
     box-sizing: border-box !important;
+}
+
+@media (max-width: 768px) {
+    .chat-item-text {
+        gap: 4px !important;
+        justify-content: center !important;
+        align-self: center !important;
+        height: auto !important;
+    }
+    .conv-delete-btn {
+        display: none !important;
+    }
 }
