@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
     Plus, Camera, Edit3, MoreVertical, Search, X, ChevronDown, ChevronUp, 
-    Eye, Trash2, Lock, Shield, VolumeX, Check
+    Eye, Trash2, Lock, Shield, VolumeX, Volume2, Check
 } from 'lucide-react';
 import { getAvatarUrl } from '../utils/defaultAvatar.js';
 
@@ -119,10 +119,17 @@ export default function StatusSection({
     const [isMyStatusesModalOpen, setIsMyStatusesModalOpen] = useState(false);
     const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
     const [viewersModalStatus, setViewersModalStatus] = useState(null);
-    const [privacySetting, setPrivacySetting] = useState(() => localStorage.getItem('devsup_status_privacy') || 'contacts');
+    const [privacySetting, setPrivacySetting] = useState(() => {
+        try {
+            return localStorage.getItem('devsup_status_privacy') || 'contacts';
+        } catch {
+            return 'contacts';
+        }
+    });
     const [mutedUserIds, setMutedUserIds] = useState(() => {
         try {
-            return JSON.parse(localStorage.getItem('devsup_muted_status_users') || '[]');
+            const parsed = JSON.parse(localStorage.getItem('devsup_muted_status_users') || '[]');
+            return Array.isArray(parsed) ? parsed : [];
         } catch {
             return [];
         }
@@ -140,9 +147,14 @@ export default function StatusSection({
         if (!userId) return;
         const uidStr = String(userId);
         setMutedUserIds(prev => {
-            const exists = prev.includes(uidStr);
-            const next = exists ? prev.filter(id => id !== uidStr) : [...prev, uidStr];
-            localStorage.setItem('devsup_muted_status_users', JSON.stringify(next));
+            const arr = Array.isArray(prev) ? prev : [];
+            const exists = arr.includes(uidStr);
+            const next = exists ? arr.filter(id => id !== uidStr) : [...arr, uidStr];
+            try {
+                localStorage.setItem('devsup_muted_status_users', JSON.stringify(next));
+            } catch (e) {
+                console.error(e);
+            }
             showToast?.(exists ? `Unmuted ${userName || 'contact'}'s status updates` : `Muted ${userName || 'contact'}'s status updates`);
             return next;
         });
@@ -150,7 +162,11 @@ export default function StatusSection({
 
     const handleSavePrivacy = (val) => {
         setPrivacySetting(val);
-        localStorage.setItem('devsup_status_privacy', val);
+        try {
+            localStorage.setItem('devsup_status_privacy', val);
+        } catch (e) {
+            console.error(e);
+        }
         setIsPrivacyModalOpen(false);
         showToast?.('Status privacy updated');
     };
@@ -171,11 +187,12 @@ export default function StatusSection({
         const recent = [];
         const viewed = [];
         const muted = [];
+        const safeMuted = Array.isArray(mutedUserIds) ? mutedUserIds : [];
 
         filteredOtherStatuses.forEach(group => {
             if (!group || !group.user) return;
             const uidStr = String(group.user?._id || group.user);
-            if (mutedUserIds.includes(uidStr)) {
+            if (safeMuted.includes(uidStr)) {
                 muted.push(group);
                 return;
             }
@@ -192,11 +209,12 @@ export default function StatusSection({
         return { recentUpdates: recent, viewedUpdates: viewed, mutedUpdates: muted };
     }, [filteredOtherStatuses, mutedUserIds, mongoUserId]);
 
-    const myActiveStatuses = myGroupedStatuses?.statuses || [];
+    const myActiveStatuses = Array.isArray(myGroupedStatuses?.statuses) ? myGroupedStatuses.statuses : [];
     const myTotalStatuses = myActiveStatuses.length;
     const lastMyStatus = myTotalStatuses > 0 ? myActiveStatuses[myTotalStatuses - 1] : null;
 
     const myIndexInGrouped = useMemo(() => {
+        if (!Array.isArray(groupedStatuses)) return -1;
         return groupedStatuses.findIndex(g => isSameUser(g?.user, mongoUserId));
     }, [groupedStatuses, mongoUserId]);
 

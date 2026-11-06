@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2 } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3 } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -34,6 +34,7 @@ const StatusUploadModal = lazy(() => import('../components/StatusUploadModal'));
 const EventsView = lazy(() => import('../components/EventsView'));
 const LiveCodingWorkspace = lazy(() => import('../components/LiveCodingWorkspace'));
 import StatusSection from '../components/StatusSection.jsx';
+import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import { useNavigate } from 'react-router-dom';
 import { normalizeUsername } from '../utils/username.js';
 import DevSupLogo from '../components/DevSupLogo.jsx';
@@ -1318,6 +1319,7 @@ hljs.configure({ languages: ['javascript', 'typescript', 'python', 'xml', 'css',
 const formatMessageTime = (dateString, isMessageList = false) => {
     if (!dateString) return '';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
     const today = new Date();
     
     // Normalize to start of day for accurate day differences
@@ -3609,7 +3611,7 @@ export default function Dashboard() {
                         <Phone size={22} />
                     </NavRailItem>
                     <NavRailItem active={activeTab === 'status'} onClick={() => handleTabChange('status')} title="Status" style={activeTab === 'status' ? {} : { color: 'var(--colors-textMuted)' }}>
-                        <CircleDot size={24} />
+                        <Code2 size={24} />
                     </NavRailItem>
                     <NavRailItem active={activeTab === 'settings'} onClick={() => handleTabChange('settings')} title="Settings">
                         <Settings size={22} />
@@ -4315,24 +4317,26 @@ export default function Dashboard() {
                 )}
 
                 {activeTab === 'status' && (
-                    <StatusSection
-                        groupedStatuses={groupedStatuses}
-                        myGroupedStatuses={myGroupedStatuses}
-                        otherGroupedStatuses={otherGroupedStatuses}
-                        mongoUserId={mongoUserId}
-                        currentUserData={currentUserData}
-                        onOpenStory={(userIndex) => setStoryViewerInitialUserIndex(userIndex)}
-                        onOpenCreateStatus={(mode) => {
-                            setStatusUploadMode(mode || 'text');
-                            setIsStatusModalOpen(true);
-                        }}
-                        onDeleteStatus={handleDeleteStatus}
-                        onForwardStatus={handleForwardStatus}
-                        onReshareStatus={handleReshareStatus}
-                        formatMessageTime={formatMessageTime}
-                        isMobileViewport={isMobileViewport}
-                        showToast={showToast}
-                    />
+                    <ErrorBoundary>
+                        <StatusSection
+                            groupedStatuses={groupedStatuses}
+                            myGroupedStatuses={myGroupedStatuses}
+                            otherGroupedStatuses={otherGroupedStatuses}
+                            mongoUserId={mongoUserId}
+                            currentUserData={currentUserData}
+                            onOpenStory={(userIndex) => setStoryViewerInitialUserIndex(userIndex)}
+                            onOpenCreateStatus={(mode) => {
+                                setStatusUploadMode(mode || 'text');
+                                setIsStatusModalOpen(true);
+                            }}
+                            onDeleteStatus={handleDeleteStatus}
+                            onForwardStatus={handleForwardStatus}
+                            onReshareStatus={handleReshareStatus}
+                            formatMessageTime={formatMessageTime}
+                            isMobileViewport={isMobileViewport}
+                            showToast={showToast}
+                        />
+                    </ErrorBoundary>
                 )}
             </Sidebar>
 
@@ -4382,7 +4386,7 @@ export default function Dashboard() {
                             border: '2px solid rgba(0, 168, 132, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '28px', 
                             boxShadow: '0 0 40px rgba(0, 168, 132, 0.2), inset 0 0 20px rgba(0, 168, 132, 0.15)', position: 'relative', zIndex: 1
                         }}>
-                            <CircleDot size={60} color="var(--colors-accent, #00a884)" strokeWidth={1.8} style={{ filter: 'drop-shadow(0 0 8px rgba(0, 168, 132, 0.5))' }} />
+                            <Code2 size={60} color="var(--colors-accent, #00a884)" strokeWidth={1.8} style={{ filter: 'drop-shadow(0 0 8px rgba(0, 168, 132, 0.5))' }} />
                         </div>
                         <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2rem', marginBottom: '12px', fontWeight: '600', letterSpacing: '-0.4px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Status updates</h2>
                         <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.55', position: 'relative', zIndex: 1, margin: '0 0 24px 0' }}>
@@ -5663,7 +5667,7 @@ export default function Dashboard() {
                                     border: '2px solid rgba(0, 168, 132, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '28px', 
                                     boxShadow: '0 0 40px rgba(0, 168, 132, 0.2), inset 0 0 20px rgba(0, 168, 132, 0.15)', position: 'relative', zIndex: 1
                                 }}>
-                                    <CircleDot size={60} color="var(--colors-accent, #00a884)" strokeWidth={1.8} style={{ filter: 'drop-shadow(0 0 8px rgba(0, 168, 132, 0.5))' }} />
+                                    <Code2 size={60} color="var(--colors-accent, #00a884)" strokeWidth={1.8} style={{ filter: 'drop-shadow(0 0 8px rgba(0, 168, 132, 0.5))' }} />
                                 </div>
                                 <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2rem', marginBottom: '12px', fontWeight: '600', letterSpacing: '-0.4px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Status updates</h2>
                                 <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.55', position: 'relative', zIndex: 1, margin: '0 0 24px 0' }}>
