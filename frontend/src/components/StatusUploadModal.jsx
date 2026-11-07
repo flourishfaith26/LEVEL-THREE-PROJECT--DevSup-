@@ -6,7 +6,14 @@ const BACKGROUND_COLORS = [
     '#2196F3', '#009688', '#4CAF50', '#FF9800', '#FF5722'
 ];
 
-const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilently, initialMode = 'text' }) => {
+const StatusUploadModal = ({ 
+    onClose, 
+    onUpload, 
+    BACKEND_URL, 
+    getAccessTokenSilently, 
+    initialMode = 'text',
+    isMobileViewport: propIsMobile
+}) => {
     const [mode, setMode] = useState(initialMode); // 'text' or 'media'
     const [textContext, setTextContext] = useState('');
     const [bgColorIndex, setBgColorIndex] = useState(0);
@@ -20,8 +27,24 @@ const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilen
     const [trimStart, setTrimStart] = useState(0);
     const [trimEnd, setTrimEnd] = useState(30);
 
+    const [isMobile, setIsMobile] = useState(() => 
+        typeof propIsMobile === 'boolean' 
+            ? propIsMobile 
+            : (typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
+    );
+
     const fileInputRef = useRef(null);
     const videoRef = useRef(null);
+
+    useEffect(() => {
+        if (typeof propIsMobile === 'boolean') {
+            setIsMobile(propIsMobile);
+            return;
+        }
+        const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, [propIsMobile]);
 
     useEffect(() => {
         if (initialMode === 'media' && !mediaFile) {
@@ -99,63 +122,136 @@ const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilen
     };
 
     return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh', minHeight: '100dvh',
-            backgroundColor: mode === 'text' ? BACKGROUND_COLORS[bgColorIndex] : '#000', zIndex: 10000,
-            display: 'flex', flexDirection: 'column',
-            fontFamily: 'system-ui, -apple-system, sans-serif'
-        }}>
+        <div 
+            className="status-modal-root"
+            style={{
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0,
+                width: '100%', 
+                height: isMobile ? '100dvh' : '100vh', 
+                minHeight: '100dvh',
+                maxHeight: isMobile ? '100dvh' : 'none',
+                backgroundColor: mode === 'text' ? BACKGROUND_COLORS[bgColorIndex] : '#000', 
+                zIndex: 10000,
+                display: 'flex', 
+                flexDirection: 'column',
+                overflow: 'hidden',
+                boxSizing: 'border-box',
+                fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}
+        >
             {/* Header Controls */}
             <div style={{ 
                 display: 'flex', 
                 justifyContent: mode === 'media' && mediaPreview ? 'flex-end' : 'space-between', 
-                padding: '24px', 
-                zIndex: 10, 
+                padding: isMobile ? '12px 16px' : '24px', 
+                paddingTop: isMobile ? 'calc(12px + env(safe-area-inset-top, 0px))' : '24px',
+                zIndex: 20, 
                 flexShrink: 0,
                 position: mode === 'media' && mediaPreview ? 'absolute' : 'relative',
-                width: '100%', boxSizing: 'border-box'
+                top: 0,
+                left: 0,
+                width: '100%', 
+                boxSizing: 'border-box'
             }}>
                 {!(mode === 'media' && mediaPreview) && (
-                    <div style={{ display: 'flex', gap: '16px' }}>
+                    <div style={{ display: 'flex', gap: isMobile ? '12px' : '16px' }}>
                         <button 
                             type="button"
-                            style={{ backgroundColor: mode === 'text' ? 'rgba(255,255,255,0.2)' : 'transparent', color: '#fff', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
+                            style={{ 
+                                backgroundColor: mode === 'text' ? 'rgba(255,255,255,0.2)' : 'transparent', 
+                                color: '#fff', 
+                                border: 'none', 
+                                borderRadius: '50%', 
+                                width: isMobile ? '38px' : '40px', 
+                                height: isMobile ? '38px' : '40px', 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center', 
+                                cursor: 'pointer' 
+                            }}
                             onClick={() => setMode('text')}
                         >
-                            <Type size={24} />
+                            <Type size={isMobile ? 20 : 24} />
                         </button>
                         <button 
                             type="button"
-                            style={{ backgroundColor: mode === 'media' ? 'rgba(255,255,255,0.2)' : 'transparent', color: '#fff', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
+                            style={{ 
+                                backgroundColor: mode === 'media' ? 'rgba(255,255,255,0.2)' : 'transparent', 
+                                color: '#fff', 
+                                border: 'none', 
+                                borderRadius: '50%', 
+                                width: isMobile ? '38px' : '40px', 
+                                height: isMobile ? '38px' : '40px', 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center', 
+                                cursor: 'pointer' 
+                            }}
                             onClick={() => { setMode('media'); fileInputRef.current?.click(); }}
                         >
-                            <ImageIcon size={24} />
+                            <ImageIcon size={isMobile ? 20 : 24} />
                         </button>
                         
                         {mode === 'text' && (
                             <button 
                                 type="button"
-                                style={{ color: '#fff', backgroundColor: 'transparent', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
+                                style={{ 
+                                    color: '#fff', 
+                                    backgroundColor: 'transparent', 
+                                    border: 'none', 
+                                    borderRadius: '50%', 
+                                    width: isMobile ? '38px' : '40px', 
+                                    height: isMobile ? '38px' : '40px', 
+                                    display: 'flex', 
+                                    justifyContent: 'center', 
+                                    alignItems: 'center', 
+                                    cursor: 'pointer' 
+                                }}
                                 onClick={() => setBgColorIndex((prev) => (prev + 1) % BACKGROUND_COLORS.length)}
                                 title="Change Background Color"
                             >
-                                <RefreshCw size={24} />
+                                <RefreshCw size={isMobile ? 20 : 24} />
                             </button>
                         )}
                     </div>
                 )}
-                <button type="button" onClick={onClose} style={{ color: '#fff', backgroundColor: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}>
-                    <X size={28} />
+                <button 
+                    type="button" 
+                    onClick={onClose} 
+                    style={{ 
+                        color: '#fff', 
+                        backgroundColor: 'rgba(0,0,0,0.5)', 
+                        border: 'none', 
+                        borderRadius: '50%', 
+                        width: isMobile ? '38px' : '40px', 
+                        height: isMobile ? '38px' : '40px', 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center', 
+                        cursor: 'pointer' 
+                    }}
+                >
+                    <X size={isMobile ? 24 : 28} />
                 </button>
             </div>
 
             {/* Main Area */}
             <div style={{
-                flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center',
+                flex: 1, 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
                 backgroundColor: 'transparent',
                 transition: 'background-color 0.3s ease',
                 position: mode === 'media' && mediaPreview ? 'absolute' : 'relative',
-                top: 0, left: 0, width: '100%', height: '100%',
+                top: 0, 
+                left: 0, 
+                width: '100%', 
+                height: '100%',
                 minHeight: 0,
                 overflow: 'hidden',
                 zIndex: 1
@@ -167,13 +263,17 @@ const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilen
                         placeholder="Type a status..."
                         autoFocus
                         style={{
-                            background: 'transparent', border: 'none', color: '#fff',
-                            fontSize: textContext.length > 150 ? '1.25rem' : textContext.length > 70 ? '1.75rem' : '2.5rem', 
+                            background: 'transparent', 
+                            border: 'none', 
+                            color: '#fff',
+                            fontSize: isMobile
+                                ? (textContext.length > 150 ? '1.15rem' : textContext.length > 70 ? '1.5rem' : '2rem')
+                                : (textContext.length > 150 ? '1.25rem' : textContext.length > 70 ? '1.75rem' : '2.5rem'),
                             textAlign: 'center', 
                             width: 'calc(100% - 32px)', 
                             maxWidth: '700px',
-                            height: '60%',
-                            padding: '0 16px',
+                            height: isMobile ? '70%' : '60%',
+                            padding: isMobile ? '0 16px 80px 16px' : '0 16px',
                             boxSizing: 'border-box',
                             resize: 'none', 
                             outline: 'none', 
@@ -194,12 +294,31 @@ const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilen
                         )}
                         {mediaPreview && (
                             mediaFile?.type?.startsWith('video/') ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', height: '100%', padding: '20px', paddingBottom: '120px', boxSizing: 'border-box', justifyContent: 'center' }}>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'column', 
+                                    alignItems: 'center', 
+                                    width: '100%', 
+                                    height: '100%', 
+                                    padding: isMobile ? '56px 12px calc(80px + env(safe-area-inset-bottom, 16px)) 12px' : '20px', 
+                                    paddingBottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom, 16px))' : '120px', 
+                                    boxSizing: 'border-box', 
+                                    justifyContent: 'center' 
+                                }}>
                                     <video 
                                         src={mediaPreview} 
                                         ref={videoRef}
                                         controls 
-                                        style={{ maxWidth: '100%', flex: 1, minHeight: 0, width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: '8px' }}
+                                        style={{ 
+                                            maxWidth: '100%', 
+                                            flex: 1, 
+                                            minHeight: 0, 
+                                            width: 'auto', 
+                                            maxHeight: isMobile ? 'calc(100% - 90px)' : '100%',
+                                            height: 'auto', 
+                                            objectFit: 'contain', 
+                                            borderRadius: '8px' 
+                                        }}
                                         onLoadedMetadata={(e) => {
                                             const duration = e.target.duration;
                                             setVideoDuration(duration);
@@ -212,8 +331,20 @@ const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilen
                                             }
                                         }}
                                     />
-                                    <div style={{ width: '90%', maxWidth: '500px', marginTop: '16px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 10 }}>
-                                        <div style={{ color: 'white', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', fontWeight: '500' }}>
+                                    <div style={{ 
+                                        width: isMobile ? '100%' : '90%', 
+                                        maxWidth: '500px', 
+                                        marginTop: isMobile ? '8px' : '16px', 
+                                        padding: isMobile ? '10px 14px' : '16px', 
+                                        backgroundColor: 'rgba(0,0,0,0.6)', 
+                                        borderRadius: '12px', 
+                                        display: 'flex', 
+                                        flexDirection: 'column', 
+                                        gap: isMobile ? '8px' : '16px', 
+                                        zIndex: 10,
+                                        flexShrink: 0
+                                    }}>
+                                        <div style={{ color: 'white', fontSize: isMobile ? '0.82rem' : '0.9rem', display: 'flex', justifyContent: 'space-between', fontWeight: '500' }}>
                                             <span>Trim Video (Max 30s)</span>
                                             <span>Duration: {(trimEnd - trimStart).toFixed(1)}s</span>
                                         </div>
@@ -264,7 +395,17 @@ const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilen
                                     </div>
                                 </div>
                             ) : (
-                                <img src={mediaPreview} alt="preview" style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }} />
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    width: '100%',
+                                    height: '100%',
+                                    padding: isMobile ? '56px 16px calc(80px + env(safe-area-inset-bottom, 16px)) 16px' : '20px',
+                                    boxSizing: 'border-box'
+                                }}>
+                                    <img src={mediaPreview} alt="preview" style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }} />
+                                </div>
                             )
                         )}
                     </>
@@ -280,69 +421,179 @@ const StatusUploadModal = ({ onClose, onUpload, BACKEND_URL, getAccessTokenSilen
             </div>
 
             {/* Footer / Send Button */}
-            <div style={{ 
-                padding: '24px', display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                backgroundColor: mode === 'media' && mediaPreview ? 'transparent' : 'transparent',
-                background: mode === 'media' && mediaPreview ? 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)' : 'none',
-                position: mode === 'media' && mediaPreview ? 'absolute' : 'relative',
-                bottom: mode === 'media' && mediaPreview ? '0' : 'auto', left: 0, width: '100%', boxSizing: 'border-box',
-                zIndex: 10
-            }}>
-                <div style={{ 
-                    display: 'flex', 
-                    justifyContent: mode === 'media' && mediaPreview ? 'center' : 'flex-end', 
-                    alignItems: 'center', 
-                    gap: '16px', 
-                    width: '100%', 
-                    maxWidth: '700px'
-                }}>
-                    {mode === 'media' && mediaPreview && (
-                        <input 
-                            type="text" 
-                            placeholder="Add a caption..." 
-                            value={mediaCaption}
-                            onChange={(e) => setMediaCaption(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !isUploading) {
-                                    e.preventDefault();
-                                    handleSubmit(e);
-                                }
-                            }}
+            {isMobile ? (
+                /* Mobile Footer */
+                mode === 'text' ? (
+                    /* Floating Send Button for Text Mode on Mobile */
+                    <div style={{
+                        position: 'fixed',
+                        bottom: 'calc(24px + env(safe-area-inset-bottom, 16px))',
+                        right: '20px',
+                        zIndex: 100
+                    }}>
+                        <button 
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={isUploading || !textContext.trim()}
                             style={{
-                                flex: 1,
-                                backgroundColor: 'rgba(255,255,255,0.2)',
-                                border: 'none',
-                                borderRadius: '24px',
-                                color: '#fff',
-                                padding: '16px 24px',
-                                fontSize: '1.1rem',
-                                outline: 'none',
-                                backdropFilter: 'blur(10px)'
+                                backgroundColor: 'var(--colors-accent, #00C853)',
+                                color: '#fff', 
+                                border: 'none', 
+                                borderRadius: '50%',
+                                width: '56px', 
+                                height: '56px', 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center',
+                                cursor: isUploading || !textContext.trim() ? 'not-allowed' : 'pointer',
+                                opacity: !textContext.trim() ? 0.5 : 1,
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                                flexShrink: 0
                             }}
-                        />
-                    )}
-                    <button 
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={isUploading || (mode === 'text' && !textContext.trim()) || (mode === 'media' && !mediaFile)}
-                        style={{
-                            backgroundColor: 'var(--colors-accent, #00C853)',
-                            color: '#fff', border: 'none', borderRadius: '50%',
-                            width: '56px', height: '56px', display: 'flex', justifyContent: 'center', alignItems: 'center',
-                            cursor: isUploading ? 'not-allowed' : 'pointer',
-                            opacity: (mode === 'text' && !textContext.trim()) || (mode === 'media' && !mediaFile) ? 0.5 : 1,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                            flexShrink: 0
-                        }}
-                    >
-                        {isUploading ? <RefreshCw size={24} className="spin" /> : <Send size={24} style={{ marginLeft: '4px' }} />}
-                    </button>
+                        >
+                            {isUploading ? <RefreshCw size={24} className="spin" /> : <Send size={24} style={{ marginLeft: '4px' }} />}
+                        </button>
+                    </div>
+                ) : (
+                    /* Media Bottom Caption Bar for Mobile */
+                    mediaPreview && (
+                        <div style={{ 
+                            position: 'fixed',
+                            bottom: 0,
+                            left: 0,
+                            width: '100%',
+                            padding: '10px 14px calc(16px + env(safe-area-inset-bottom, 14px)) 14px',
+                            boxSizing: 'border-box',
+                            background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 70%, rgba(0,0,0,0) 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            zIndex: 100
+                        }}>
+                            <input 
+                                type="text" 
+                                placeholder="Add a caption..." 
+                                value={mediaCaption}
+                                onChange={(e) => setMediaCaption(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !isUploading) {
+                                        e.preventDefault();
+                                        handleSubmit(e);
+                                    }
+                                }}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: 'rgba(255,255,255,0.22)',
+                                    border: 'none',
+                                    borderRadius: '24px',
+                                    color: '#fff',
+                                    padding: '12px 18px',
+                                    fontSize: '1rem',
+                                    outline: 'none',
+                                    backdropFilter: 'blur(10px)'
+                                }}
+                            />
+                            <button 
+                                type="button"
+                                onClick={handleSubmit}
+                                disabled={isUploading || !mediaFile}
+                                style={{
+                                    backgroundColor: 'var(--colors-accent, #00C853)',
+                                    color: '#fff', 
+                                    border: 'none', 
+                                    borderRadius: '50%',
+                                    width: '52px', 
+                                    height: '52px', 
+                                    display: 'flex', 
+                                    justifyContent: 'center', 
+                                    alignItems: 'center',
+                                    cursor: isUploading || !mediaFile ? 'not-allowed' : 'pointer',
+                                    opacity: !mediaFile ? 0.5 : 1,
+                                    boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+                                    flexShrink: 0
+                                }}
+                            >
+                                {isUploading ? <RefreshCw size={22} className="spin" /> : <Send size={22} style={{ marginLeft: '3px' }} />}
+                            </button>
+                        </div>
+                    )
+                )
+            ) : (
+                /* Desktop Footer */
+                <div style={{ 
+                    padding: '24px', 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    backgroundColor: 'transparent',
+                    background: mode === 'media' && mediaPreview ? 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)' : 'none',
+                    position: mode === 'media' && mediaPreview ? 'absolute' : 'relative',
+                    bottom: mode === 'media' && mediaPreview ? '0' : 'auto', 
+                    left: 0, 
+                    width: '100%', 
+                    boxSizing: 'border-box',
+                    zIndex: 10
+                }}>
+                    <div style={{ 
+                        display: 'flex', 
+                        justifyContent: mode === 'media' && mediaPreview ? 'center' : 'flex-end', 
+                        alignItems: 'center', 
+                        gap: '16px', 
+                        width: '100%', 
+                        maxWidth: '700px'
+                    }}>
+                        {mode === 'media' && mediaPreview && (
+                            <input 
+                                type="text" 
+                                placeholder="Add a caption..." 
+                                value={mediaCaption}
+                                onChange={(e) => setMediaCaption(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !isUploading) {
+                                        e.preventDefault();
+                                        handleSubmit(e);
+                                    }
+                                }}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: 'rgba(255,255,255,0.2)',
+                                    border: 'none',
+                                    borderRadius: '24px',
+                                    color: '#fff',
+                                    padding: '16px 24px',
+                                    fontSize: '1.1rem',
+                                    outline: 'none',
+                                    backdropFilter: 'blur(10px)'
+                                }}
+                            />
+                        )}
+                        <button 
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={isUploading || (mode === 'text' && !textContext.trim()) || (mode === 'media' && !mediaFile)}
+                            style={{
+                                backgroundColor: 'var(--colors-accent, #00C853)',
+                                color: '#fff', border: 'none', borderRadius: '50%',
+                                width: '56px', height: '56px', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                                cursor: isUploading ? 'not-allowed' : 'pointer',
+                                opacity: (mode === 'text' && !textContext.trim()) || (mode === 'media' && !mediaFile) ? 0.5 : 1,
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                flexShrink: 0
+                            }}
+                        >
+                            {isUploading ? <RefreshCw size={24} className="spin" /> : <Send size={24} style={{ marginLeft: '4px' }} />}
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
             
             <style>{`
+                @media (max-width: 768px) {
+                    .status-modal-root {
+                        height: 100dvh !important;
+                        max-height: 100dvh !important;
+                    }
+                }
                 .dual-thumb {
                     -webkit-appearance: none;
                     appearance: none;

@@ -7030,6 +7030,7 @@ export default function Dashboard() {
                     getAccessTokenSilently={getAccessTokenSilently}
                     onUpload={handleStatusUpload}
                     initialMode={statusUploadMode}
+                    isMobileViewport={isMobileViewport}
                 /></Suspense>
             )}
 
