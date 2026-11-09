@@ -18,7 +18,17 @@ router.post('/', requireAuth, upload.single('file'), (req, res) => {
 
 // Proxy endpoint to stream files from Cloudinary with full CORS and correct headers
 // Uses Cloudinary signed private download URLs to bypass account-level PDF/document delivery restrictions
-router.get('/file', async (req, res) => {
+router.options('/file', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.sendStatus(204);
+});
+
+router.all('/file', async (req, res) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+        return res.status(405).send('Method Not Allowed');
+    }
     try {
         const fileUrl = req.query.url;
         const filename = req.query.name || 'document';
@@ -107,8 +117,10 @@ router.get('/file', async (req, res) => {
         }
 
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', '*');
         res.setHeader('Content-Type', mimeType);
+        res.setHeader('Accept-Ranges', 'bytes');
 
         const safeName = filename.replace(/["\r\n]/g, '_');
         res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
@@ -116,6 +128,10 @@ router.get('/file', async (req, res) => {
         const contentLength = cloudRes.headers.get('content-length');
         if (contentLength) {
             res.setHeader('Content-Length', contentLength);
+        }
+
+        if (req.method === 'HEAD') {
+            return res.end();
         }
 
         const buffer = await cloudRes.arrayBuffer();

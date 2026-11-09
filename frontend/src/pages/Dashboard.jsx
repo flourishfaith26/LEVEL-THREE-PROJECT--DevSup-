@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2 } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -1944,6 +1944,7 @@ export default function Dashboard() {
     const [isLiveCodingOpen, setIsLiveCodingOpen] = useState(false);
     const [isHackathonOpen, setIsHackathonOpen] = useState(false);
     const [mediaViewer, setMediaViewer] = useState(null);
+    const [documentViewer, setDocumentViewer] = useState(null);
     const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
 
     useEffect(() => {
@@ -1972,13 +1973,16 @@ export default function Dashboard() {
     }, [isWhiteboardOpen, isMobileViewport]);
 
     useEffect(() => {
-        if (!mediaViewer) return undefined;
+        if (!mediaViewer && !documentViewer) return undefined;
         const handleKeyDown = (event) => {
-            if (event.key === 'Escape') setMediaViewer(null);
+            if (event.key === 'Escape') {
+                setMediaViewer(null);
+                setDocumentViewer(null);
+            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [mediaViewer]);
+    }, [mediaViewer, documentViewer]);
 
     useEffect(() => {
         const handleGlobalShortcuts = (e) => {
@@ -3680,6 +3684,138 @@ export default function Dashboard() {
         return false;
     };
 
+    const getDocumentInfo = (filename, attachmentType = '', url = '') => {
+        const rawUrl = (url || '').replace('/upload/fl_inline/', '/upload/');
+        const safeName = filename || rawUrl.split('/').pop().split('?')[0] || 'Document';
+        const ext = safeName.includes('.') ? safeName.split('.').pop().toLowerCase() : '';
+
+        let label = 'Document';
+        let appName = 'Document App';
+        let color = '#06b6d4'; // default cyan
+        let officeScheme = null;
+        let canIframePreview = false;
+        let mimeType = 'application/octet-stream';
+
+        if (ext === 'pdf' || (attachmentType && attachmentType.includes('pdf'))) {
+            label = 'PDF Document';
+            appName = 'PDF Reader / Adobe';
+            color = '#ef4444'; // Red
+            canIframePreview = true;
+            mimeType = 'application/pdf';
+        } else if (['doc', 'docx'].includes(ext) || (attachmentType && (attachmentType.includes('word') || attachmentType.includes('officedocument.wordprocessingml')))) {
+            label = ext.toUpperCase() + ' Document';
+            appName = 'Microsoft Word / WPS';
+            color = '#2563eb'; // Blue
+            officeScheme = 'ms-word:ofv|u|';
+            canIframePreview = true;
+            mimeType = ext === 'doc' ? 'application/msword' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        } else if (['xls', 'xlsx', 'csv'].includes(ext) || (attachmentType && (attachmentType.includes('sheet') || attachmentType.includes('excel')))) {
+            label = ext.toUpperCase() + ' Spreadsheet';
+            appName = 'Microsoft Excel / WPS';
+            color = '#10b981'; // Green
+            officeScheme = ext !== 'csv' ? 'ms-excel:ofv|u|' : null;
+            canIframePreview = true;
+            mimeType = ext === 'csv' ? 'text/csv' : ext === 'xls' ? 'application/vnd.ms-excel' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        } else if (['ppt', 'pptx'].includes(ext) || (attachmentType && (attachmentType.includes('presentation') || attachmentType.includes('powerpoint')))) {
+            label = ext.toUpperCase() + ' Presentation';
+            appName = 'Microsoft PowerPoint / WPS';
+            color = '#f97316'; // Orange
+            officeScheme = 'ms-powerpoint:ofv|u|';
+            canIframePreview = true;
+            mimeType = ext === 'ppt' ? 'application/vnd.ms-powerpoint' : 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+        } else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+            label = ext.toUpperCase() + ' Archive';
+            appName = 'Archive / File Manager';
+            color = '#8b5cf6'; // Purple
+            canIframePreview = false;
+            mimeType = 'application/zip';
+        } else if (['txt', 'log', 'md', 'json'].includes(ext)) {
+            label = ext.toUpperCase() + ' File';
+            appName = 'Text Editor';
+            color = '#06b6d4';
+            canIframePreview = true;
+            mimeType = 'text/plain';
+        }
+
+        return { ext, safeName, label, appName, color, officeScheme, canIframePreview, mimeType };
+    };
+
+    const handleDownloadDocument = async (proxyUrl, filename, mimeType) => {
+        try {
+            const res = await fetch(proxyUrl);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(new Blob([blob], { type: mimeType || 'application/octet-stream' }));
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+            showToast('Document downloaded');
+        } catch {
+            const a = document.createElement('a');
+            a.href = proxyUrl;
+            a.download = filename;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    };
+
+    const handleOpenInApp = async (docInfo, proxyUrl, preloadedBlob = null) => {
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
+        // 1. Mobile devices: Open with system resolver (Word, WPS Office, Google Docs, Drive, Acrobat)
+        if (isMobile) {
+            try {
+                let blob = preloadedBlob;
+                if (!blob) {
+                    const res = await fetch(proxyUrl);
+                    if (res.ok) blob = await res.blob();
+                }
+                if (blob) {
+                    const file = new File([blob], docInfo.safeName, { type: docInfo.mimeType || blob.type });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: docInfo.safeName
+                        });
+                        return;
+                    }
+                }
+            } catch (err) {
+                if (err?.name === 'AbortError') return;
+            }
+        }
+
+        // 2. Desktop: If Office application scheme is supported (ms-word:, ms-excel:, ms-powerpoint:), launch native app
+        if (!isMobile && docInfo.officeScheme) {
+            try {
+                window.location.href = `${docInfo.officeScheme}${encodeURI(proxyUrl)}`;
+                return;
+            } catch (err) {
+                console.warn('Native office scheme launch failed:', err);
+            }
+        }
+
+        // 3. For PDFs: Open in system/browser PDF reader
+        if (docInfo.ext === 'pdf') {
+            window.open(proxyUrl, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        // 4. For Office documents: Open with Google Docs Viewer
+        if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(docInfo.ext)) {
+            window.open(`https://docs.google.com/viewer?url=${encodeURIComponent(proxyUrl)}`, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        // 5. Fallback
+        window.open(proxyUrl, '_blank', 'noopener,noreferrer');
+    };
+
     const handleOpenDocument = async (msg, e) => {
         if (e) {
             e.preventDefault();
@@ -3690,67 +3826,38 @@ export default function Dashboard() {
         // Clean up any accidental /fl_inline/ to avoid Cloudinary HTTP 400 Bad Request
         const rawUrl = msg.content.replace('/upload/fl_inline/', '/upload/');
         const filename = msg.attachmentName || rawUrl.split('/').pop().split('?')[0] || 'document';
-        const ext = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
+        const docInfo = getDocumentInfo(filename, msg.attachmentType, rawUrl);
 
         const docId = msg._id || msg.createdAt;
         setOpeningDocId(docId);
 
         // Proxy through our backend to eliminate CORS issues and avoid redirecting to Cloudinary
-        const proxyUrl = `${BACKEND_URL}/api/upload/file?url=${encodeURIComponent(rawUrl)}&name=${encodeURIComponent(filename)}`;
+        const proxyUrl = `${BACKEND_URL}/api/upload/file?url=${encodeURIComponent(rawUrl)}&name=${encodeURIComponent(docInfo.safeName)}`;
 
+        // Open WhatsApp-style Document Viewer Modal immediately
+        setDocumentViewer({
+            msg,
+            docInfo,
+            proxyUrl,
+            rawUrl,
+            filename: docInfo.safeName,
+            ext: docInfo.ext,
+            blob: null,
+            isLoading: true
+        });
+
+        // Background preload blob so "Open in App" or "Download" clicks respond instantly
         try {
-            // Fetch via backend proxy: guaranteed CORS-allowed and sets correct MIME headers
             const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const blob = await response.blob();
-
-            // Set explicit MIME type for Office / PDF documents so phone recognizes Word, WPS, and PDF readers
-            let mimeType = blob.type;
-            if (!mimeType || mimeType === 'application/octet-stream') {
-                if (ext === 'pdf') mimeType = 'application/pdf';
-                else if (ext === 'docx') mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-                else if (ext === 'doc') mimeType = 'application/msword';
-                else if (ext === 'xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-                else if (ext === 'xls') mimeType = 'application/vnd.ms-excel';
-                else if (ext === 'pptx') mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-                else if (ext === 'ppt') mimeType = 'application/vnd.ms-powerpoint';
-                else if (ext === 'txt') mimeType = 'text/plain';
-                else if (ext === 'csv') mimeType = 'text/csv';
+            if (response.ok) {
+                const blob = await response.blob();
+                setDocumentViewer(prev => (prev && prev.proxyUrl === proxyUrl ? { ...prev, blob, isLoading: false } : prev));
+            } else {
+                setDocumentViewer(prev => (prev && prev.proxyUrl === proxyUrl ? { ...prev, isLoading: false } : prev));
             }
-
-            const file = new File([blob], filename, { type: mimeType });
-
-            // 1. Mobile devices: Web Share API opens the native Android/iOS system resolver
-            // with Microsoft Word, WPS Office, Google Docs, Drive PDF Viewer, etc.
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: filename
-                    });
-                    setOpeningDocId(null);
-                    return;
-                } catch (shareErr) {
-                    if (shareErr.name === 'AbortError') {
-                        setOpeningDocId(null);
-                        return;
-                    }
-                }
-            }
-
-            // 2. Desktop or browser fallback: Download with exact filename so local Word / WPS / Acrobat opens it
-            const blobUrl = URL.createObjectURL(new Blob([blob], { type: mimeType }));
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
         } catch (err) {
-            console.warn('Proxy fetch failed, opening backend proxy URL directly:', err);
-            // Open via backend proxy URL (never Cloudinary) so it opens directly with proper headers
-            window.open(proxyUrl, '_blank', 'noopener,noreferrer');
+            console.warn('Proxy fetch warning:', err);
+            setDocumentViewer(prev => (prev && prev.proxyUrl === proxyUrl ? { ...prev, isLoading: false } : prev));
         } finally {
             setOpeningDocId(null);
         }
@@ -5747,82 +5854,85 @@ export default function Dashboard() {
                                                                                     />
                                                                                 )}
 
-                                                                                {isDocMsg && (
-                                                                                    <div 
-                                                                                        onClick={(e) => handleOpenDocument(msg, e)}
-                                                                                        title={`Open ${msg.attachmentName || 'document'}`}
-                                                                                        style={{
-                                                                                            display: 'flex',
-                                                                                            alignItems: 'center',
-                                                                                            gap: '12px',
-                                                                                            padding: '10px 12px',
-                                                                                            backgroundColor: isOwnMessage ? 'rgba(0, 0, 0, 0.22)' : 'rgba(0, 0, 0, 0.32)',
-                                                                                            borderRadius: '10px',
-                                                                                            minWidth: '220px',
-                                                                                            maxWidth: '320px',
-                                                                                            margin: 0,
-                                                                                            cursor: 'pointer',
-                                                                                            transition: 'background-color 0.15s ease, transform 0.1s ease',
-                                                                                            userSelect: 'none'
-                                                                                        }}
-                                                                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isOwnMessage ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.45)'}
-                                                                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isOwnMessage ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.32)'}
-                                                                                    >
-                                                                                        <div style={{
-                                                                                            width: '42px',
-                                                                                            height: '42px',
-                                                                                            borderRadius: '10px',
-                                                                                            backgroundColor: '#06b6d4',
-                                                                                            display: 'flex',
-                                                                                            alignItems: 'center',
-                                                                                            justifyContent: 'center',
-                                                                                            color: '#ffffff',
-                                                                                            flexShrink: 0,
-                                                                                            boxShadow: '0 2px 8px rgba(6, 182, 212, 0.3)'
-                                                                                        }}>
-                                                                                            {openingDocId === (msg._id || msg.createdAt) ? (
-                                                                                                <RefreshCw size={20} className="spin" />
-                                                                                            ) : (
-                                                                                                <FileText size={22} />
-                                                                                            )}
-                                                                                        </div>
-                                                                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                                                                            <span
-                                                                                                style={{
-                                                                                                    display: 'block',
-                                                                                                    fontWeight: '600',
-                                                                                                    fontSize: '0.88rem',
-                                                                                                    color: '#ffffff',
-                                                                                                    overflow: 'hidden',
-                                                                                                    textOverflow: 'ellipsis',
-                                                                                                    whiteSpace: 'nowrap'
-                                                                                                }}
-                                                                                            >
-                                                                                                {msg.attachmentName || 'Document'}
-                                                                                            </span>
-                                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px' }}>
-                                                                                                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>
-                                                                                                    {openingDocId === (msg._id || msg.createdAt)
-                                                                                                        ? 'Opening...'
-                                                                                                        : `${msg.attachmentName?.split('.').pop()?.toUpperCase() || 'DOCUMENT'} • Open`}
+                                                                                {isDocMsg && (() => {
+                                                                                    const docInfo = getDocumentInfo(msg.attachmentName, msg.attachmentType, msg.content);
+                                                                                    return (
+                                                                                        <div 
+                                                                                            onClick={(e) => handleOpenDocument(msg, e)}
+                                                                                            title={`Open ${docInfo.safeName} in ${docInfo.appName}`}
+                                                                                            style={{
+                                                                                                display: 'flex',
+                                                                                                alignItems: 'center',
+                                                                                                gap: '12px',
+                                                                                                padding: '10px 12px',
+                                                                                                backgroundColor: isOwnMessage ? 'rgba(0, 0, 0, 0.22)' : 'rgba(0, 0, 0, 0.32)',
+                                                                                                borderRadius: '10px',
+                                                                                                minWidth: '220px',
+                                                                                                maxWidth: '320px',
+                                                                                                margin: 0,
+                                                                                                cursor: 'pointer',
+                                                                                                transition: 'background-color 0.15s ease, transform 0.1s ease',
+                                                                                                userSelect: 'none'
+                                                                                            }}
+                                                                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isOwnMessage ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.45)'}
+                                                                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isOwnMessage ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.32)'}
+                                                                                        >
+                                                                                            <div style={{
+                                                                                                width: '42px',
+                                                                                                height: '42px',
+                                                                                                borderRadius: '10px',
+                                                                                                backgroundColor: docInfo.color,
+                                                                                                display: 'flex',
+                                                                                                alignItems: 'center',
+                                                                                                justifyContent: 'center',
+                                                                                                color: '#ffffff',
+                                                                                                flexShrink: 0,
+                                                                                                boxShadow: `0 2px 8px ${docInfo.color}55`
+                                                                                            }}>
+                                                                                                {openingDocId === (msg._id || msg.createdAt) ? (
+                                                                                                    <RefreshCw size={20} className="spin" />
+                                                                                                ) : (
+                                                                                                    <FileText size={22} />
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                                <span
+                                                                                                    style={{
+                                                                                                        display: 'block',
+                                                                                                        fontWeight: '600',
+                                                                                                        fontSize: '0.88rem',
+                                                                                                        color: '#ffffff',
+                                                                                                        overflow: 'hidden',
+                                                                                                        textOverflow: 'ellipsis',
+                                                                                                        whiteSpace: 'nowrap'
+                                                                                                    }}
+                                                                                                >
+                                                                                                    {docInfo.safeName}
                                                                                                 </span>
-                                                                                                {!msg.caption && (
-                                                                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
-                                                                                                        <span>{formatMessageClock(msg.createdAt)}</span>
-                                                                                                        {isOwnMessage && renderStatusTicks()}
-                                                                                                    </div>
+                                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px' }}>
+                                                                                                    <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>
+                                                                                                        {openingDocId === (msg._id || msg.createdAt)
+                                                                                                            ? 'Opening...'
+                                                                                                            : `${docInfo.ext ? docInfo.ext.toUpperCase() : 'DOC'} • Open in ${docInfo.appName}`}
+                                                                                                    </span>
+                                                                                                    {!msg.caption && (
+                                                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
+                                                                                                            <span>{formatMessageClock(msg.createdAt)}</span>
+                                                                                                            {isOwnMessage && renderStatusTicks()}
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div style={{ color: 'rgba(255, 255, 255, 0.65)', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '4px' }}>
+                                                                                                {openingDocId === (msg._id || msg.createdAt) ? (
+                                                                                                    <span style={{ fontSize: '0.75rem', color: '#06b6d4' }}>●●●</span>
+                                                                                                ) : (
+                                                                                                    <ExternalLink size={16} />
                                                                                                 )}
                                                                                             </div>
                                                                                         </div>
-                                                                                        <div style={{ color: 'rgba(255, 255, 255, 0.65)', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '4px' }}>
-                                                                                            {openingDocId === (msg._id || msg.createdAt) ? (
-                                                                                                <span style={{ fontSize: '0.75rem', color: '#06b6d4' }}>●●●</span>
-                                                                                            ) : (
-                                                                                                <ExternalLink size={16} />
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
+                                                                                    );
+                                                                                })()}
 
                                                                                 {msg.caption && !isWhiteboardMessage && (
                                                                                     <div style={{ whiteSpace: 'pre-wrap', marginTop: hasThinBorder ? '4px' : '6px', padding: hasThinBorder ? '2px 6px 0px 6px' : '4px 0', fontSize: '0.93rem', lineHeight: '1.35', color: 'inherit' }}>
@@ -6509,6 +6619,324 @@ export default function Dashboard() {
                             style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                         />
                     )}
+                </div>
+            )}
+
+            {documentViewer && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={() => setDocumentViewer(null)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 11000,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0, 0, 0, 0.88)',
+                        backdropFilter: 'blur(10px)',
+                        padding: window.innerWidth <= 768 ? '6px' : '20px',
+                        animation: 'fadeIn 0.15s ease'
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: '100%',
+                            maxWidth: '960px',
+                            height: window.innerWidth <= 768 ? '96vh' : '88vh',
+                            maxHeight: '900px',
+                            backgroundColor: '#111b21',
+                            borderRadius: '16px',
+                            boxShadow: '0 24px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.08)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        {/* Header */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            backgroundColor: '#202c33',
+                            borderBottom: '1px solid rgba(255,255,255,0.08)',
+                            gap: '12px',
+                            flexShrink: 0
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                                <div style={{
+                                    width: '38px',
+                                    height: '38px',
+                                    borderRadius: '10px',
+                                    backgroundColor: documentViewer.docInfo.color,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#ffffff',
+                                    flexShrink: 0,
+                                    boxShadow: `0 2px 8px ${documentViewer.docInfo.color}55`
+                                }}>
+                                    <FileText size={20} />
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                    <h3 style={{
+                                        margin: 0,
+                                        fontSize: '0.95rem',
+                                        fontWeight: '600',
+                                        color: '#ffffff',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {documentViewer.filename}
+                                    </h3>
+                                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.65)' }}>
+                                        {documentViewer.docInfo.label} • {documentViewer.docInfo.appName}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenInApp(documentViewer.docInfo, documentViewer.proxyUrl, documentViewer.blob)}
+                                    title={`Open in ${documentViewer.docInfo.appName}`}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '7px 14px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        backgroundColor: '#06b6d4',
+                                        color: '#ffffff',
+                                        fontSize: '0.82rem',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 6px rgba(6,182,212,0.35)',
+                                        transition: 'transform 0.1s ease, filter 0.1s ease'
+                                    }}
+                                >
+                                    <ExternalLink size={15} />
+                                    <span>Open in App</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => window.open(
+                                        documentViewer.docInfo.ext === 'pdf'
+                                            ? documentViewer.proxyUrl
+                                            : `https://docs.google.com/viewer?url=${encodeURIComponent(documentViewer.proxyUrl)}`,
+                                        '_blank'
+                                    )}
+                                    title="Open Fullscreen in New Tab"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '36px',
+                                        height: '36px',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(255,255,255,0.12)',
+                                        backgroundColor: 'rgba(255,255,255,0.06)',
+                                        color: '#ffffff',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <Maximize2 size={16} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleDownloadDocument(documentViewer.proxyUrl, documentViewer.filename, documentViewer.docInfo.mimeType)}
+                                    title="Download File"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '36px',
+                                        height: '36px',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(255,255,255,0.12)',
+                                        backgroundColor: 'rgba(255,255,255,0.06)',
+                                        color: '#ffffff',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <Download size={16} />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setDocumentViewer(null)}
+                                    title="Close"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '36px',
+                                        height: '36px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        backgroundColor: 'rgba(255,255,255,0.1)',
+                                        color: '#ffffff',
+                                        cursor: 'pointer',
+                                        marginLeft: '4px'
+                                    }}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Preview Body */}
+                        <div style={{ flex: 1, minHeight: 0, position: 'relative', backgroundColor: '#0c1317' }}>
+                            {documentViewer.docInfo.ext === 'pdf' ? (
+                                <iframe
+                                    src={`${documentViewer.proxyUrl}#toolbar=1`}
+                                    title={documentViewer.filename}
+                                    style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#ffffff' }}
+                                />
+                            ) : ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(documentViewer.docInfo.ext) ? (
+                                <iframe
+                                    src={`https://docs.google.com/viewer?url=${encodeURIComponent(documentViewer.proxyUrl)}&embedded=true`}
+                                    title={documentViewer.filename}
+                                    style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#ffffff' }}
+                                />
+                            ) : (
+                                <div style={{
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '30px',
+                                    textAlign: 'center',
+                                    color: '#ffffff'
+                                }}>
+                                    <div style={{
+                                        width: '72px',
+                                        height: '72px',
+                                        borderRadius: '18px',
+                                        backgroundColor: documentViewer.docInfo.color,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        marginBottom: '16px',
+                                        boxShadow: `0 8px 24px ${documentViewer.docInfo.color}44`
+                                    }}>
+                                        <FileText size={36} />
+                                    </div>
+                                    <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: '600' }}>{documentViewer.filename}</h4>
+                                    <p style={{ margin: '0 0 24px 0', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
+                                        {documentViewer.docInfo.label} • Open directly with your device applications
+                                    </p>
+                                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleOpenInApp(documentViewer.docInfo, documentViewer.proxyUrl, documentViewer.blob)}
+                                            style={{
+                                                padding: '10px 20px',
+                                                borderRadius: '10px',
+                                                backgroundColor: '#06b6d4',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                fontWeight: '600',
+                                                fontSize: '0.9rem',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '8px'
+                                            }}
+                                        >
+                                            <ExternalLink size={18} />
+                                            Open in {documentViewer.docInfo.appName}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDownloadDocument(documentViewer.proxyUrl, documentViewer.filename, documentViewer.docInfo.mimeType)}
+                                            style={{
+                                                padding: '10px 20px',
+                                                borderRadius: '10px',
+                                                backgroundColor: 'rgba(255,255,255,0.12)',
+                                                color: '#ffffff',
+                                                border: '1px solid rgba(255,255,255,0.16)',
+                                                fontWeight: '600',
+                                                fontSize: '0.9rem',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '8px'
+                                            }}
+                                        >
+                                            <Download size={18} />
+                                            Download File
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Mobile Action Footer */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            padding: '10px 14px',
+                            backgroundColor: '#1f2c34',
+                            borderTop: '1px solid rgba(255,255,255,0.08)',
+                            flexShrink: 0
+                        }}>
+                            <button
+                                type="button"
+                                onClick={() => handleOpenInApp(documentViewer.docInfo, documentViewer.proxyUrl, documentViewer.blob)}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px 16px',
+                                    borderRadius: '10px',
+                                    backgroundColor: '#06b6d4',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <ExternalLink size={16} />
+                                Open with {documentViewer.docInfo.appName}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleDownloadDocument(documentViewer.proxyUrl, documentViewer.filename, documentViewer.docInfo.mimeType)}
+                                style={{
+                                    padding: '10px 16px',
+                                    borderRadius: '10px',
+                                    backgroundColor: 'rgba(255,255,255,0.1)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    fontWeight: '500',
+                                    fontSize: '0.85rem',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <Download size={16} />
+                                Save
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
