@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -2206,6 +2206,7 @@ export default function Dashboard() {
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editInputContent, setEditInputContent] = useState('');
     const [replyingToMessage, setReplyingToMessage] = useState(null);
+    const [openingDocId, setOpeningDocId] = useState(null);
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, message: null, callLog: null });
@@ -3679,42 +3680,75 @@ export default function Dashboard() {
         return false;
     };
 
-    const handleOpenDocument = (msg, e) => {
+    const handleOpenDocument = async (msg, e) => {
         if (e) {
             e.preventDefault();
             e.stopPropagation();
         }
         if (!msg?.content) return;
 
-        let url = msg.content;
-        const name = (msg.attachmentName || '').toLowerCase();
-        const type = (msg.attachmentType || '').toLowerCase();
+        // Clean up any accidental /fl_inline/ to avoid Cloudinary HTTP 400 Bad Request
+        const url = msg.content.replace('/upload/fl_inline/', '/upload/');
+        const filename = msg.attachmentName || url.split('/').pop().split('?')[0] || 'document';
+        const ext = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
 
-        const isOfficeDoc = /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(name) || /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)(\?.*)?$/i.test(url);
-        const isPdf = name.endsWith('.pdf') || url.toLowerCase().includes('.pdf') || type.includes('pdf');
+        const docId = msg._id || msg.createdAt;
+        setOpeningDocId(docId);
 
-        // Ensure Cloudinary delivers it inline without forcing attachment download
-        if (url.includes('/upload/') && !url.includes('/fl_inline/')) {
-            url = url.replace('/upload/', '/upload/fl_inline/');
-        }
+        try {
+            // Fetch original file bytes preserving exact format and contents
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const blob = await response.blob();
 
-        if (isOfficeDoc) {
-            // Office documents (Word, Excel, PowerPoint) cannot be rendered natively inside browser windows;
-            // Google Docs Viewer opens and renders them directly on the device with zero corruption or alteration!
-            const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=false`;
-            window.open(viewerUrl, '_blank', 'noopener,noreferrer');
-        } else if (isPdf) {
-            // On mobile devices, Chrome/Safari in PWA standalone mode often intercepts direct PDFs to download manager.
-            // Google Docs Viewer displays the PDF on-screen directly on the phone. On desktop, open in a new tab directly.
-            if (isMobileViewport) {
-                const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=false`;
-                window.open(viewerUrl, '_blank', 'noopener,noreferrer');
-            } else {
-                window.open(url, '_blank', 'noopener,noreferrer');
+            // Set explicit MIME type for Office / PDF documents so phone recognizes Word, WPS, and PDF readers
+            let mimeType = blob.type;
+            if (!mimeType || mimeType === 'application/octet-stream') {
+                if (ext === 'pdf') mimeType = 'application/pdf';
+                else if (ext === 'docx') mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                else if (ext === 'doc') mimeType = 'application/msword';
+                else if (ext === 'xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                else if (ext === 'xls') mimeType = 'application/vnd.ms-excel';
+                else if (ext === 'pptx') mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+                else if (ext === 'ppt') mimeType = 'application/vnd.ms-powerpoint';
+                else if (ext === 'txt') mimeType = 'text/plain';
+                else if (ext === 'csv') mimeType = 'text/csv';
             }
-        } else {
-            // Text, images, or standard files open directly in a new tab
+
+            const file = new File([blob], filename, { type: mimeType });
+
+            // 1. Mobile devices: Web Share API opens the native Android/iOS system resolver
+            // with Microsoft Word, WPS Office, Google Docs, Drive PDF Viewer, etc.
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: filename
+                    });
+                    setOpeningDocId(null);
+                    return;
+                } catch (shareErr) {
+                    if (shareErr.name === 'AbortError') {
+                        setOpeningDocId(null);
+                        return;
+                    }
+                }
+            }
+
+            // 2. Desktop or browser fallback: Download with exact filename so local Word / WPS / Acrobat opens it
+            const blobUrl = URL.createObjectURL(new Blob([blob], { type: mimeType }));
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+        } catch (err) {
+            console.warn('Direct blob open failed, opening cleaned URL directly:', err);
             window.open(url, '_blank', 'noopener,noreferrer');
+        } finally {
+            setOpeningDocId(null);
         }
     };
 
@@ -5742,7 +5776,11 @@ export default function Dashboard() {
                                                                                             flexShrink: 0,
                                                                                             boxShadow: '0 2px 8px rgba(6, 182, 212, 0.3)'
                                                                                         }}>
-                                                                                            <FileText size={22} />
+                                                                                            {openingDocId === (msg._id || msg.createdAt) ? (
+                                                                                                <RefreshCw size={20} className="spin" />
+                                                                                            ) : (
+                                                                                                <FileText size={22} />
+                                                                                            )}
                                                                                         </div>
                                                                                         <div style={{ flex: 1, minWidth: 0 }}>
                                                                                             <span
@@ -5760,7 +5798,9 @@ export default function Dashboard() {
                                                                                             </span>
                                                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px' }}>
                                                                                                 <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>
-                                                                                                    {msg.attachmentName?.split('.').pop()?.toUpperCase() || 'DOCUMENT'} • Open
+                                                                                                    {openingDocId === (msg._id || msg.createdAt)
+                                                                                                        ? 'Opening...'
+                                                                                                        : `${msg.attachmentName?.split('.').pop()?.toUpperCase() || 'DOCUMENT'} • Open`}
                                                                                                 </span>
                                                                                                 {!msg.caption && (
                                                                                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
@@ -5771,7 +5811,11 @@ export default function Dashboard() {
                                                                                             </div>
                                                                                         </div>
                                                                                         <div style={{ color: 'rgba(255, 255, 255, 0.65)', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '4px' }}>
-                                                                                            <ExternalLink size={16} />
+                                                                                            {openingDocId === (msg._id || msg.createdAt) ? (
+                                                                                                <span style={{ fontSize: '0.75rem', color: '#06b6d4' }}>●●●</span>
+                                                                                            ) : (
+                                                                                                <ExternalLink size={16} />
+                                                                                            )}
                                                                                         </div>
                                                                                     </div>
                                                                                 )}
