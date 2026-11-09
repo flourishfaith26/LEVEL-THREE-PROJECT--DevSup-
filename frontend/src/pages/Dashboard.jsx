@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3 } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -3679,6 +3679,45 @@ export default function Dashboard() {
         return false;
     };
 
+    const handleOpenDocument = (msg, e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        if (!msg?.content) return;
+
+        let url = msg.content;
+        const name = (msg.attachmentName || '').toLowerCase();
+        const type = (msg.attachmentType || '').toLowerCase();
+
+        const isOfficeDoc = /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(name) || /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)(\?.*)?$/i.test(url);
+        const isPdf = name.endsWith('.pdf') || url.toLowerCase().includes('.pdf') || type.includes('pdf');
+
+        // Ensure Cloudinary delivers it inline without forcing attachment download
+        if (url.includes('/upload/') && !url.includes('/fl_inline/')) {
+            url = url.replace('/upload/', '/upload/fl_inline/');
+        }
+
+        if (isOfficeDoc) {
+            // Office documents (Word, Excel, PowerPoint) cannot be rendered natively inside browser windows;
+            // Google Docs Viewer opens and renders them directly on the device with zero corruption or alteration!
+            const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=false`;
+            window.open(viewerUrl, '_blank', 'noopener,noreferrer');
+        } else if (isPdf) {
+            // On mobile devices, Chrome/Safari in PWA standalone mode often intercepts direct PDFs to download manager.
+            // Google Docs Viewer displays the PDF on-screen directly on the phone. On desktop, open in a new tab directly.
+            if (isMobileViewport) {
+                const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=false`;
+                window.open(viewerUrl, '_blank', 'noopener,noreferrer');
+            } else {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
+        } else {
+            // Text, images, or standard files open directly in a new tab
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+    };
+
     const formatLastMessagePreview = (lastMsg, currentUserId) => {
         if (!lastMsg) return 'No messages yet';
         if (lastMsg.isDeletedForEveryone) return 'This message was deleted';
@@ -5671,52 +5710,57 @@ export default function Dashboard() {
                                                                                 )}
 
                                                                                 {isDocMsg && (
-                                                                                    <div style={{
-                                                                                        display: 'flex',
-                                                                                        alignItems: 'center',
-                                                                                        gap: '12px',
-                                                                                        padding: '8px 10px',
-                                                                                        backgroundColor: isOwnMessage ? 'rgba(0, 0, 0, 0.16)' : 'rgba(0, 0, 0, 0.28)',
-                                                                                        borderRadius: '8px',
-                                                                                        minWidth: '220px',
-                                                                                        maxWidth: '320px',
-                                                                                        margin: 0
-                                                                                    }}>
+                                                                                    <div 
+                                                                                        onClick={(e) => handleOpenDocument(msg, e)}
+                                                                                        title={`Open ${msg.attachmentName || 'document'}`}
+                                                                                        style={{
+                                                                                            display: 'flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: '12px',
+                                                                                            padding: '10px 12px',
+                                                                                            backgroundColor: isOwnMessage ? 'rgba(0, 0, 0, 0.22)' : 'rgba(0, 0, 0, 0.32)',
+                                                                                            borderRadius: '10px',
+                                                                                            minWidth: '220px',
+                                                                                            maxWidth: '320px',
+                                                                                            margin: 0,
+                                                                                            cursor: 'pointer',
+                                                                                            transition: 'background-color 0.15s ease, transform 0.1s ease',
+                                                                                            userSelect: 'none'
+                                                                                        }}
+                                                                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isOwnMessage ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.45)'}
+                                                                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isOwnMessage ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.32)'}
+                                                                                    >
                                                                                         <div style={{
-                                                                                            width: '40px',
-                                                                                            height: '40px',
-                                                                                            borderRadius: '8px',
+                                                                                            width: '42px',
+                                                                                            height: '42px',
+                                                                                            borderRadius: '10px',
                                                                                             backgroundColor: '#06b6d4',
                                                                                             display: 'flex',
                                                                                             alignItems: 'center',
                                                                                             justifyContent: 'center',
                                                                                             color: '#ffffff',
-                                                                                            flexShrink: 0
+                                                                                            flexShrink: 0,
+                                                                                            boxShadow: '0 2px 8px rgba(6, 182, 212, 0.3)'
                                                                                         }}>
                                                                                             <FileText size={22} />
                                                                                         </div>
                                                                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                                                                            <a
-                                                                                                href={msg.content}
-                                                                                                target="_blank"
-                                                                                                rel="noopener noreferrer"
+                                                                                            <span
                                                                                                 style={{
                                                                                                     display: 'block',
                                                                                                     fontWeight: '600',
                                                                                                     fontSize: '0.88rem',
                                                                                                     color: '#ffffff',
-                                                                                                    textDecoration: 'none',
                                                                                                     overflow: 'hidden',
                                                                                                     textOverflow: 'ellipsis',
                                                                                                     whiteSpace: 'nowrap'
                                                                                                 }}
-                                                                                                title={msg.attachmentName || 'Document'}
                                                                                             >
                                                                                                 {msg.attachmentName || 'Document'}
-                                                                                            </a>
+                                                                                            </span>
                                                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px' }}>
-                                                                                                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)' }}>
-                                                                                                    {msg.attachmentName?.split('.').pop()?.toUpperCase() || 'DOCUMENT'}
+                                                                                                <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>
+                                                                                                    {msg.attachmentName?.split('.').pop()?.toUpperCase() || 'DOCUMENT'} • Open
                                                                                                 </span>
                                                                                                 {!msg.caption && (
                                                                                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
@@ -5725,6 +5769,9 @@ export default function Dashboard() {
                                                                                                     </div>
                                                                                                 )}
                                                                                             </div>
+                                                                                        </div>
+                                                                                        <div style={{ color: 'rgba(255, 255, 255, 0.65)', display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '4px' }}>
+                                                                                            <ExternalLink size={16} />
                                                                                         </div>
                                                                                     </div>
                                                                                 )}
