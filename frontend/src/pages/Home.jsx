@@ -1,729 +1,337 @@
-import { useState } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import { styled, keyframes } from '../stitches.config.js';
-import { 
-    Terminal, Code, Layers, Zap, MessageSquare, 
-    PenTool, Video, FileText, Users, ArrowUpRight, 
-    Activity, Shield, Cpu, Database, Radio, Check
-} from 'lucide-react';
+import { Terminal, Code, Layers, Zap, MessageSquare, LayoutTemplate, PenTool } from 'lucide-react';
 import DevSupLogo from '../components/DevSupLogo.jsx';
 
-// Precision Ticker Animation
-const tickerForward = keyframes({
+const scroll = keyframes({
     '0%': { transform: 'translateX(0)' },
     '100%': { transform: 'translateX(-50%)' },
 });
 
-const tickerReverse = keyframes({
-    '0%': { transform: 'translateX(-50%)' },
-    '100%': { transform: 'translateX(0)' },
+const glowPulse = keyframes({
+    '0%': { boxShadow: '0 0 20px rgba(6, 182, 212, 0.2)' },
+    '50%': { boxShadow: '0 0 40px rgba(6, 182, 212, 0.5)' },
+    '100%': { boxShadow: '0 0 20px rgba(6, 182, 212, 0.2)' },
 });
 
-// Root Container - Authentic Deep Abyss Canvas
-const Root = styled('div', {
+const HomeContainer = styled('div', {
     minHeight: '100vh',
     '@supports (min-height: 100dvh)': {
         minHeight: '100dvh',
     },
     width: '100%',
-    backgroundColor: '#070A0F',
-    color: '#E2E8F0',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "SF Pro Display", sans-serif',
+    overflowX: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    overflowX: 'hidden',
+    backgroundColor: '$bg',
+    color: '$textMain',
     overflowY: 'auto',
-    WebkitFontSmoothing: 'antialiased',
 });
 
-// Structural Bar
-const TopNav = styled('header', {
-    width: '100%',
-    borderBottom: '1px solid #161F30',
-    backgroundColor: 'rgba(7, 10, 15, 0.92)',
-    backdropFilter: 'blur(8px)',
-    position: 'sticky',
-    top: 0,
-    zIndex: 50,
-});
-
-const NavInner = styled('div', {
-    maxWidth: '1240px',
-    margin: '0 auto',
-    padding: '16px 24px',
+const HeroSection = styled('section', {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'space-between',
-});
-
-const BrandGroup = styled('div', {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    cursor: 'pointer',
-    userSelect: 'none',
-});
-
-const BrandName = styled('span', {
-    fontSize: '1.2rem',
-    fontWeight: '700',
-    letterSpacing: '-0.02em',
-    color: '#F8FAFC',
-});
-
-const SystemStatus = styled('div', {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '3px 9px',
-    borderRadius: '4px',
-    backgroundColor: 'rgba(0, 210, 180, 0.08)',
-    border: '1px solid rgba(0, 210, 180, 0.25)',
-    color: '#00D2B4',
-    fontSize: '0.72rem',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    fontWeight: '600',
-    '@media (max-width: 640px)': {
-        display: 'none',
+    justifyContent: 'center',
+    padding: '$4 20px',
+    minHeight: '70vh',
+    textAlign: 'center',
+    position: 'relative',
+    overflowX: 'hidden',
+    '@media (max-width: 768px)': {
+        padding: '$4 16px',
     }
 });
 
-const NavActions = styled('div', {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
+const GlowBackground = styled('div', {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '600px',
+    height: '600px',
+    background: 'radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, rgba(15, 23, 42, 0) 70%)',
+    zIndex: 0,
 });
 
-const TextLinkButton = styled('button', {
-    background: 'none',
-    border: 'none',
-    color: '#94A3B8',
-    fontSize: '0.88rem',
-    fontWeight: '500',
-    padding: '8px 14px',
-    cursor: 'pointer',
-    borderRadius: '5px',
-    transition: 'color 0.15s ease',
-    '&:hover': {
-        color: '#F8FAFC',
-    }
-});
-
-const SolidButton = styled('button', {
-    backgroundColor: '#00D2B4',
-    color: '#070A0F',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '9px 18px',
-    fontSize: '0.88rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    transition: 'background-color 0.15s ease',
-    '&:hover': {
-        backgroundColor: '#1ae2c5',
-    }
-});
-
-// Hero Arena
-const HeroContainer = styled('section', {
-    maxWidth: '1240px',
-    margin: '0 auto',
-    padding: '80px 24px 70px 24px',
-    width: '100%',
-    display: 'grid',
-    gridTemplateColumns: '1.15fr 0.85fr',
-    gap: '48px',
-    alignItems: 'center',
-    '@media (max-width: 960px)': {
-        gridTemplateColumns: '1fr',
-        padding: '50px 20px 40px 20px',
-        gap: '36px',
-    }
-});
-
-const HeroCopyBlock = styled('div', {
-    textAlign: 'left',
-});
-
-const SectionMarker = styled('div', {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    fontSize: '0.78rem',
-    color: '#00D2B4',
-    fontWeight: '600',
-    marginBottom: '16px',
-});
-
-const Headline = styled('h1', {
-    fontSize: '3.6rem',
-    fontWeight: '800',
-    lineHeight: '1.08',
-    letterSpacing: '-0.035em',
-    color: '#F8FAFC',
-    margin: '0 0 24px 0',
+const Title = styled('h1', {
+    fontSize: '4rem',
+    fontWeight: '900',
+    marginBottom: '$3',
+    background: 'linear-gradient(to right, #F8FAFC, #94A3B8)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    zIndex: 1,
     '@media (max-width: 768px)': {
         fontSize: '2.5rem',
-        lineHeight: '1.14',
     }
 });
 
-const Subhead = styled('p', {
-    fontSize: '1.18rem',
-    lineHeight: '1.65',
-    color: '#94A3B8',
-    maxWidth: '580px',
-    margin: '0 0 36px 0',
-    fontWeight: '400',
+const Subtitle = styled('p', {
+    fontSize: '1.25rem',
+    color: '$textMuted',
+    maxWidth: '600px',
+    marginBottom: '$4',
+    lineHeight: '1.6',
+    zIndex: 1,
 });
 
-const ActionRow = styled('div', {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    flexWrap: 'wrap',
-});
-
-const PrimaryLaunch = styled('button', {
-    backgroundColor: '#00D2B4',
-    color: '#070A0F',
+const CyanGlowButton = styled('button', {
+    padding: '16px 40px',
+    fontSize: '1.2rem',
+    fontWeight: 'bold',
+    backgroundColor: '$accent',
+    color: '$bg',
     border: 'none',
-    borderRadius: '6px',
-    padding: '14px 28px',
-    fontSize: '0.98rem',
-    fontWeight: '700',
+    borderRadius: '$1',
     cursor: 'pointer',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    transition: 'all 0.15s ease',
-    '&:hover': {
-        backgroundColor: '#1ae2c5',
-        transform: 'translateY(-1px)',
-    }
-});
-
-const SecondaryDocLink = styled('button', {
-    backgroundColor: 'transparent',
-    color: '#CBD5E1',
-    border: '1px solid #1E293B',
-    borderRadius: '6px',
-    padding: '14px 24px',
-    fontSize: '0.98rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    transition: 'all 0.15s ease',
-    '&:hover': {
-        backgroundColor: '#0E1420',
-        borderColor: '#334155',
-        color: '#F8FAFC',
-    }
-});
-
-// Telemetry Hero Inspector (Real Architectural Graphic)
-const TelemetryConsole = styled('div', {
-    backgroundColor: '#0B111A',
-    border: '1px solid #1A263B',
-    borderRadius: '10px',
-    overflow: 'hidden',
-    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
-});
-
-const ConsoleTop = styled('div', {
-    padding: '10px 14px',
-    backgroundColor: '#080D14',
-    borderBottom: '1px solid #162133',
+    transition: 'all 0.3s ease',
+    animation: `${glowPulse} 3s infinite`,
+    zIndex: 1,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    fontSize: '0.75rem',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    color: '#64748B',
-});
-
-const ConsoleInner = styled('div', {
-    padding: '18px',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    fontSize: '0.82rem',
-    lineHeight: '1.6',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-});
-
-const ConsoleRow = styled('div', {
-    display: 'flex',
-    alignItems: 'flex-start',
     gap: '10px',
-    borderLeft: '2px solid transparent',
-    paddingLeft: '8px',
-    variants: {
-        active: {
-            true: {
-                borderLeftColor: '#00D2B4',
-                backgroundColor: 'rgba(0, 210, 180, 0.04)',
-            }
-        }
+    '&:hover': {
+        backgroundColor: '$accentHover',
+        transform: 'translateY(-2px)',
     }
 });
 
-// Magnificent Dual-Tiered Marquee Section
-const MarqueeZone = styled('section', {
+const MarqueeContainer = styled('div', {
     width: '100%',
-    backgroundColor: '#05070B',
-    borderTop: '1px solid #161F30',
-    borderBottom: '1px solid #161F30',
-    padding: '28px 0',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
     overflow: 'hidden',
-    position: 'relative',
-    '&::before, &::after': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        width: '140px',
-        zIndex: 10,
-        pointerEvents: 'none',
-    },
-    '&::before': {
-        left: 0,
-        background: 'linear-gradient(to right, #070A0F, transparent)',
-    },
-    '&::after': {
-        right: 0,
-        background: 'linear-gradient(to left, #070A0F, transparent)',
-    }
-});
-
-const Track = styled('div', {
+    backgroundColor: '$surface',
+    padding: '$3 0',
+    borderTop: '1px solid $border',
+    borderBottom: '1px solid $border',
     display: 'flex',
-    gap: '16px',
-    width: 'max-content',
-    whiteSpace: 'nowrap',
-    variants: {
-        direction: {
-            forward: { animation: `${tickerForward} 45s linear infinite` },
-            reverse: { animation: `${tickerReverse} 40s linear infinite` },
-        }
-    }
 });
 
-const TelemetryChip = styled('div', {
-    display: 'inline-flex',
+const MarqueeTrack = styled('div', {
+    display: 'flex',
+    width: '200%',
+    animation: `${scroll} 20s linear infinite`,
+});
+
+const TechLogo = styled('div', {
+    flex: '1',
+    display: 'flex',
     alignItems: 'center',
+    justifyContent: 'center',
+    color: '$textMuted',
+    fontSize: '1.2rem',
+    fontWeight: 'bold',
     gap: '10px',
-    padding: '7px 14px',
-    borderRadius: '5px',
-    backgroundColor: '#0C121D',
-    border: '1px solid #1A263B',
-    fontSize: '0.8rem',
-    color: '#CBD5E1',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    transition: 'border-color 0.15s ease',
+    filter: 'grayscale(100%)',
+    transition: 'filter 0.3s',
     '&:hover': {
-        borderColor: '#00D2B4',
+        filter: 'grayscale(0%)',
+        color: '$accent',
     }
 });
 
-const MetricPill = styled('span', {
-    color: '#00D2B4',
-    fontWeight: '700',
-});
-
-// Asymmetric Architectural Breakdown (Replaces Generic SaaS Cards)
-const ArchitectureSection = styled('section', {
-    maxWidth: '1240px',
+const BentoSection = styled('section', {
+    padding: '80px 20px',
+    maxWidth: '1200px',
     margin: '0 auto',
-    padding: '90px 24px',
-    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
 });
 
-const SectionHeader = styled('div', {
-    marginBottom: '54px',
-    textAlign: 'left',
-    maxWidth: '720px',
+const SectionTitle = styled('h2', {
+    fontSize: '2.5rem',
+    marginBottom: '3rem',
+    color: '$textMain',
 });
 
-const MainSectionTitle = styled('h2', {
-    fontSize: '2.4rem',
-    fontWeight: '800',
-    letterSpacing: '-0.025em',
-    color: '#F8FAFC',
-    margin: '0 0 14px 0',
-});
-
-const SectionDescription = styled('p', {
-    fontSize: '1.1rem',
-    color: '#94A3B8',
-    lineHeight: '1.6',
-    margin: 0,
-});
-
-const ColumnsLayout = styled('div', {
+const BentoGrid = styled('div', {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '1px',
-    backgroundColor: '#161F30',
-    border: '1px solid #161F30',
-    borderRadius: '10px',
-    overflow: 'hidden',
-    '@media (max-width: 900px)': {
-        gridTemplateColumns: '1fr',
-    }
-});
-
-const LayerColumn = styled('div', {
-    backgroundColor: '#090E17',
-    padding: '36px 30px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    minHeight: '360px',
-});
-
-const LayerIndex = styled('div', {
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    fontSize: '0.78rem',
-    color: '#00D2B4',
-    fontWeight: '700',
-    marginBottom: '20px',
-});
-
-const LayerHeading = styled('h3', {
-    fontSize: '1.35rem',
-    fontWeight: '700',
-    color: '#F8FAFC',
-    letterSpacing: '-0.015em',
-    margin: '0 0 12px 0',
-});
-
-const LayerBody = styled('p', {
-    fontSize: '0.94rem',
-    lineHeight: '1.65',
-    color: '#94A3B8',
-    margin: '0 0 24px 0',
-});
-
-const LayerSpecsList = styled('ul', {
-    listStyle: 'none',
-    padding: 0,
-    margin: 0,
-    borderTop: '1px solid #162133',
-    paddingTop: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-});
-
-const LayerSpec = styled('li', {
-    fontSize: '0.8rem',
-    color: '#64748B',
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    '& span': {
-        color: '#94A3B8',
-    }
-});
-
-// Precision Terminal Action Zone
-const DirectLaunchZone = styled('section', {
-    borderTop: '1px solid #161F30',
-    backgroundColor: '#05080E',
-    padding: '70px 24px',
-});
-
-const DirectLaunchInner = styled('div', {
-    maxWidth: '1240px',
-    margin: '0 auto',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '30px',
-    flexWrap: 'wrap',
-    '@media (max-width: 768px)': {
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-    }
-});
-
-// Grounded Footer
-const BaseFooter = styled('footer', {
-    borderTop: '1px solid #121A28',
-    backgroundColor: '#04060A',
-    padding: '36px 24px 44px 24px',
-});
-
-const FooterInner = styled('div', {
-    maxWidth: '1240px',
-    margin: '0 auto',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    gridTemplateColumns: 'repeat(12, 1fr)',
     gap: '20px',
-    fontSize: '0.84rem',
-    color: '#475569',
+    width: '100%',
+});
+
+const BentoCard = styled('div', {
+    backgroundColor: '$surface',
+    borderRadius: '$2',
+    padding: '$4',
+    border: '1px solid $border',
+    display: 'flex',
+    flexDirection: 'column',
+    transition: 'transform 0.2s',
+    '&:hover': {
+        transform: 'translateY(-4px)',
+        borderColor: '$accent',
+    },
+    variants: {
+        span: {
+            4: { gridColumn: 'span 12', '@media (min-width: 768px)': { gridColumn: 'span 4' } },
+            8: { gridColumn: 'span 12', '@media (min-width: 768px)': { gridColumn: 'span 8' } },
+            6: { gridColumn: 'span 12', '@media (min-width: 768px)': { gridColumn: 'span 6' } },
+            12: { gridColumn: 'span 12' },
+        }
+    }
+});
+
+const CardIcon = styled('div', {
+    color: '$accent',
+    marginBottom: '$3',
+});
+
+const CardTitle = styled('h3', {
+    fontSize: '1.25rem',
+    marginBottom: '$2',
+    color: '$textMain',
+});
+
+const CardText = styled('p', {
+    color: '$textMuted',
+    lineHeight: '1.5',
+});
+
+const FooterCTA = styled('footer', {
+    backgroundColor: '$bg',
+    padding: '60px 20px',
+    borderTop: '1px solid $border',
+    display: 'flex',
+    justifyContent: 'center',
+});
+
+const TerminalBox = styled('div', {
+    backgroundColor: '$surface',
+    borderRadius: '$1',
+    border: '1px solid $border',
+    width: '100%',
+    maxWidth: '600px',
+    overflow: 'hidden',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+});
+
+const TerminalHeader = styled('div', {
+    backgroundColor: '#0F172A',
+    padding: '10px',
+    display: 'flex',
+    gap: '6px',
+    borderBottom: '1px solid $border',
+});
+
+const TerminalDot = styled('div', {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    variants: {
+        color: {
+            red: { backgroundColor: '#EF4444' },
+            yellow: { backgroundColor: '#F59E0B' },
+            green: { backgroundColor: '#10B981' },
+        }
+    }
+});
+
+const TerminalBody = styled('div', {
+    padding: '$4',
+    fontFamily: 'monospace',
+    color: '$textMain',
+});
+
+const TerminalPrompt = styled('span', {
+    color: '$accent',
+    marginRight: '10px',
 });
 
 export default function Home() {
     const navigate = useNavigate();
 
-    // Upper Tier: Operational Runtimes & Infrastructure
-    const infrastructureTape = [
-        { key: 'TRANSPORT', val: 'WebSocket Full-Duplex (4ms)' },
-        { key: 'MEDIA-ENGINE', val: 'WebRTC Mesh / VP8 + Opus 48kHz' },
-        { key: 'AST-PARSER', val: 'Prism Engine / 50+ Grammars' },
-        { key: 'DOCUMENT-PROXY', val: 'Signed Cloudinary Streaming' },
-        { key: 'SYNC-PIPELINE', val: 'Vector Canvas Socket Delta' },
-        { key: 'AUTH-SUBSYSTEM', val: 'JWT Bearer & Auth0 RS256' },
-        { key: 'DATABASE', val: 'MongoDB Atlas Sharded Cluster' },
+    const techStack = [
+        { name: 'React', icon: <Code size={24} /> },
+        { name: 'Auth0', icon: <Zap size={24} /> },
+        { name: 'MongoDB', icon: <Layers size={24} /> },
+        { name: 'Socket.io', icon: <MessageSquare size={24} /> },
+        { name: 'Cloudinary', icon: <LayoutTemplate size={24} /> },
     ];
 
-    // Lower Tier: Protocol Standards & Engineering Workflows
-    const protocolsTape = [
-        { key: 'OFFICE-PROTOCOL', val: 'ms-word: / ms-excel: Direct Launch' },
-        { key: 'ATTACHMENT-EXT', val: 'PDF • DOCX • XLSX • PPTX • RAW' },
-        { key: 'STATUS-LIFECYCLE', val: '24-Hour Ephemeral Cache' },
-        { key: 'VOICE-NOTES', val: 'MediaRecorder Audio/WebM Stream' },
-        { key: 'WHITEBOARD', val: 'Vector Path Canvas Serialization' },
-        { key: 'DEPLOY-TARGET', val: 'Vercel Edge & Render Engine' },
-    ];
-
-    const doubleInfra = [...infrastructureTape, ...infrastructureTape];
-    const doubleProto = [...protocolsTape, ...protocolsTape];
+    // Duplicate for continuous marquee effect
+    const marqueeItems = [...techStack, ...techStack];
 
     return (
-        <Root>
-            {/* Top Navigation */}
-            <TopNav>
-                <NavInner>
-                    <BrandGroup onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-                        <DevSupLogo size={28} glow={false} />
-                        <BrandName>DevSup</BrandName>
-                        <SystemStatus>
-                            <Activity size={12} />
-                            CLUSTERS OPERATIONAL
-                        </SystemStatus>
-                    </BrandGroup>
+        <HomeContainer>
+            <HeroSection>
+                <GlowBackground />
+                <DevSupLogo size={110} style={{ marginBottom: '16px', zIndex: 1 }} />
+                <Title>Code Meets Conversation</Title>
+                <Subtitle>
+                    DevSup is a developer-centric chat application engineered to bridge the gap between casual communication and heavy-duty technical collaboration. No more context switching.
+                </Subtitle>
+                <CyanGlowButton onClick={() => navigate('/login')}>
+                    <Terminal size={20} />
+                    Launch DevSup
+                </CyanGlowButton>
+            </HeroSection>
 
-                    <NavActions>
-                        <TextLinkButton onClick={() => navigate('/login')}>
-                            Sign In
-                        </TextLinkButton>
-                        <SolidButton onClick={() => navigate('/login')}>
-                            Enter Workspace
-                            <ArrowUpRight size={15} />
-                        </SolidButton>
-                    </NavActions>
-                </NavInner>
-            </TopNav>
-
-            {/* Hero Section */}
-            <HeroContainer>
-                <HeroCopyBlock>
-                    <SectionMarker>
-                        <Terminal size={14} />
-                        ENGINEERING COMMUNICATION PLATFORM
-                    </SectionMarker>
-                    <Headline>
-                        The messaging engine built for software engineering.
-                    </Headline>
-                    <Subhead>
-                        DevSup unifies real-time chat, syntax-highlighted code blocks, collaborative vector whiteboarding, and native document workflows into a single high-performance workspace. Zero context-switching penalty.
-                    </Subhead>
-                    <ActionRow>
-                        <PrimaryLaunch onClick={() => navigate('/login')}>
-                            Launch DevSup Free
-                            <ArrowUpRight size={17} />
-                        </PrimaryLaunch>
-                        <SecondaryDocLink onClick={() => navigate('/login')}>
-                            Sign In to Account
-                        </SecondaryDocLink>
-                    </ActionRow>
-                </HeroCopyBlock>
-
-                {/* Telemetry Console (Demonstrating Real System Architecture) */}
-                <TelemetryConsole>
-                    <ConsoleTop>
-                        <span>devsup-cluster-telemetry // v2.4</span>
-                        <span style={{ color: '#00D2B4' }}>● LIVE</span>
-                    </ConsoleTop>
-                    <ConsoleInner>
-                        <ConsoleRow active={true}>
-                            <span style={{ color: '#64748B' }}>01</span>
-                            <div>
-                                <span style={{ color: '#00D2B4' }}>WS_SOCKET:</span>{' '}
-                                <span style={{ color: '#CBD5E1' }}>handshake confirmed on /chat-gateway</span>
-                            </div>
-                        </ConsoleRow>
-                        <ConsoleRow>
-                            <span style={{ color: '#64748B' }}>02</span>
-                            <div>
-                                <span style={{ color: '#94A3B8' }}>SYNTAX_AST:</span>{' '}
-                                <span style={{ color: '#E2E8F0' }}>vscDarkPlus active (TypeScript, Go, Rust, Python)</span>
-                            </div>
-                        </ConsoleRow>
-                        <ConsoleRow active={true}>
-                            <span style={{ color: '#64748B' }}>03</span>
-                            <div>
-                                <span style={{ color: '#00D2B4' }}>CANVAS_DELTA:</span>{' '}
-                                <span style={{ color: '#CBD5E1' }}>collaborative whiteboard sync buffer ready</span>
-                            </div>
-                        </ConsoleRow>
-                        <ConsoleRow>
-                            <span style={{ color: '#64748B' }}>04</span>
-                            <div>
-                                <span style={{ color: '#94A3B8' }}>DOC_RESOLVER:</span>{' '}
-                                <span style={{ color: '#E2E8F0' }}>native launch routes [Word, WPS, PDF] mapped</span>
-                            </div>
-                        </ConsoleRow>
-                        <ConsoleRow>
-                            <span style={{ color: '#64748B' }}>05</span>
-                            <div>
-                                <span style={{ color: '#94A3B8' }}>WEBRTC_AUDIO:</span>{' '}
-                                <span style={{ color: '#E2E8F0' }}>Opus 48kHz full-duplex session pool online</span>
-                            </div>
-                        </ConsoleRow>
-                    </ConsoleInner>
-                </TelemetryConsole>
-            </HeroContainer>
-
-            {/* Magnificent Dual-Tiered Marquee (High-Density Telemetry Stream) */}
-            <MarqueeZone>
-                {/* Upper Tier: Forward Flow */}
-                <Track direction="forward">
-                    {doubleInfra.map((item, idx) => (
-                        <TelemetryChip key={`infra-${idx}`}>
-                            <span style={{ color: '#64748B' }}>{item.key} //</span>
-                            <MetricPill>{item.val}</MetricPill>
-                        </TelemetryChip>
+            <MarqueeContainer>
+                <MarqueeTrack>
+                    {marqueeItems.map((tech, index) => (
+                        <TechLogo key={index}>
+                            {tech.icon}
+                            {tech.name}
+                        </TechLogo>
                     ))}
-                </Track>
+                </MarqueeTrack>
+            </MarqueeContainer>
 
-                {/* Lower Tier: Reverse Flow */}
-                <Track direction="reverse">
-                    {doubleProto.map((item, idx) => (
-                        <TelemetryChip key={`proto-${idx}`}>
-                            <span style={{ color: '#64748B' }}>{item.key} //</span>
-                            <span style={{ color: '#CBD5E1' }}>{item.val}</span>
-                        </TelemetryChip>
-                    ))}
-                </Track>
-            </MarqueeZone>
+            <BentoSection>
+                <SectionTitle>Engineered for Developers</SectionTitle>
+                <BentoGrid>
+                    <BentoCard span={8}>
+                        <CardIcon><Code size={32} /></CardIcon>
+                        <CardTitle>Developer-Centric Messaging</CardTitle>
+                        <CardText>Intelligent text parsing automatically detects syntax, rendering multi-line code blocks cleanly and accurately using highlight.js with the vscDarkPlus theme.</CardText>
+                    </BentoCard>
+                    <BentoCard span={4}>
+                        <CardIcon><Layers size={32} /></CardIcon>
+                        <CardTitle>Dynamic Tech Identity</CardTitle>
+                        <CardText>Every participant bears a specific tech discipline badge (Frontend, Backend, UI/UX) directly in their profile.</CardText>
+                    </BentoCard>
+                    
+                    <BentoCard span={4}>
+                        <CardIcon><LayoutTemplate size={32} /></CardIcon>
+                        <CardTitle>3-Pane Architecture</CardTitle>
+                        <CardText>A WhatsApp-meets-IDE layout featuring a Nav Sidebar, central Chat Arena, and a Productivity Drawer for pinned resources.</CardText>
+                    </BentoCard>
+                    <BentoCard span={4}>
+                        <CardIcon><PenTool size={32} /></CardIcon>
+                        <CardTitle>In-Chat Whiteboarding</CardTitle>
+                        <CardText>A lightweight, WebSocket-synced collaborative canvas overlay. Sketch system architecture diagrams or UI wireframes in real-time.</CardText>
+                    </BentoCard>
+                    <BentoCard span={4}>
+                        <CardIcon><Zap size={32} /></CardIcon>
+                        <CardTitle>Rich Ecosystem Integrations</CardTitle>
+                        <CardText>Native URL parser intercepts GitHub, Figma, and Notion links, transforming them into interactive, dark-themed embed cards.</CardText>
+                    </BentoCard>
+                </BentoGrid>
+            </BentoSection>
 
-            {/* Architectural Pillars (Asymmetric 3-Column System Breakdown) */}
-            <ArchitectureSection>
-                <SectionHeader>
-                    <SectionMarker>
-                        <Cpu size={14} />
-                        SYSTEM CAPABILITIES
-                    </SectionMarker>
-                    <MainSectionTitle>Built to replace fragmented developer stacks.</MainSectionTitle>
-                    <SectionDescription>
-                        Engineers typically juggle four separate windows for chat, code snippets, visual diagramming, and file exchange. DevSup unifies all four under one persistent connection.
-                    </SectionDescription>
-                </SectionHeader>
-
-                <ColumnsLayout>
-                    {/* Column 1: Syntax & Code Pipeline */}
-                    <LayerColumn>
-                        <div>
-                            <LayerIndex>SYS_LAYER_01 // CODE</LayerIndex>
-                            <LayerHeading>Native Syntax Tokenization</LayerHeading>
-                            <LayerBody>
-                                Multi-line code snippets are parsed and tokenized across 50+ languages with line numbering, accurate indentation retention, and clean one-click clipboard copying.
-                            </LayerBody>
+            <FooterCTA>
+                <TerminalBox>
+                    <TerminalHeader>
+                        <TerminalDot color="red" />
+                        <TerminalDot color="yellow" />
+                        <TerminalDot color="green" />
+                    </TerminalHeader>
+                    <TerminalBody>
+                        <div><TerminalPrompt>~</TerminalPrompt><span>npm install @devsup/collaboration</span></div>
+                        <div style={{ color: '#94A3B8', margin: '10px 0' }}>{'>'} Resolving dependencies...</div>
+                        <div style={{ color: '#10B981', margin: '10px 0' }}>{'>'} Ready to bridge code and chat.</div>
+                        <div style={{ marginTop: '20px' }}>
+                            <CyanGlowButton onClick={() => navigate('/login')} style={{ padding: '8px 20px', fontSize: '1rem', width: '100%', justifyContent: 'center' }}>
+                                initialize()
+                            </CyanGlowButton>
                         </div>
-                        <LayerSpecsList>
-                            <LayerSpec>ENGINE: <span>highlight.js AST parser</span></LayerSpec>
-                            <LayerSpec>THEME: <span>VS Code Dark Plus compliant</span></LayerSpec>
-                            <LayerSpec>COPY_BUFFER: <span>Preserves CRLF/LF line endings</span></LayerSpec>
-                        </LayerSpecsList>
-                    </LayerColumn>
-
-                    {/* Column 2: Vector Whiteboarding */}
-                    <LayerColumn>
-                        <div>
-                            <LayerIndex>SYS_LAYER_02 // CANVAS</LayerIndex>
-                            <LayerHeading>Real-Time Whiteboard Vector</LayerHeading>
-                            <LayerBody>
-                                An in-chat collaborative vector canvas overlay. Sketch distributed system architectures, database schemas, and wireframes together without launching external tools.
-                            </LayerBody>
-                        </div>
-                        <LayerSpecsList>
-                            <LayerSpec>SYNC: <span>Full-duplex WebSocket path delta</span></LayerSpec>
-                            <LayerSpec>EXPORT: <span>Direct-to-chat image commit</span></LayerSpec>
-                            <LayerSpec>TOOLING: <span>Pen, shape, erase, stroke weights</span></LayerSpec>
-                        </LayerSpecsList>
-                    </LayerColumn>
-
-                    {/* Column 3: Native Document Execution */}
-                    <LayerColumn>
-                        <div>
-                            <LayerIndex>SYS_LAYER_03 // RUNTIME</LayerIndex>
-                            <LayerHeading>Native Document Resolver</LayerHeading>
-                            <LayerBody>
-                                View PDFs, Word documents, and spreadsheets directly in-app or launch them immediately on your device using native application protocols (Microsoft Word, WPS Office, Acrobat).
-                            </LayerBody>
-                        </div>
-                        <LayerSpecsList>
-                            <LayerSpec>DESKTOP: <span>ms-word: & ms-excel: protocol handlers</span></LayerSpec>
-                            <LayerSpec>MOBILE: <span>Android/iOS system share resolver</span></LayerSpec>
-                            <LayerSpec>STREAM: <span>Authenticated signed Cloudinary pipe</span></LayerSpec>
-                        </LayerSpecsList>
-                    </LayerColumn>
-                </ColumnsLayout>
-            </ArchitectureSection>
-
-            {/* Direct Launch Banner */}
-            <DirectLaunchZone>
-                <DirectLaunchInner>
-                    <div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: '700', color: '#F8FAFC', marginBottom: '6px' }}>
-                            Ready to consolidate your engineering team communication?
-                        </div>
-                        <div style={{ fontSize: '0.94rem', color: '#94A3B8' }}>
-                            Authenticate with your developer identity and begin collaborating in seconds.
-                        </div>
-                    </div>
-                    <PrimaryLaunch onClick={() => navigate('/login')}>
-                        Launch DevSup Workspace
-                        <ArrowUpRight size={17} />
-                    </PrimaryLaunch>
-                </DirectLaunchInner>
-            </DirectLaunchZone>
-
-            {/* Grounded Minimal Footer */}
-            <BaseFooter>
-                <FooterInner>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <DevSupLogo size={22} glow={false} />
-                        <span>DevSup Platform // Developer Communication Network</span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '24px' }}>
-                        <span style={{ cursor: 'pointer', color: '#94A3B8' }} onClick={() => navigate('/login')}>Sign In</span>
-                        <span style={{ cursor: 'pointer', color: '#94A3B8' }} onClick={() => navigate('/login')}>Register</span>
-                        <span style={{ cursor: 'pointer', color: '#94A3B8' }} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Return to Top</span>
-                    </div>
-
-                    <div>
-                        © {new Date().getFullYear()} DevSup. All systems operational.
-                    </div>
-                </FooterInner>
-            </BaseFooter>
-        </Root>
+                    </TerminalBody>
+                </TerminalBox>
+            </FooterCTA>
+        </HomeContainer>
     );
 }
