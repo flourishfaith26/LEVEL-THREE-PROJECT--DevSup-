@@ -1,6 +1,7 @@
 import express from 'express';
 import { upload } from '../middleware/upload.js';
 import { requireAuth } from '../middleware/auth.js';
+import { v2 as cloudinary } from 'cloudinary';
 import path from 'path';
 
 const router = express.Router();
@@ -16,7 +17,7 @@ router.post('/', requireAuth, upload.single('file'), (req, res) => {
 });
 
 // Proxy endpoint to stream files from Cloudinary with full CORS and correct headers
-// Allows opening files directly in mobile apps (Word, WPS, PDF readers) without redirecting to Cloudinary
+// Uses Cloudinary signed private download URLs to bypass account-level PDF/document delivery restrictions
 router.get('/file', async (req, res) => {
     try {
         const fileUrl = req.query.url;
@@ -46,10 +47,63 @@ router.get('/file', async (req, res) => {
         else if (ext === '.png') mimeType = 'image/png';
         else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
 
-        // Fetch from Cloudinary on server side (no CORS blocks, follows redirects)
-        const cloudRes = await fetch(fileUrl);
-        if (!cloudRes.ok) {
-            return res.status(cloudRes.status).send('File not found or inaccessible on storage');
+        // Extract public_id from Cloudinary URL (e.g. devsup_attachments/my_file.pdf)
+        const match = fileUrl.match(/\/upload\/(?:v\d+\/)?(.+)$/);
+        let publicId = match ? decodeURIComponent(match[1]).split('?')[0] : null;
+
+        let cloudRes = null;
+
+        // 1. Authenticated signed download URL using Cloudinary SDK (bypasses all delivery restrictions)
+        if (publicId) {
+            cloudinary.config({
+                cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+                api_key: process.env.CLOUDINARY_API_KEY,
+                api_secret: process.env.CLOUDINARY_API_SECRET
+            });
+
+            const isRaw = fileUrl.includes('/raw/');
+            const candidateConfigs = [
+                { resource_type: isRaw ? 'raw' : 'image', id: publicId },
+                { resource_type: isRaw ? 'image' : 'raw', id: publicId },
+                { resource_type: 'image', id: publicId.replace(/\.[^/.]+$/, '') },
+                { resource_type: 'raw', id: publicId.replace(/\.[^/.]+$/, '') }
+            ];
+
+            for (const cfg of candidateConfigs) {
+                try {
+                    const signedUrl = cloudinary.utils.private_download_url(cfg.id, '', {
+                        resource_type: cfg.resource_type,
+                        type: 'upload',
+                        expires_at: Math.floor(Date.now() / 1000) + 3600
+                    });
+                    const resTest = await fetch(signedUrl);
+                    if (resTest.ok) {
+                        cloudRes = resTest;
+                        break;
+                    }
+                } catch {
+                    // Try next candidate
+                }
+            }
+        }
+
+        // 2. Fallback: Direct fetch
+        if (!cloudRes) {
+            const directRes = await fetch(fileUrl);
+            if (directRes.ok) {
+                cloudRes = directRes;
+            }
+        }
+
+        // 3. Fallback: Try swapping raw and image paths if needed
+        if (!cloudRes && fileUrl.includes('/raw/')) {
+            const imgUrl = fileUrl.replace('/raw/', '/image/');
+            const imgRes = await fetch(imgUrl);
+            if (imgRes.ok) cloudRes = imgRes;
+        }
+
+        if (!cloudRes || !cloudRes.ok) {
+            return res.status(404).send('File not found or inaccessible on storage');
         }
 
         res.setHeader('Access-Control-Allow-Origin', '*');
