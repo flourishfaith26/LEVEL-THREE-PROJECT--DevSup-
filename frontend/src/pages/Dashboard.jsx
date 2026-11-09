@@ -3688,16 +3688,19 @@ export default function Dashboard() {
         if (!msg?.content) return;
 
         // Clean up any accidental /fl_inline/ to avoid Cloudinary HTTP 400 Bad Request
-        const url = msg.content.replace('/upload/fl_inline/', '/upload/');
-        const filename = msg.attachmentName || url.split('/').pop().split('?')[0] || 'document';
+        const rawUrl = msg.content.replace('/upload/fl_inline/', '/upload/');
+        const filename = msg.attachmentName || rawUrl.split('/').pop().split('?')[0] || 'document';
         const ext = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
 
         const docId = msg._id || msg.createdAt;
         setOpeningDocId(docId);
 
+        // Proxy through our backend to eliminate CORS issues and avoid redirecting to Cloudinary
+        const proxyUrl = `${BACKEND_URL}/api/upload/file?url=${encodeURIComponent(rawUrl)}&name=${encodeURIComponent(filename)}`;
+
         try {
-            // Fetch original file bytes preserving exact format and contents
-            const response = await fetch(url);
+            // Fetch via backend proxy: guaranteed CORS-allowed and sets correct MIME headers
+            const response = await fetch(proxyUrl);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const blob = await response.blob();
 
@@ -3745,8 +3748,9 @@ export default function Dashboard() {
             document.body.removeChild(a);
             setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
         } catch (err) {
-            console.warn('Direct blob open failed, opening cleaned URL directly:', err);
-            window.open(url, '_blank', 'noopener,noreferrer');
+            console.warn('Proxy fetch failed, opening backend proxy URL directly:', err);
+            // Open via backend proxy URL (never Cloudinary) so it opens directly with proper headers
+            window.open(proxyUrl, '_blank', 'noopener,noreferrer');
         } finally {
             setOpeningDocId(null);
         }
