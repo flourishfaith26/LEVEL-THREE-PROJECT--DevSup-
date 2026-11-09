@@ -3,20 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
     
     <!-- PWA Configuration -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#06b6d4" />
+    <meta name="theme-color" content="#0B0F19" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="DevSup" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     
     <title>DevSup - Developer Support Network</title>
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="margin: 0; background-color: #0B0F19; color: #F8FAFC;">
+    <div id="root">
+      <div id="app-splash" style="position: fixed; inset: 0; background: radial-gradient(circle at center, #0F172A 0%, #070B14 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999999; font-family: system-ui, -apple-system, sans-serif; user-select: none;">
+        <div style="display: flex; align-items: center; justify-content: center; width: 88px; height: 88px; border-radius: 26px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(6, 182, 212, 0.35); box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.6), 0 0 28px rgba(6, 182, 212, 0.25); animation: devsupPulse 1.4s ease-in-out infinite;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="50" height="42" fill="none" style="filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.65));">
+            <g stroke="#06b6d4" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M 40 40 L 17 64 L 40 88" />
+              <path d="M 72 30 L 54 98" />
+              <path d="M 88 40 L 111 64 L 88 88" />
+            </g>
+          </svg>
+        </div>
+        <div style="margin-top: 24px; text-align: center;">
+          <div style="font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; color: #F8FAFC;">
+            Dev<span style="color: #06b6d4;">Sup</span>
+          </div>
+          <div style="font-size: 0.8rem; color: #94A3B8; margin-top: 4px; letter-spacing: 0.04em;">
+            Developer Support Network
+          </div>
+        </div>
+      </div>
+      <style>
+        @keyframes devsupPulse {
+          0%, 100% { transform: scale(0.96); filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.2)); }
+          50% { transform: scale(1.04); filter: drop-shadow(0 0 24px rgba(6, 182, 212, 0.5)); }
+        }
+      </style>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     
     <!-- Service Worker Registration -->
