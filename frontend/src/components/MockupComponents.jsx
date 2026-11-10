@@ -415,6 +415,22 @@ export const RealNavbar = ({ el, onUpdate }) => {
 // === 9. Real Functional Image Component (Supports Upload, URL, Replace) ===
 export const RealImage = ({ el, onUpdate }) => {
     const fileInputRef = useRef(null);
+    const clickCountRef = useRef(0);
+    const clickTimerRef = useRef(null);
+
+    const handleTripleClick = (e) => {
+        clickCountRef.current += 1;
+        if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+
+        if (clickCountRef.current >= 3 || (e.detail && e.detail >= 3)) {
+            clickCountRef.current = 0;
+            fileInputRef.current?.click();
+        } else {
+            clickTimerRef.current = setTimeout(() => {
+                clickCountRef.current = 0;
+            }, 600);
+        }
+    };
 
     const handleFileChange = (e) => {
         const file = e.target.files?.[0];
@@ -428,15 +444,20 @@ export const RealImage = ({ el, onUpdate }) => {
 
     if (el.src) {
         return (
-            <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', borderRadius: `${el.borderRadius ?? 8}px` }}>
+            <div 
+                onClick={handleTripleClick}
+                title="Triple-click (3 clicks) to replace image"
+                style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', borderRadius: `${el.borderRadius ?? 8}px` }}
+            >
                 <img
                     src={el.src}
-                    alt={el.text || 'Imported asset'}
+                    alt={el.name || 'Imported asset'}
                     style={{
                         width: '100%',
                         height: '100%',
                         objectFit: el.fit || 'cover',
-                        display: 'block'
+                        display: 'block',
+                        pointerEvents: 'none'
                     }}
                 />
                 <input
@@ -452,7 +473,8 @@ export const RealImage = ({ el, onUpdate }) => {
 
     return (
         <div
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleTripleClick}
+            title="Click 3 times to import image"
             style={{
                 width: '100%',
                 height: '100%',
@@ -467,12 +489,13 @@ export const RealImage = ({ el, onUpdate }) => {
                 color: '#94A3B8',
                 cursor: 'pointer',
                 padding: '12px',
-                textAlign: 'center'
+                textAlign: 'center',
+                userSelect: 'none'
             }}
         >
             <ImageIcon size={32} color="#06B6D4" />
-            <span style={{ fontSize: '0.82rem', fontWeight: '600', color: '#E2E8F0' }}>Click to Import Image</span>
-            <span style={{ fontSize: '0.72rem', color: '#64748B' }}>PNG, JPG, SVG, WebP, GIF</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: '600', color: '#E2E8F0' }}>Triple-click to Import Image</span>
+            <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Click 3 times to browse files (PNG, JPG, SVG, WebP)</span>
             <input
                 type="file"
                 ref={fileInputRef}
@@ -487,6 +510,22 @@ export const RealImage = ({ el, onUpdate }) => {
 // === 10. Real Functional Video Player Component ===
 export const RealVideo = ({ el, onUpdate }) => {
     const fileInputRef = useRef(null);
+    const clickCountRef = useRef(0);
+    const clickTimerRef = useRef(null);
+
+    const handleTripleClick = (e) => {
+        clickCountRef.current += 1;
+        if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+
+        if (clickCountRef.current >= 3 || (e.detail && e.detail >= 3)) {
+            clickCountRef.current = 0;
+            fileInputRef.current?.click();
+        } else {
+            clickTimerRef.current = setTimeout(() => {
+                clickCountRef.current = 0;
+            }, 600);
+        }
+    };
 
     const handleFileChange = (e) => {
         const file = e.target.files?.[0];
@@ -500,7 +539,11 @@ export const RealVideo = ({ el, onUpdate }) => {
 
     if (el.src) {
         return (
-            <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', borderRadius: `${el.borderRadius ?? 8}px`, backgroundColor: '#000000' }}>
+            <div 
+                onClick={handleTripleClick}
+                title="Triple-click (3 clicks) to replace video"
+                style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', borderRadius: `${el.borderRadius ?? 8}px`, backgroundColor: '#000000' }}
+            >
                 <video
                     src={el.src}
                     controls
@@ -525,7 +568,8 @@ export const RealVideo = ({ el, onUpdate }) => {
 
     return (
         <div
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleTripleClick}
+            title="Click 3 times to import video"
             style={{
                 width: '100%',
                 height: '100%',
@@ -540,12 +584,13 @@ export const RealVideo = ({ el, onUpdate }) => {
                 color: '#94A3B8',
                 cursor: 'pointer',
                 padding: '12px',
-                textAlign: 'center'
+                textAlign: 'center',
+                userSelect: 'none'
             }}
         >
             <Video size={36} color="#06B6D4" />
-            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#E2E8F0' }}>Click to Import Video</span>
-            <span style={{ fontSize: '0.72rem', color: '#64748B' }}>MP4, WebM, MOV with full playback</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#E2E8F0' }}>Triple-click to Import Video</span>
+            <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Click 3 times to browse files (MP4, WebM, MOV)</span>
             <input
                 type="file"
                 ref={fileInputRef}
@@ -562,45 +607,47 @@ export const RealSwitch = ({ el, onUpdate }) => {
     const isChecked = el.checked ?? true;
     return (
         <div
-            onClick={() => onUpdate({ checked: !isChecked })}
+            onClick={(e) => {
+                e.stopPropagation();
+                onUpdate({ checked: !isChecked });
+            }}
             style={{
                 width: '100%',
                 height: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
+                justifyContent: 'center',
                 cursor: 'pointer',
                 userSelect: 'none'
             }}
+            title={isChecked ? "Toggle Switch: On" : "Toggle Switch: Off"}
         >
             <div
                 style={{
-                    width: '40px',
-                    height: '22px',
-                    borderRadius: '11px',
-                    backgroundColor: isChecked ? '#06B6D4' : '#334155',
+                    width: '46px',
+                    height: '24px',
+                    borderRadius: '12px',
+                    backgroundColor: isChecked ? (el.bgColor || '#06B6D4') : '#334155',
                     position: 'relative',
                     transition: 'background-color 0.2s ease',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)'
                 }}
             >
                 <div
                     style={{
-                        width: '16px',
-                        height: '16px',
+                        width: '18px',
+                        height: '18px',
                         borderRadius: '50%',
                         backgroundColor: '#FFFFFF',
                         position: 'absolute',
                         top: '3px',
-                        left: isChecked ? '21px' : '3px',
+                        left: isChecked ? '25px' : '3px',
                         transition: 'left 0.2s ease',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.4)'
                     }}
                 />
             </div>
-            <span style={{ fontSize: `${el.fontSize || 14}px`, color: el.textColor || '#F8FAFC' }}>
-                {el.text || 'Toggle'}
-            </span>
         </div>
     );
 };
@@ -610,36 +657,38 @@ export const RealCheckbox = ({ el, onUpdate }) => {
     const isChecked = el.checked ?? false;
     return (
         <div
-            onClick={() => onUpdate({ checked: !isChecked })}
+            onClick={(e) => {
+                e.stopPropagation();
+                onUpdate({ checked: !isChecked });
+            }}
             style={{
                 width: '100%',
                 height: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                justifyContent: 'center',
                 cursor: 'pointer',
                 userSelect: 'none'
             }}
+            title={isChecked ? "Checkbox: Checked" : "Checkbox: Unchecked"}
         >
             <div
                 style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '4px',
-                    backgroundColor: isChecked ? '#06B6D4' : '#1E293B',
-                    border: `1px solid ${isChecked ? '#06B6D4' : '#475569'}`,
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '5px',
+                    backgroundColor: isChecked ? (el.bgColor || '#06B6D4') : '#1E293B',
+                    border: `2px solid ${isChecked ? (el.bgColor || '#06B6D4') : '#475569'}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#0B0F19',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease'
                 }}
             >
-                {isChecked && <Check size={14} strokeWidth={3} />}
+                {isChecked && <Check size={16} strokeWidth={3} />}
             </div>
-            <span style={{ fontSize: `${el.fontSize || 14}px`, color: el.textColor || '#F8FAFC' }}>
-                {el.text || 'Remember choice'}
-            </span>
         </div>
     );
 };
@@ -803,8 +852,8 @@ export const MOCKUP_TYPES = {
 
     // Actions & Controls
     button: { component: RealButton, label: 'Button', defaultW: 140, defaultH: 44, icon: Square },
-    switch: { component: RealSwitch, label: 'Toggle Switch', defaultW: 140, defaultH: 32, icon: ToggleRight },
-    checkbox: { component: RealCheckbox, label: 'Checkbox', defaultW: 200, defaultH: 28, icon: CheckSquare },
+    switch: { component: RealSwitch, label: 'Toggle Switch', defaultW: 56, defaultH: 32, icon: ToggleRight },
+    checkbox: { component: RealCheckbox, label: 'Checkbox', defaultW: 34, defaultH: 34, icon: CheckSquare },
     dropdown: { component: RealDropdown, label: 'Dropdown Select', defaultW: 180, defaultH: 40, icon: ChevronDown },
 
     // Forms

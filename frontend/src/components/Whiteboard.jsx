@@ -935,10 +935,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
             defaults.textColor = '#F8FAFC';
             defaults.borderRadius = 6;
         } else if (type === 'switch') {
-            defaults.text = 'Active toggle';
             defaults.checked = true;
         } else if (type === 'checkbox') {
-            defaults.text = 'Enable option';
             defaults.checked = true;
         } else if (type === 'dropdown') {
             defaults.text = 'Option 1';
@@ -1700,6 +1698,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                         if (!Component) return null;
                         const isSelected = selectedElements.includes(el.id);
                         const elementZIndex = (index + 1) * 5;
+                        const hasEditableText = ['heading', 'paragraph', 'button', 'badge', 'navbar', 'textInput', 'textarea', 'dropdown', 'infoCard', 'avatar'].includes(el.type);
+                        const hasEditableFill = ['container', 'button', 'badge', 'navbar', 'heading', 'paragraph', 'infoCard', 'switch', 'checkbox', 'textInput', 'textarea'].includes(el.type) && el.bgColor !== undefined;
                         
                         return (
                             <div
@@ -1764,8 +1764,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                         onClick={(e) => e.stopPropagation()}
                                         onMouseDown={(e) => e.stopPropagation()}
                                     >
-                                        {/* Direct Edit Text Button */}
-                                        {(el.text !== undefined || el.title !== undefined) && (
+                                        {/* Direct Edit Text Button - ONLY for elements that have text to edit */}
+                                        {hasEditableText && (
                                             <button
                                                 type="button"
                                                 onClick={(e) => {
@@ -1793,19 +1793,21 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                             </button>
                                         )}
 
-                                        {/* Fill Color */}
-                                        <label title="Background Fill Color" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600', height: '32px', padding: '0 4px', flexShrink: 0 }}>
-                                            Fill
-                                            <input 
-                                                type="color" 
-                                                value={el.bgColor || '#1E293B'} 
-                                                onChange={(e) => handleUpdateElement(el.id, { bgColor: e.target.value })} 
-                                                style={{ width: '22px', height: '22px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', borderRadius: '4px', padding: 0 }}
-                                            />
-                                        </label>
+                                        {/* Fill Color - ONLY for elements that support fill */}
+                                        {hasEditableFill && (
+                                            <label title="Background Fill Color" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600', height: '32px', padding: '0 4px', flexShrink: 0 }}>
+                                                Fill
+                                                <input 
+                                                    type="color" 
+                                                    value={el.bgColor || '#1E293B'} 
+                                                    onChange={(e) => handleUpdateElement(el.id, { bgColor: e.target.value })} 
+                                                    style={{ width: '22px', height: '22px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', borderRadius: '4px', padding: 0 }}
+                                                />
+                                            </label>
+                                        )}
 
-                                        {/* Text Color */}
-                                        {el.textColor !== undefined && (
+                                        {/* Text Color - ONLY for elements that have text */}
+                                        {hasEditableText && el.textColor !== undefined && (
                                             <label title="Text Color" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600', height: '32px', padding: '0 4px', flexShrink: 0 }}>
                                                 Text
                                                 <input 
@@ -1817,8 +1819,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                             </label>
                                         )}
 
-                                        {/* Font Size (+ / -) */}
-                                        {el.fontSize !== undefined && (
+                                        {/* Font Size (+ / -) - ONLY for elements that have text */}
+                                        {hasEditableText && el.fontSize !== undefined && (
                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', borderLeft: '1px solid rgba(255,255,255,0.12)', paddingLeft: '6px', height: '32px', flexShrink: 0 }}>
                                                 <button
                                                     type="button"
@@ -1843,7 +1845,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                         )}
 
                                         {/* Border Radius */}
-                                        {el.borderRadius !== undefined && (
+                                        {el.borderRadius !== undefined && !['switch', 'checkbox', 'divider'].includes(el.type) && (
                                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', borderLeft: '1px solid rgba(255,255,255,0.12)', paddingLeft: '6px', height: '32px', flexShrink: 0 }}>
                                                 <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Radius:</span>
                                                 {[0, 6, 12, 999].map(r => (
