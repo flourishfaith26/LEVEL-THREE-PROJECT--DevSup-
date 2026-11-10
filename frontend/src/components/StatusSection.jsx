@@ -59,7 +59,7 @@ export const SegmentedStatusRing = ({
     // Single status: continuous circle
     if (count === 1) {
         const isViewed = statuses[0]?.viewers?.some(v => isSameUser(v, currentUserId));
-        const color = isViewed ? '#8696a0' : 'var(--colors-accent, #00a884)';
+        const color = isViewed ? '#8696a0' : 'var(--colors-accent, #06b6d4)';
         return (
             <div style={{ position: 'relative', width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg width={size} height={size} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
@@ -91,7 +91,7 @@ export const SegmentedStatusRing = ({
                 {Array.from({ length: count }).map((_, i) => {
                     const status = statuses[i];
                     const isViewed = status?.viewers?.some(v => isSameUser(v, currentUserId));
-                    const color = isViewed ? '#8696a0' : 'var(--colors-accent, #00a884)';
+                    const color = isViewed ? '#8696a0' : 'var(--colors-accent, #06b6d4)';
                     const rotation = i * (arcDeg + gapDeg) + (gapDeg / 2);
 
                     return (
@@ -510,7 +510,7 @@ export default function StatusSection({
                                     width: '20px',
                                     height: '20px',
                                     borderRadius: '50%',
-                                    backgroundColor: 'var(--colors-accent, #00a884)',
+                                    backgroundColor: 'var(--colors-accent, #06b6d4)',
                                     border: '2px solid var(--colors-surface, #111b21)',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -573,8 +573,8 @@ export default function StatusSection({
                                 width: '32px',
                                 height: '32px',
                                 borderRadius: '50%',
-                                backgroundColor: 'rgba(0, 168, 132, 0.12)',
-                                color: 'var(--colors-accent, #00a884)',
+                                backgroundColor: 'rgba(6, 182, 212, 0.12)',
+                                color: 'var(--colors-accent, #06b6d4)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -953,13 +953,13 @@ export default function StatusSection({
                             width: '56px',
                             height: '56px',
                             borderRadius: '50%',
-                            backgroundColor: '#00a884',
+                            backgroundColor: 'var(--colors-accent, #06b6d4)',
                             border: 'none',
                             color: '#111b21',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 6px 16px rgba(0, 168, 132, 0.35)',
+                            boxShadow: '0 6px 16px rgba(6, 182, 212, 0.4)',
                             cursor: 'pointer',
                             transition: 'transform 0.15s ease'
                         }}
@@ -1077,7 +1077,7 @@ export default function StatusSection({
                                                         display: 'inline-flex',
                                                         alignItems: 'center',
                                                         gap: '6px',
-                                                        color: 'var(--colors-accent, #00a884)',
+                                                        color: 'var(--colors-accent, #06b6d4)',
                                                         fontSize: '0.8rem',
                                                         cursor: 'pointer',
                                                         marginTop: '4px'
@@ -1135,7 +1135,7 @@ export default function StatusSection({
                                 style={{
                                     flex: 1,
                                     padding: '10px 16px',
-                                    backgroundColor: '#00a884',
+                                    backgroundColor: 'var(--colors-accent, #06b6d4)',
                                     border: 'none',
                                     borderRadius: '24px',
                                     color: '#111b21',
@@ -1297,8 +1297,8 @@ export default function StatusSection({
                                         cursor: 'pointer',
                                         padding: '10px 12px',
                                         borderRadius: '12px',
-                                        backgroundColor: privacySetting === opt.id ? 'rgba(0, 168, 132, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                                        border: privacySetting === opt.id ? '1px solid #00a884' : '1px solid transparent'
+                                        backgroundColor: privacySetting === opt.id ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                                        border: privacySetting === opt.id ? '1px solid var(--colors-accent, #06b6d4)' : '1px solid transparent'
                                     }}
                                 >
                                     <input
@@ -1306,7 +1306,7 @@ export default function StatusSection({
                                         name="status_privacy"
                                         checked={privacySetting === opt.id}
                                         onChange={() => setPrivacySetting(opt.id)}
-                                        style={{ marginTop: '3px', accentColor: '#00a884' }}
+                                        style={{ marginTop: '3px', accentColor: 'var(--colors-accent, #06b6d4)' }}
                                     />
                                     <div>
                                         <div style={{ fontSize: '0.92rem', fontWeight: 500, color: '#e9edef' }}>{opt.title}</div>
@@ -1343,7 +1343,7 @@ export default function StatusSection({
                                 style={{
                                     flex: 1,
                                     padding: '10px 16px',
-                                    backgroundColor: '#00a884',
+                                    backgroundColor: 'var(--colors-accent, #06b6d4)',
                                     border: 'none',
                                     borderRadius: '24px',
                                     color: '#111b21',
