@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevSup — Developer Communication Platform</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        devsup: {
+                            base: '#0F172A',       /* Slate 900 - Background */
+                            surface: '#1E293B',    /* Slate 800 - Panels */
+                            panel: '#1E293B',      /* Slate 800 - Cards */
+                            border: '#334155',     /* Slate 700 - Hairline borders */
+                            borderHover: '#475569',/* Slate 600 - Hover borders */
+                            accent: '#06B6D4',     /* Electric Cyan */
+                            accentLight: '#22D3EE',/* Light Cyan */
+                            subtle: '#94A3B8',     /* Slate 400 - Muted text */
+                            text: '#F8FAFC'        /* Slate 50 - Primary text */
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Three.js 3D Engine CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        body {
+            background-color: #0F172A;
+            color: #F8FAFC;
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        /* Hairline Structural Panels */
+        .card-panel {
+            background-color: #1E293B;
+            border: 1px solid #334155;
+            box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+            transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .card-panel:hover {
+            border-color: #475569;
+            box-shadow: 0 10px 30px -10px rgba(6, 182, 212, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0F172A;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #06B6D4;
+        }
+
+        /* Syntax Highlight Token Colors */
+        .code-keyword { color: #EC4899; font-weight: 600; }
+        .code-func { color: #22D3EE; }
+        .code-str { color: #10B981; }
+        .code-comment { color: #64748B; font-style: italic; }
+        .code-type { color: #F59E0B; }
+
+        /* Interactive Canvas Cursors */
+        #whiteboardCanvas {
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        #hero3dCanvasContainer {
+            cursor: grab;
+            touch-action: none;
+        }
+        #hero3dCanvasContainer:active {
+            cursor: grabbing;
+        }
+
+        /* Infinite Edge-to-Edge Marquee Track */
+        @keyframes marqueeEdgeScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .marquee-track-container {
+            display: flex;
+            width: max-content;
+            animation: marqueeEdgeScroll 24s linear infinite;
+        }
+
+        .marquee-track-container.paused {
+            animation-play-state: paused;
+        }
+
+        /* Alive Animatronic Character Animations */
+        @keyframes floatToken {
+            0% { transform: translateY(0) scale(0.9); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(-35px) scale(1.15); opacity: 0; }
+        }
+
+        @keyframes drawVectorPath {
+            0% { stroke-dashoffset: 300; }
+            50% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: 300; }
+        }
+
+        @keyframes floatEmojiReaction {
+            0% { transform: translateY(0) scale(0.7) rotate(0deg); opacity: 0; }
+            40% { opacity: 1; }
+            100% { transform: translateY(-40px) scale(1.2) rotate(12deg); opacity: 0; }
+        }
+
+        @keyframes eqBop {
+            0%, 100% { height: 6px; }
+            50% { height: 26px; }
+        }
+
+        @keyframes headBop {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-4px) rotate(1.5deg); }
+        }
+
+        @keyframes handTypeLeft {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(3px); }
+        }
+
+        @keyframes handTypeRight {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(3px); }
+        }
+
+        .anim-head-bop { animation: headBop 2s ease-in-out infinite; transform-origin: center bottom; }
+        .anim-type-left { animation: handTypeLeft 0.25s ease-in-out infinite; }
+        .anim-type-right { animation: handTypeRight 0.25s ease-in-out 0.12s infinite; }
+        .anim-eq-1 { animation: eqBop 0.6s ease-in-out infinite; }
+        .anim-eq-2 { animation: eqBop 0.8s ease-in-out 0.2s infinite; }
+        .anim-eq-3 { animation: eqBop 0.5s ease-in-out 0.4s infinite; }
+
+        /* Architecture Hanging Alternating Animation */
+        .arch-card {
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+            transform-origin: top center;
+        }
+        .arch-card:nth-child(odd):hover {
+            transform: translateY(-8px) rotate(-7deg) scale(1.06);
+            border-color: #06B6D4;
+            box-shadow: 0 16px 32px -6px rgba(6, 182, 212, 0.35);
+        }
+        .arch-card:nth-child(even):hover {
+            transform: translateY(-8px) rotate(7deg) scale(1.06);
+            border-color: #06B6D4;
+            box-shadow: 0 16px 32px -6px rgba(6, 182, 212, 0.35);
+        }
+
+        /* Story Modal Overlay Backdrop */
+        .modal-backdrop {
+            background-color: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="bg-devsup-base text-devsup-text selection:bg-cyan-900 selection:text-cyan-200 relative min-h-screen">
+
+    <!-- DYNAMIC 3D GRID WAVE-LIFT & CURSOR CANVAS BACKGROUND -->
+    <canvas id="bgCanvas" class="fixed inset-0 pointer-events-none z-0 opacity-80"></canvas>
+
+    <!-- =================================================================== -->
+    <!-- [1] TOP NAVIGATION BAR -->
+    <!-- =================================================================== -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-devsup-base/90 backdrop-blur-md border-b border-devsup-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            
+            <!-- Brand Logo: Angled-bracket icon (< />) with text "DevSup" -->
+            <a href="/login" target="_top" class="flex items-center gap-2.5 group">
+                <div class="w-8 h-8 rounded-lg bg-devsup-surface border border-devsup-border flex items-center justify-center font-mono font-bold text-sm text-cyan-400 group-hover:border-cyan-500 group-hover:text-cyan-300 transition-all shadow-sm">
+                    &lt;/&gt;
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-lg tracking-tight text-white font-mono">DevSup</span>
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-devsup-surface border border-devsup-border text-cyan-400">v2.4</span>
+                </div>
+            </a>
+
+            <!-- Navigation Links -->
+            <nav class="hidden lg:flex items-center space-x-8 text-xs font-mono uppercase tracking-wider text-devsup-subtle">
+                <a href="#showcase" class="hover:text-cyan-400 transition-colors">Showcase</a>
+                <a href="#features" class="hover:text-cyan-400 transition-colors">Features</a>
+                <a href="#architecture" class="hover:text-cyan-400 transition-colors">Architecture</a>
+                <a href="#identity" class="hover:text-cyan-400 transition-colors">Developer Identity</a>
+            </nav>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center space-x-3">
+                <a href="/login" target="_top" class="text-xs font-mono text-devsup-subtle hover:text-white px-3 py-1.5 transition-colors">
+                    Sign In
+                </a>
+                <a href="/login" target="_top" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold font-mono tracking-tight transition-all flex items-center gap-1.5 shadow-lg shadow-cyan-500/20">
+                    <span>Launch App</span>
+                    <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <main class="relative z-10 pt-16">
+
+        <!-- =================================================================== -->
+        <!-- [2] HERO SECTION & PROMINENT 3D EARTH-ROLLING EMBLEM -->
+        <!-- =================================================================== -->
+        <section class="relative pt-8 pb-12 flex flex-col items-center justify-center text-center overflow-hidden">
+            
+            <!-- PROMINENT 3D EARTH-ROLLING EMBLEM CONTAINER (Positioned Above Main Headline) -->
+            <div class="w-full max-w-4xl h-72 sm:h-[380px] relative mb-2 flex items-center justify-center" id="hero3dCanvasContainer">
+                <!-- Three.js Canvas Injected Dynamically -->
+            </div>
+
+            <!-- Main Headline -->
+            <h1 class="text-4xl sm:text-6xl md:text-7xl font-extrabold text-white tracking-tight max-w-4xl leading-[1.1] mb-6">
+                Where code meets <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-sky-400">conversation.</span>
+            </h1>
+
+            <!-- Subheadline -->
+            <p class="text-devsup-subtle text-base sm:text-lg max-w-2xl mx-auto mb-8 font-sans leading-relaxed">
+                DevSup brings syntax-highlighted code sharing, real-time collaborative whiteboarding, WebRTC audio/video calls, and WhatsApp-grade statuses into one persistent developer workspace.
+            </p>
+
+            <!-- Action CTA Group -->
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+                <a href="/login" target="_top" class="w-full sm:w-auto px-8 py-3.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold font-mono text-sm tracking-tight transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25">
+                    <span>Launch DevSup Free</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </a>
+                <a href="/login" target="_top" class="w-full sm:w-auto px-6 py-3.5 rounded-lg bg-devsup-surface hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-all border border-devsup-border flex items-center justify-center gap-2">
+                    <span>Sign In to Account</span>
+                </a>
+            </div>
+
+            <!-- Quick-Read Technology Highlights -->
+            <div class="flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto px-4 mt-2">
+                <span class="px-3 py-1 rounded-md bg-devsup-surface border border-devsup-border text-slate-300 text-xs font-mono">⚡ Real-Time WebSockets</span>
+                <span class="px-3 py-1 rounded-md bg-devsup-surface border border-devsup-border text-slate-300 text-xs font-mono">💻 50+ Languages Syntax-Highlighted</span>
+                <span class="px-3 py-1 rounded-md bg-devsup-surface border border-devsup-border text-slate-300 text-xs font-mono">🔒 WebRTC Encrypted HD Calls</span>
+                <span class="px-3 py-1 rounded-md bg-devsup-surface border border-devsup-border text-slate-300 text-xs font-mono">🎨 Vector Collaborative Whiteboard</span>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- [3] SPIDER WEB & FERRIS WHEEL LIVE WORKSPACE MOCKUP SECTION -->
+        <!-- =================================================================== -->
+        <section id="showcase" class="relative border-t border-devsup-border">
+            
+            <!-- SCROLL TRACK CONTAINER (Drives 360° Ferris Wheel Rotation) -->
+            <div id="ferrisScrollTrack" class="relative h-[420vh]">
+                
+                <!-- STICKY VIEWPORT STAGE -->
+                <div class="sticky top-16 h-[calc(100vh-4rem)] flex flex-col items-center justify-center overflow-hidden">
+                    
+                    <!-- Section Header -->
+                    <div class="text-center z-20 mb-2 pointer-events-none px-4">
+                        <h2 class="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">Interactive Workspace Orbit</h2>
+                        <p class="text-xs text-devsup-subtle font-mono mt-1">Scroll up/down to rotate the wheel & inspect live interactive components</p>
+                    </div>
+
+                    <!-- FERRIS WHEEL & SPIDER WEB STAGE CONTAINER -->
+                    <div id="ferrisStage" class="relative w-full max-w-6xl h-[580px] flex items-center justify-center">
+                        
+                        <!-- SPIDER WEB SVG LAYER -->
+                        <svg id="spiderWebSvg" class="absolute inset-0 w-full h-full pointer-events-none z-10" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="webCyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#06B6D4" stop-opacity="0.9" />
+                                    <stop offset="50%" stop-color="#22D3EE" stop-opacity="1" />
+                                    <stop offset="100%" stop-color="#06B6D4" stop-opacity="0.3" />
+                                </linearGradient>
+                                <filter id="cyanGlow">
+                                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                    <feMerge>
+                                        <feMergeNode in="coloredBlur"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            <!-- Concentric Web Rings & Radiating Strands drawn dynamically via JavaScript -->
+                            <g id="webConcentricGroup" stroke="url(#webCyanGrad)" stroke-width="1.2" fill="none" opacity="0.6" stroke-dasharray="4,4"></g>
+                            <g id="webRadiatingGroup" stroke="url(#webCyanGrad)" stroke-width="1.8" filter="url(#cyanGlow)"></g>
+                        </svg>
+
+                        <!-- CENTRAL DEV-SUP CORE NODE HUB -->
+                        <div id="webCoreNode" class="absolute z-30 w-16 h-16 rounded-full bg-slate-900 border-2 border-cyan-400 flex items-center justify-center shadow-[0_0_35px_rgba(6,182,212,0.8)]">
+                            <div class="w-8 h-8 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center font-mono font-bold text-xs text-cyan-300 animate-pulse">
+                                &lt;/&gt;
+                            </div>
+                            <span class="absolute -bottom-6 font-mono text-[9px] text-cyan-400 font-bold tracking-widest uppercase">CORE HUB</span>
+                        </div>
+
+                        <!-- 5 ORBITING MOCKUP PANELS (FERRIS WHEEL CARS) -->
+
+                        <!-- PANEL 0: Channels & DM WhatsApp Status Rings -->
+                        <div id="ferrisPanel-0" class="ferris-panel absolute z-20 w-[300px] sm:w-[340px] card-panel rounded-xl p-4 bg-slate-900/95 border border-devsup-border backdrop-blur-md shadow-2xl transition-shadow duration-300">
+                            <div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-devsup-border">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+                                    <span class="font-bold text-xs text-white font-mono">CHANNELS & DM</span>
+                                </div>
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            </div>
+                            <div class="space-y-3 font-mono text-xs">
+                                <div class="px-2.5 py-1.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-semibold flex items-center justify-between">
+                                    <span># frontend-engineers</span>
+                                    <span class="text-[9px] px-1 rounded bg-cyan-400 text-slate-950 font-bold">3</span>
+                                </div>
+                                <div class="px-2.5 py-1.5 rounded text-devsup-subtle"># backend-infra</div>
+                                <div class="pt-2 border-t border-devsup-border space-y-2">
+                                    <span class="text-[10px] text-devsup-subtle uppercase tracking-wider block">Direct Messages (24h Status)</span>
+                                    <button onclick="openStoryModal('Sarah Chen', 'Frontend Lead', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150', 'Shipped sprint v2.4 with instant hot-reload 🚀')" class="w-full flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-left group">
+                                        <div class="relative">
+                                            <div class="w-8 h-8 rounded-full p-[2px] bg-gradient-to-tr from-cyan-400 to-teal-300 animate-pulse">
+                                                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" class="w-full h-full rounded-full object-cover border border-slate-900" alt="Sarah">
+                                            </div>
+                                            <span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 border border-slate-900"></span>
+                                        </div>
+                                        <div class="flex flex-col min-w-0">
+                                            <span class="text-xs font-semibold text-white font-sans group-hover:text-cyan-300 truncate">Sarah Chen</span>
+                                            <span class="text-[9px] text-cyan-400 font-mono">Frontend Lead • Active Story</span>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PANEL 1: VS Code Arena & Syntax Switcher -->
+                        <div id="ferrisPanel-1" class="ferris-panel absolute z-20 w-[320px] sm:w-[380px] card-panel rounded-xl p-4 bg-slate-900/95 border border-devsup-border backdrop-blur-md shadow-2xl transition-shadow duration-300">
+                            <div class="flex items-center justify-between pb-2 mb-2 border-b border-devsup-border">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="terminal" class="w-4 h-4 text-cyan-400"></i>
+                                    <span class="font-bold text-xs text-white font-mono"># frontend-engineers</span>
+                                </div>
+                                <span class="text-[9px] font-mono text-devsup-subtle">VS Code Dark Plus</span>
+                            </div>
+                            <div class="p-2.5 rounded-lg bg-slate-950 border border-devsup-border mb-2">
+                                <div class="flex items-center justify-between mb-1.5 text-[10px] font-mono">
+                                    <span class="text-cyan-400 font-bold" id="codeFileName">sync_engine.ts</span>
+                                    <div class="flex space-x-1">
+                                        <button onclick="switchLang('ts')" id="tab-ts" class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-medium">TS</button>
+                                        <button onclick="switchLang('py')" id="tab-py" class="px-1.5 py-0.5 rounded text-devsup-subtle hover:text-white">PY</button>
+                                        <button onclick="switchLang('rs')" id="tab-rs" class="px-1.5 py-0.5 rounded text-devsup-subtle hover:text-white">RS</button>
+                                        <button onclick="switchLang('go')" id="tab-go" class="px-1.5 py-0.5 rounded text-devsup-subtle hover:text-white">GO</button>
+                                    </div>
+                                </div>
+                                <pre class="font-mono text-[11px] leading-relaxed text-slate-300 overflow-x-auto"><code id="codeBlockDisplay"><span class="code-keyword">import</span> { DevSupMesh } <span class="code-keyword">from</span> <span class="code-str">'@devsup/ws'</span>;
+
+<span class="code-keyword">export async function</span> <span class="code-func">syncDelta</span>(payload: <span class="code-type">Payload</span>) {
+  <span class="code-keyword">const</span> node = <span class="code-keyword">await</span> DevSupMesh.<span class="code-func">connect</span>();
+  node.<span class="code-func">broadcast</span>(<span class="code-str">'STATE_UPDATE'</span>, payload);
+}</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- PANEL 2: Reference Document Attachment Card -->
+                        <div id="ferrisPanel-2" class="ferris-panel absolute z-20 w-[300px] sm:w-[350px] card-panel rounded-xl p-4 bg-slate-900/95 border border-devsup-border backdrop-blur-md shadow-2xl transition-shadow duration-300">
+                            <div class="flex items-center justify-between pb-2 mb-2 border-b border-devsup-border">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="file-text" class="w-4 h-4 text-cyan-400"></i>
+                                    <span class="font-bold text-xs text-white font-mono">NATIVE FILE VIEWER</span>
+                                </div>
+                                <span class="text-[9px] font-mono text-cyan-400">Zero Corrupt Files</span>
+                            </div>
+                            <div class="text-left pt-1">
+                                <div class="text-[10px] font-mono text-devsup-subtle mb-1.5">Elena Rostova • 10:46 AM</div>
+                                <a href="/login" target="_top" class="p-3 rounded-lg bg-slate-950 border border-devsup-border hover:border-cyan-400 flex items-center justify-between transition-all group">
+                                    <div class="flex items-center gap-2.5">
+                                        <div class="w-7 h-7 rounded bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                                            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                                        </div>
+                                        <span class="font-mono text-xs text-white font-medium group-hover:text-cyan-300">Architecture-v3-Sprint.pdf</span>
+                                    </div>
+                                    <span class="font-mono text-xs font-bold text-cyan-400 hover:underline">Open in App</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- PANEL 3: WebRTC HD Voice Mesh Widget -->
+                        <div id="ferrisPanel-3" class="ferris-panel absolute z-20 w-[290px] sm:w-[330px] card-panel rounded-xl p-4 bg-slate-900/95 border border-devsup-border backdrop-blur-md shadow-2xl transition-shadow duration-300">
+                            <div class="flex items-center justify-between pb-2 mb-2 border-b border-devsup-border">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="mic" class="w-4 h-4 text-cyan-400"></i>
+                                    <span class="font-bold text-xs text-white font-mono">WEBRTC VOICE MESH</span>
+                                </div>
+                                <span class="text-[9px] font-mono text-emerald-400 font-bold">3 Speaking</span>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-950 border border-devsup-border">
+                                <div class="flex items-center justify-between text-[10px] font-mono text-devsup-subtle mb-2">
+                                    <span>Encrypted P2P Voice</span>
+                                    <span class="text-cyan-400">Opus 48kHz</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex -space-x-2 overflow-hidden">
+                                        <img class="inline-block h-7 w-7 rounded-full ring-2 ring-slate-900 object-cover" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150" alt="User1">
+                                        <img class="inline-block h-7 w-7 rounded-full ring-2 ring-slate-900 object-cover" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" alt="User2">
+                                        <div class="w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-400 text-cyan-300 font-mono text-[9px] font-bold flex items-center justify-center ring-2 ring-slate-900">YOU</div>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <span class="w-1.5 h-3 bg-cyan-400 rounded animate-pulse"></span>
+                                        <span class="w-1.5 h-5 bg-cyan-400 rounded animate-pulse"></span>
+                                        <span class="w-1.5 h-2 bg-cyan-400 rounded animate-pulse"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PANEL 4: Interactive Vector Whiteboard Canvas -->
+                        <div id="ferrisPanel-4" class="ferris-panel absolute z-20 w-[310px] sm:w-[360px] card-panel rounded-xl p-4 bg-slate-900/95 border border-devsup-border backdrop-blur-md shadow-2xl transition-shadow duration-300">
+                            <div class="flex items-center justify-between pb-2 mb-2 border-b border-devsup-border">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="edit-3" class="w-4 h-4 text-cyan-400"></i>
+                                    <span class="font-bold text-xs text-white font-mono">VECTOR WHITEBOARD</span>
+                                </div>
+                                <button onclick="clearCanvas()" class="text-[10px] font-mono text-devsup-subtle hover:text-white">Clear</button>
+                            </div>
+                            <div class="relative h-36 rounded-lg bg-slate-950 border border-devsup-border overflow-hidden mb-2">
+                                <canvas id="whiteboardCanvas" class="w-full h-full"></canvas>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-1.5">
+                                    <button onclick="setPenColor('#06b6d4')" class="w-3.5 h-3.5 rounded-full bg-cyan-400 ring-2 ring-offset-1 ring-offset-slate-900 ring-cyan-400"></button>
+                                    <button onclick="setPenColor('#10b981')" class="w-3.5 h-3.5 rounded-full bg-emerald-400"></button>
+                                    <button onclick="setPenColor('#ec4899')" class="w-3.5 h-3.5 rounded-full bg-pink-400"></button>
+                                    <button onclick="setPenColor('#ffffff')" class="w-3.5 h-3.5 rounded-full bg-white"></button>
+                                </div>
+                                <button onclick="commitDiagramToChat()" class="px-2 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[10px] font-mono border border-cyan-500/40 font-bold transition-all">
+                                    Commit Diagram
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- [4] ARCHITECTURE & OPEN STANDARDS STRIP -->
+        <!-- =================================================================== -->
+        <section id="architecture" class="py-14 border-t border-devsup-border bg-slate-950/60">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-8">
+                    <span class="text-xs font-mono uppercase text-cyan-400 font-semibold tracking-wider">BUILT ON MODERN OPEN STANDARDS</span>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div class="arch-card p-4 rounded-xl card-panel text-center cursor-pointer">
+                        <span class="text-white font-bold text-sm block font-mono">React 19 & Vite</span>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-1 block">Instant reactivity</span>
+                    </div>
+                    <div class="arch-card p-4 rounded-xl card-panel text-center cursor-pointer">
+                        <span class="text-white font-bold text-sm block font-mono">Socket.io</span>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-1 block">Full-duplex delta sync</span>
+                    </div>
+                    <div class="arch-card p-4 rounded-xl card-panel text-center cursor-pointer">
+                        <span class="text-white font-bold text-sm block font-mono">WebRTC Mesh</span>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-1 block">Opus 48kHz audio</span>
+                    </div>
+                    <div class="arch-card p-4 rounded-xl card-panel text-center cursor-pointer">
+                        <span class="text-white font-bold text-sm block font-mono">MongoDB Atlas</span>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-1 block">Scalable index storage</span>
+                    </div>
+                    <div class="arch-card p-4 rounded-xl card-panel text-center cursor-pointer">
+                        <span class="text-white font-bold text-sm block font-mono">Cloudinary</span>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-1 block">Authenticated delivery</span>
+                    </div>
+                    <div class="arch-card p-4 rounded-xl card-panel text-center cursor-pointer">
+                        <span class="text-white font-bold text-sm block font-mono">Auth0 Security</span>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-1 block">JWT Enterprise auth</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- [5] PINNED SCROLL STORYBOARD: THE 6 FEATURE PILLARS WITH ALIVE ANIMATRONICS -->
+        <!-- =================================================================== -->
+        <section id="features" class="relative bg-slate-900/40 border-t border-devsup-border">
+            
+            <!-- STICKY SCROLL CONTAINER (Height 480vh driving pinned steps) -->
+            <div id="pinnedStoryContainer" class="relative h-[480vh]">
+                
+                <div class="sticky top-16 h-[calc(100vh-4rem)] flex items-center justify-center overflow-hidden">
+                    <div class="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8">
+                        
+                        <div class="text-center mb-6">
+                            <span class="text-xs font-mono uppercase text-cyan-400 font-semibold tracking-wider">FEATURE LAB // THE 6 PILLARS</span>
+                            <h2 class="text-2xl sm:text-3xl font-bold text-white mt-1">Engineered for Developer Productivity</h2>
+                            <p class="text-xs text-devsup-subtle font-mono mt-1">Scroll down to watch Sora the Anime Developer demonstrate each feature live</p>
+                        </div>
+
+                        <!-- Progress Step Dots -->
+                        <div class="flex items-center justify-center gap-2 mb-6">
+                            <span id="dot-0" class="w-2.5 h-2.5 rounded-full bg-cyan-400 scale-125 transition-all"></span>
+                            <span id="dot-1" class="w-2.5 h-2.5 rounded-full bg-slate-700 transition-all"></span>
+                            <span id="dot-2" class="w-2.5 h-2.5 rounded-full bg-slate-700 transition-all"></span>
+                            <span id="dot-3" class="w-2.5 h-2.5 rounded-full bg-slate-700 transition-all"></span>
+                            <span id="dot-4" class="w-2.5 h-2.5 rounded-full bg-slate-700 transition-all"></span>
+                            <span id="dot-5" class="w-2.5 h-2.5 rounded-full bg-slate-700 transition-all"></span>
+                        </div>
+
+                        <!-- STORYBOARD CARD (2 COLS: TAB DETAILS + ALIVE ANIMATRONICS STAGE) -->
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-slate-900/90 border border-devsup-border p-6 sm:p-8 rounded-2xl backdrop-blur-md shadow-2xl min-h-[380px]">
+                            
+                            <!-- LEFT COLUMN: Pillar Details -->
+                            <div class="lg:col-span-5 flex flex-col justify-center space-y-4">
+                                <div class="inline-flex items-center gap-2 px-3 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono text-xs w-max">
+                                    <span id="pillarNumber" class="font-bold">PILLAR 1 / 6</span>
+                                </div>
+                                <h3 id="pillarTitle" class="text-2xl font-bold text-white tracking-tight">Syntax-Highlighted Code Messaging</h3>
+                                <p id="pillarDesc" class="text-xs sm:text-sm text-devsup-subtle leading-relaxed font-sans">
+                                    Automatic language detection for 50+ languages with VS Code Dark Plus styling, line numbers, and single-click copy without mangling LF/CRLF endings.
+                                </p>
+                                <div id="pillarChips" class="flex flex-wrap gap-2 pt-2 font-mono text-[11px] text-cyan-300">
+                                    <span class="px-2 py-1 rounded bg-slate-800 border border-devsup-border">VS Code Dark Plus</span>
+                                    <span class="px-2 py-1 rounded bg-slate-800 border border-devsup-border">50+ Languages</span>
+                                </div>
+                            </div>
+
+                            <!-- RIGHT COLUMN: ALIVE ANIMATRONIC ANIME CHARACTER STAGE -->
+                            <div class="lg:col-span-7 flex items-center justify-center relative min-h-[290px] bg-slate-950/80 border border-devsup-border rounded-xl p-4 overflow-hidden">
+                                <div id="animeCharacterStage" class="w-full flex items-center justify-center transition-all duration-500">
+                                    <!-- Rendered dynamically via JS -->
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- [6] EDGE-TO-EDGE DEVELOPER IDENTITY STAGE (MARQUEE <-> 3D RING) -->
+        <!-- =================================================================== -->
+        <section id="identity" class="py-16 border-t border-devsup-border relative overflow-hidden">
+            <div class="text-center mb-8 px-4">
+                <span class="text-xs font-mono uppercase text-cyan-400 font-semibold tracking-wider">DEVELOPER IDENTITY & TEAM CONTEXT</span>
+                <h2 class="text-2xl sm:text-3xl font-bold text-white mt-1">Role-Based Engineering Profiles</h2>
+                <p class="text-xs text-devsup-subtle font-mono mt-1">Hover over stage to morph into 3D cylinder ring • Scroll wheel to rotate</p>
+            </div>
+
+            <!-- EDGE-TO-EDGE FULL-BLEED STAGE (No Bounding Box) -->
+            <div class="w-screen -ml-[50vw] left-1/2 relative h-48 flex items-center justify-center" 
+                 onmouseenter="enable3DRing()" 
+                 onmouseleave="disable3DRing()" 
+                 onwheel="on3DRingWheel(event)">
+                
+                <div id="marqueeTrackContainer" class="marquee-track-container gap-4 items-center">
+                    
+                    <!-- SET 1 (Cards 1-6) -->
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">Frontend Engineer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                        </div>
+                        <p class="text-xs text-cyan-300 font-mono">React • TS • Vite</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #01</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">Backend Engineer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                        </div>
+                        <p class="text-xs text-emerald-300 font-mono">Go • Rust • Node</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #02</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">Fullstack Developer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+                        </div>
+                        <p class="text-xs text-purple-300 font-mono">End-to-End System</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #03</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">UI/UX Designer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-pink-400"></span>
+                        </div>
+                        <p class="text-xs text-pink-300 font-mono">Design Systems</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #04</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">DevOps / SRE</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                        </div>
+                        <p class="text-xs text-amber-300 font-mono">K8s • Terraform</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #05</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">Mobile Engineer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                        </div>
+                        <p class="text-xs text-sky-300 font-mono">iOS • Android</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #06</span>
+                    </div>
+
+                    <!-- SET 2 (Identical Duplicate Set 1-6 for Endless Infinite Seamless Loop) -->
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">Frontend Engineer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                        </div>
+                        <p class="text-xs text-cyan-300 font-mono">React • TS • Vite</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #01</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">Backend Engineer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                        </div>
+                        <p class="text-xs text-emerald-300 font-mono">Go • Rust • Node</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #02</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">Fullstack Developer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+                        </div>
+                        <p class="text-xs text-purple-300 font-mono">End-to-End System</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #03</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">UI/UX Designer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-pink-400"></span>
+                        </div>
+                        <p class="text-xs text-pink-300 font-mono">Design Systems</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #04</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">DevOps / SRE</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                        </div>
+                        <p class="text-xs text-amber-300 font-mono">K8s • Terraform</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #05</span>
+                    </div>
+
+                    <div class="identity-card w-64 p-4 rounded-xl card-panel flex-shrink-0 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-sm text-white font-mono">Mobile Engineer</span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                        </div>
+                        <p class="text-xs text-sky-300 font-mono">iOS • Android</p>
+                        <span class="text-[10px] text-devsup-subtle font-mono mt-2 block">Discipline Badge #06</span>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- [7] BOTTOM CALL-TO-ACTION (CTA) SECTION -->
+        <!-- =================================================================== -->
+        <section class="py-20 border-t border-devsup-border relative text-center">
+            <div class="max-w-4xl mx-auto px-4">
+                <h2 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight mb-4">
+                    Ready to consolidate your engineering team's communication?
+                </h2>
+                <p class="text-devsup-subtle text-sm sm:text-base max-w-2xl mx-auto mb-8 font-sans">
+                    Stop switching between chat apps, external whiteboard tools, video links, and pastebins. Authenticate with your developer identity and begin collaborating in seconds.
+                </p>
+                <a href="/login" target="_top" class="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold font-mono text-base tracking-tight transition-all shadow-xl shadow-cyan-500/25">
+                    <span>Launch DevSup Workspace</span>
+                    <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- [8] FOOTER DETAILS -->
+    <!-- =================================================================== -->
+    <footer class="border-t border-devsup-border py-12 bg-slate-950/80 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-devsup-surface border border-devsup-border flex items-center justify-center font-mono font-bold text-sm text-cyan-400">
+                    &lt;/&gt;
+                </div>
+                <div>
+                    <span class="font-bold text-sm text-white font-mono block">DevSup Platform</span>
+                    <span class="text-[10px] text-devsup-subtle font-mono">Developer Communication Network</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-6 text-xs font-mono text-devsup-subtle">
+                <a href="/login" target="_top" class="hover:text-cyan-400 transition-colors">Sign In</a>
+                <a href="/login" target="_top" class="hover:text-cyan-400 transition-colors">Register</a>
+                <a href="#" class="hover:text-cyan-400 transition-colors">Return to Top</a>
+            </div>
+
+            <div class="text-[11px] font-mono text-devsup-subtle text-center md:text-right">
+                <p>© 2026 DevSup. All systems operational.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- WHATSAPP STORY/STATUS MODAL -->
+    <div id="storyModal" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+        <div class="w-full max-w-sm card-panel rounded-2xl overflow-hidden p-5 relative shadow-2xl">
+            <!-- Progress Bar -->
+            <div class="w-full h-1 bg-slate-800 rounded-full mb-4 overflow-hidden">
+                <div id="storyProgress" class="h-full bg-cyan-400 w-0 transition-all duration-[5000ms] ease-linear"></div>
+            </div>
+            
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <img id="storyAvatar" src="" class="w-10 h-10 rounded-full object-cover border-2 border-cyan-400" alt="Avatar">
+                    <div>
+                        <h4 id="storyUser" class="font-bold text-xs text-white"></h4>
+                        <span id="storyRole" class="text-[10px] font-mono text-cyan-400 block"></span>
+                    </div>
+                </div>
+                <button onclick="closeStoryModal()" class="text-devsup-subtle hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="bg-slate-950 p-4 rounded-xl border border-devsup-border mb-4 min-h-[120px] flex items-center justify-center text-center">
+                <p id="storyCaption" class="text-xs font-mono text-cyan-300"></p>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] font-mono text-devsup-subtle">
+                <span>👁️ 42 Developer views</span>
+                <div class="flex space-x-1 text-sm">
+                    <span>🚀</span>
+                    <span>🔥</span>
+                    <span>💻</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLIENT CONTROLLER SCRIPTS -->
+    <script>
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+
+        window.addEventListener('load', function() {
+            if (window.lucide) lucide.createIcons();
+            initHero3D();
+            initBgCanvas();
+            initAudioWaveform();
+            initWhiteboard();
+            renderPillarStep(0);
+            updatePinnedStoryScroll();
+            initIdentityStageCards();
+            initFerrisWheel();
+        });
+
+        // Ensure all /login navigation breaks out of iframe to the top window
+        document.addEventListener('click', function(e) {
+            const a = e.target.closest('a');
+            if (a) {
+                const href = a.getAttribute('href');
+                if (href === '/login' || href === 'https://frontend-tjte.vercel.app/login') {
+                    if (window.top && window.top !== window) {
+                        e.preventDefault();
+                        window.top.location.href = '/login';
+                    }
+                }
+            }
+        });
+
+        // -------------------------------------------------------------
+        // FERRIS WHEEL & SPIDER WEB CONTROLLER
+        // -------------------------------------------------------------
+        let currentFerrisAngle = 0;
+        const totalPanels = 5;
+
+        function initFerrisWheel() {
+            updateFerrisWheel();
+            window.addEventListener('scroll', updateFerrisWheel);
+            window.addEventListener('resize', updateFerrisWheel);
+        }
+
+        function updateFerrisWheel() {
+            const track = document.getElementById('ferrisScrollTrack');
+            const stage = document.getElementById('ferrisStage');
+            const core = document.getElementById('webCoreNode');
+            const svgRadGroup = document.getElementById('webRadiatingGroup');
+            const svgRingGroup = document.getElementById('webConcentricGroup');
+
+            if (!track || !stage || !core || !svgRadGroup || !svgRingGroup) return;
+
+            const rect = track.getBoundingClientRect();
+            const scrollable = track.offsetHeight - window.innerHeight;
+            const scrolled = -rect.top;
+
+            if (scrolled < -window.innerHeight || scrolled > track.offsetHeight) return;
+
+            let progress = scrolled / scrollable;
+            progress = Math.max(0, Math.min(1, progress));
+
+            // Smooth 360-degree rotation angle based on scroll position
+            currentFerrisAngle = progress * Math.PI * 2 * 1.5;
+
+            const stageRect = stage.getBoundingClientRect();
+            const cX = stageRect.width / 2;
+            const cY = stageRect.height / 2;
+
+            // Positioning Core Node at exact center
+            core.style.left = `${cX - 32}px`;
+            core.style.top = `${cY - 32}px`;
+
+            const rx = Math.min(stageRect.width * 0.38, 360);
+            const ry = Math.min(stageRect.height * 0.38, 190);
+
+            let panelCoords = [];
+            let radSvgHtml = '';
+
+            for (let i = 0; i < totalPanels; i++) {
+                const panel = document.getElementById(`ferrisPanel-${i}`);
+                if (!panel) continue;
+
+                // Angle for each panel
+                const angle = currentFerrisAngle + (i * Math.PI * 2 / totalPanels);
+                const x = cX + rx * Math.cos(angle);
+                const y = cY + ry * Math.sin(angle);
+
+                // Depth & scale calculation based on Y position (bottom is foreground)
+                const sinVal = Math.sin(angle);
+                const depthScale = 0.72 + 0.38 * ((sinVal + 1) / 2);
+                const opacity = 0.45 + 0.55 * ((sinVal + 1) / 2);
+                const zIndex = Math.round(10 + 20 * ((sinVal + 1) / 2));
+
+                panel.style.left = `${x}px`;
+                panel.style.top = `${y}px`;
+                panel.style.transform = `translate(-50%, -50%) scale(${depthScale.toFixed(3)})`;
+                panel.style.opacity = opacity.toFixed(2);
+                panel.style.zIndex = zIndex;
+
+                // Highlight active foreground panel
+                if (sinVal > 0.75) {
+                    panel.classList.add('border-cyan-400', 'shadow-[0_0_30px_rgba(6,182,212,0.4)]');
+                    panel.classList.remove('border-devsup-border');
+                } else {
+                    panel.classList.remove('border-cyan-400', 'shadow-[0_0_30px_rgba(6,182,212,0.4)]');
+                    panel.classList.add('border-devsup-border');
+                }
+
+                panelCoords.push({ x, y });
+
+                // Draw spider web radiating line from Core Node (cX, cY) to Panel (x, y)
+                radSvgHtml += `<line x1="${cX}" y1="${cY}" x2="${x}" y2="${y}" stroke="url(#webCyanGrad)" stroke-width="${(1.2 * depthScale).toFixed(1)}" opacity="${opacity.toFixed(2)}" />`;
+            }
+
+            svgRadGroup.innerHTML = radSvgHtml;
+
+            // Draw concentric spider web ring connecting adjacent panels & inner web strands
+            let ringSvgHtml = '';
+            for (let i = 0; i < totalPanels; i++) {
+                const p1 = panelCoords[i];
+                const p2 = panelCoords[(i + 1) % totalPanels];
+                
+                // Outer web perimeter line
+                ringSvgHtml += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" />`;
+
+                // Inner concentric web strand (50% distance to center)
+                const inner1X = cX + (p1.x - cX) * 0.55;
+                const inner1Y = cY + (p1.y - cY) * 0.55;
+                const inner2X = cX + (p2.x - cX) * 0.55;
+                const inner2Y = cY + (p2.y - cY) * 0.55;
+                ringSvgHtml += `<line x1="${inner1X}" y1="${inner1Y}" x2="${inner2X}" y2="${inner2Y}" stroke-dasharray="2,2" opacity="0.5" />`;
+            }
+
+            svgRingGroup.innerHTML = ringSvgHtml;
+        }
+
+        // -------------------------------------------------------------
+        // 1. THREE.JS 3D HERO LOGO EMBLEM (Native Bracket Shapes)
+        // -------------------------------------------------------------
+        function initHero3D() {
+            const container = document.getElementById('hero3dCanvasContainer');
+            if (!container || !window.THREE) return;
+
+            container.innerHTML = '';
+            const width = container.clientWidth || 600;
+            const height = container.clientHeight || 360;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(0, 0, 7.5);
+
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            const logoGroup = new THREE.Group();
+
+            const cyanMaterial = new THREE.MeshStandardMaterial({
+                color: 0x06b6d4,
+                metalness: 0.9,
+                roughness: 0.15,
+                emissive: 0x083344,
+                emissiveIntensity: 0.55,
+                side: THREE.DoubleSide
+            });
+
+            const extrudeSettings = { depth: 0.38, bevelEnabled: true, bevelSegments: 4, steps: 1, bevelSize: 0.05, bevelThickness: 0.05 };
+
+            // Left Bracket '<'
+            const leftBracketShape = new THREE.Shape();
+            leftBracketShape.moveTo(0.5, 1.15);
+            leftBracketShape.lineTo(-0.65, 0);
+            leftBracketShape.lineTo(0.5, -1.15);
+            leftBracketShape.lineTo(0.95, -0.78);
+            leftBracketShape.lineTo(-0.1, 0);
+            leftBracketShape.lineTo(0.95, 0.78);
+            leftBracketShape.closePath();
+            const meshLeft = new THREE.Mesh(new THREE.ExtrudeGeometry(leftBracketShape, extrudeSettings), cyanMaterial);
+            meshLeft.position.set(-1.85, 0, 0);
+            logoGroup.add(meshLeft);
+
+            // Center Slash '/'
+            const slashShape = new THREE.Shape();
+            slashShape.moveTo(0.3, 1.25);
+            slashShape.lineTo(0.68, 1.25);
+            slashShape.lineTo(-0.3, -1.25);
+            slashShape.lineTo(-0.68, -1.25);
+            slashShape.closePath();
+            const meshSlash = new THREE.Mesh(new THREE.ExtrudeGeometry(slashShape, extrudeSettings), cyanMaterial);
+            meshSlash.position.set(0, 0, 0);
+            logoGroup.add(meshSlash);
+
+            // Right Bracket '>'
+            const rightBracketShape = new THREE.Shape();
+            rightBracketShape.moveTo(-0.5, 1.15);
+            rightBracketShape.lineTo(0.65, 0);
+            rightBracketShape.lineTo(-0.5, -1.15);
+            rightBracketShape.lineTo(-0.95, -0.78);
+            rightBracketShape.lineTo(0.1, 0);
+            rightBracketShape.lineTo(-0.95, 0.78);
+            rightBracketShape.closePath();
+            const meshRight = new THREE.Mesh(new THREE.ExtrudeGeometry(rightBracketShape, extrudeSettings), cyanMaterial);
+            meshRight.position.set(1.85, 0, 0);
+            logoGroup.add(meshRight);
+
+            // 3D Text Canvas "DevSup"
+            const textCanvas = document.createElement('canvas');
+            textCanvas.width = 512;
+            textCanvas.height = 128;
+            const ctx = textCanvas.getContext('2d');
+            ctx.fillStyle = 'transparent';
+            ctx.fillRect(0, 0, 512, 128);
+            ctx.fillStyle = '#22d3ee';
+            ctx.shadowColor = '#06b6d4';
+            ctx.shadowBlur = 14;
+            ctx.font = '900 82px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('DevSup', 256, 64);
+
+            const textTexture = new THREE.CanvasTexture(textCanvas);
+            textTexture.needsUpdate = true;
+            const textMat = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true, side: THREE.DoubleSide });
+            const textPlane = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.1), textMat);
+            textPlane.position.set(0, -2.15, 0);
+            logoGroup.add(textPlane);
+
+            scene.add(logoGroup);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+            const dir1 = new THREE.DirectionalLight(0x22d3ee, 2.8);
+            dir1.position.set(5, 8, 10);
+            scene.add(dir1);
+
+            let isDragging = false;
+            let prevPointer = { x: 0, y: 0 };
+            let velX = 0, velY = 0;
+
+            function onDown(e) {
+                isDragging = true;
+                const x = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                const y = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+                prevPointer = { x, y };
+            }
+
+            function onMove(e) {
+                if (!isDragging) return;
+                const x = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                const y = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+                velY = (x - prevPointer.x) * 0.008;
+                velX = (y - prevPointer.y) * 0.008;
+                logoGroup.rotation.y += velY;
+                logoGroup.rotation.x += velX;
+                prevPointer = { x, y };
+            }
+
+            function onUp() { isDragging = false; }
+
+            container.addEventListener('mousedown', onDown);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+
+            container.addEventListener('touchstart', onDown, { passive: true });
+            window.addEventListener('touchmove', onMove, { passive: true });
+            window.addEventListener('touchend', onUp);
+
+            window.addEventListener('resize', () => {
+                const w = container.clientWidth || 600;
+                const h = container.clientHeight || 360;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            });
+
+            function renderLoop() {
+                requestAnimationFrame(renderLoop);
+                if (!isDragging) {
+                    logoGroup.rotation.y += 0.008 + velY;
+                    logoGroup.rotation.x += velX;
+                    velY *= 0.93;
+                    velX *= 0.93;
+                }
+                renderer.render(scene, camera);
+            }
+            renderLoop();
+        }
+
+        // -------------------------------------------------------------
+        // 2. BACKGROUND 3D GRID WAVE-LIFT DISPLACEMENT CANVAS
+        // -------------------------------------------------------------
+        function initBgCanvas() {
+            const canvas = document.getElementById('bgCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let w = canvas.width = window.innerWidth;
+            let h = canvas.height = window.innerHeight;
+            let mouse = { x: w / 2, y: h / 2, tx: w / 2, ty: h / 2 };
+            let particles = [];
+
+            window.addEventListener('mousemove', e => { 
+                mouse.tx = e.clientX; 
+                mouse.ty = e.clientY; 
+            });
+            window.addEventListener('resize', () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; });
+
+            function draw() {
+                const prevX = mouse.x;
+                const prevY = mouse.y;
+                mouse.x += (mouse.tx - mouse.x) * 0.08;
+                mouse.y += (mouse.ty - mouse.y) * 0.08;
+
+                const speed = Math.hypot(mouse.x - prevX, mouse.y - prevY);
+
+                // Spawn subtle glowing dots that follow mouse movement
+                if (speed > 0.4) {
+                    const count = Math.min(Math.floor(speed * 0.25) + 1, 3);
+                    for (let i = 0; i < count; i++) {
+                        particles.push({
+                            x: mouse.x + (Math.random() - 0.5) * 14,
+                            y: mouse.y + (Math.random() - 0.5) * 14,
+                            vx: (Math.random() - 0.5) * 0.6,
+                            vy: (Math.random() - 0.5) * 0.6 - 0.2,
+                            radius: Math.random() * 1.8 + 1,
+                            life: 0,
+                            maxLife: Math.floor(Math.random() * 20 + 20)
+                        });
+                    }
+                }
+
+                ctx.clearRect(0, 0, w, h);
+
+                const grad = ctx.createRadialGradient(mouse.x, mouse.y, 10, mouse.x, mouse.y, 380);
+                grad.addColorStop(0, 'rgba(6, 182, 212, 0.14)');
+                grad.addColorStop(0.4, 'rgba(6, 182, 212, 0.03)');
+                grad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+
+                const spacing = 44, maxD = 220;
+
+                for (let x = 0; x <= w; x += spacing) {
+                    ctx.beginPath();
+                    for (let y = 0; y <= h; y += 15) {
+                        const dx = x - mouse.x, dy = y - mouse.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        let offX = 0;
+                        if (dist < maxD) {
+                            offX = (dx / dist) * Math.cos((dist / maxD) * (Math.PI / 2)) * 18;
+                        }
+                        if (y === 0) ctx.moveTo(x + offX, y);
+                        else ctx.lineTo(x + offX, y);
+                    }
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.stroke();
+                }
+
+                for (let y = 0; y <= h; y += spacing) {
+                    ctx.beginPath();
+                    for (let x = 0; x <= w; x += 15) {
+                        const dx = x - mouse.x, dy = y - mouse.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        let offY = 0;
+                        if (dist < maxD) {
+                            offY = (dy / dist) * Math.cos((dist / maxD) * (Math.PI / 2)) * 18;
+                        }
+                        if (x === 0) ctx.moveTo(x, y + offY);
+                        else ctx.lineTo(x, y + offY);
+                    }
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.stroke();
+                }
+
+                // Render & update glowing dots following cursor
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life++;
+
+                    const alpha = Math.max(0, (1 - (p.life / p.maxLife)) * 0.7);
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(34, 211, 238, ${alpha})`;
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 6;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    if (p.life >= p.maxLife) {
+                        particles.splice(i, 1);
+                    }
+                }
+
+                requestAnimationFrame(draw);
+            }
+            draw();
+        }
+
+        // -------------------------------------------------------------
+        // 4. PINNED SCROLL STORYBOARD FOR THE 6 FEATURE PILLARS
+        // -------------------------------------------------------------
+        const pillarsData = [
+            {
+                num: "PILLAR 1 / 6",
+                title: "Syntax-Highlighted Code Messaging",
+                desc: "Automatic language detection for 50+ languages with VS Code Dark Plus styling, line numbers, and single-click copy without mangling LF/CRLF endings.",
+                chips: ["VS Code Dark Plus", "50+ Languages", "One-Click Copy"],
+                svg: `
+                    <svg viewBox="0 0 500 280" class="w-full h-auto max-h-[260px]">
+                        <rect x="50" y="220" width="400" height="12" rx="4" fill="#1e293b" stroke="#334155" />
+                        <rect x="80" y="90" width="160" height="110" rx="6" fill="#0f172a" stroke="#06b6d4" stroke-width="2" />
+                        <rect x="260" y="90" width="160" height="110" rx="6" fill="#0f172a" stroke="#06b6d4" stroke-width="2" />
+                        
+                        <line x1="95" y1="110" x2="180" y2="110" stroke="#ec4899" stroke-width="4" stroke-linecap="round" />
+                        <line x1="95" y1="125" x2="220" y2="125" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" />
+                        <line x1="95" y1="140" x2="160" y2="140" stroke="#10b981" stroke-width="4" stroke-linecap="round" />
+                        <line x1="275" y1="110" x2="380" y2="110" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" />
+                        <line x1="275" y1="125" x2="340" y2="125" stroke="#f59e0b" stroke-width="4" stroke-linecap="round" />
+
+                        <g class="anim-head-bop" transform="translate(200, 100)">
+                            <path d="M 25 25 Q 50 -10 75 25 Q 85 45 75 60 Q 50 70 25 60 Z" fill="#06b6d4" />
+                            <ellipse cx="50" cy="45" rx="22" ry="24" fill="#fed7aa" />
+                            <rect x="35" y="40" width="12" height="8" rx="2" fill="#090a0f" stroke="#22d3ee" stroke-width="2" />
+                            <rect x="53" y="40" width="12" height="8" rx="2" fill="#090a0f" stroke="#22d3ee" stroke-width="2" />
+                            <circle cx="41" cy="44" r="2" fill="#22d3ee" />
+                            <circle cx="59" cy="44" r="2" fill="#22d3ee" />
+                            <path d="M 46 58 Q 50 62 54 58" stroke="#000" stroke-width="2" fill="none" />
+                            <path d="M 20 68 L 80 68 L 90 120 L 10 120 Z" fill="#1e293b" stroke="#334155" stroke-width="2" />
+                        </g>
+
+                        <text x="70" y="70" fill="#22d3ee" font-family="monospace" font-size="14" font-weight="bold" style="animation: floatToken 2s ease-in-out infinite;">&lt;/&gt;</text>
+                        <text x="400" y="65" fill="#ec4899" font-family="monospace" font-size="14" font-weight="bold" style="animation: floatToken 2.2s ease-in-out 0.4s infinite;">{ }</text>
+                    </svg>
+                `
+            },
+            {
+                num: "PILLAR 2 / 6",
+                title: "In-Chat Collaborative Whiteboarding",
+                desc: "Full-duplex real-time vector drawing canvas built directly into chat. Multi-user simultaneous diagramming for architecture schemas, ERDs, and wireframes.",
+                chips: ["Vector Pen", "Multi-User Draw", "Commit to Chat"],
+                svg: `
+                    <svg viewBox="0 0 500 280" class="w-full h-auto max-h-[260px]">
+                        <rect x="60" y="40" width="380" height="190" rx="10" fill="#0f172a" stroke="#06b6d4" stroke-width="2" />
+                        <circle cx="150" cy="110" r="25" fill="#1e293b" stroke="#22d3ee" stroke-width="2" />
+                        <rect x="280" y="90" width="80" height="40" rx="6" fill="#1e293b" stroke="#ec4899" stroke-width="2" />
+                        
+                        <path d="M 175 110 Q 220 70 280 110" stroke="#10b981" stroke-width="3" stroke-dasharray="300" fill="none" style="animation: drawVectorPath 3s ease-in-out infinite;" />
+
+                        <g class="anim-head-bop" transform="translate(320, 70)">
+                            <path d="M 25 25 Q 50 -10 75 25 Q 85 45 75 60 Q 50 70 25 60 Z" fill="#06b6d4" />
+                            <ellipse cx="50" cy="45" rx="22" ry="24" fill="#fed7aa" />
+                            <rect x="35" y="40" width="12" height="8" rx="2" fill="#090a0f" stroke="#22d3ee" stroke-width="2" />
+                            <rect x="53" y="40" width="12" height="8" rx="2" fill="#090a0f" stroke="#22d3ee" stroke-width="2" />
+                            <path d="M 20 68 L 80 68 L 90 120 L 10 120 Z" fill="#1e293b" stroke="#334155" stroke-width="2" />
+                        </g>
+                    </svg>
+                `
+            },
+            {
+                num: "PILLAR 3 / 6",
+                title: "WebRTC HD Voice & Video Calling",
+                desc: "Encrypted peer-to-peer group audio and video rooms with low-latency screen sharing for pair programming, code reviews, and instant standups.",
+                chips: ["WebRTC Mesh", "Opus 48kHz", "Pair Screen Share"],
+                svg: `
+                    <svg viewBox="0 0 500 280" class="w-full h-auto max-h-[260px]">
+                        <rect x="80" y="40" width="340" height="180" rx="10" fill="#090a0f" stroke="#06b6d4" stroke-width="2" />
+                        <g class="anim-head-bop" transform="translate(190, 60)">
+                            <path d="M 25 25 Q 50 -10 75 25 Q 85 45 75 60 Q 50 70 25 60 Z" fill="#06b6d4" />
+                            <ellipse cx="50" cy="45" rx="22" ry="24" fill="#fed7aa" />
+                            <path d="M 20 40 Q 15 10 50 10 Q 85 10 80 40" stroke="#ec4899" stroke-width="4" fill="none" />
+                            <rect x="15" y="35" width="10" height="18" rx="3" fill="#ec4899" />
+                            <rect x="75" y="35" width="10" height="18" rx="3" fill="#ec4899" />
+                            <path d="M 20 68 L 80 68 L 90 120 L 10 120 Z" fill="#1e293b" stroke="#334155" stroke-width="2" />
+                        </g>
+                        <circle cx="110" cy="70" r="6" fill="#10b981" class="animate-ping" />
+                        <text x="124" y="74" fill="#10b981" font-family="monospace" font-size="11">HD LIVE • 18ms</text>
+                    </svg>
+                `
+            },
+            {
+                num: "PILLAR 4 / 6",
+                title: "WhatsApp-Grade Statuses & Stories",
+                desc: "24-hour disappearing photo, video, and text status updates. Segmented status rings around avatars, live view receipts, and emoji reactions.",
+                chips: ["24h Stories", "Cyan Avatar Ring", "Instant Reactions"],
+                svg: `
+                    <svg viewBox="0 0 500 280" class="w-full h-auto max-h-[260px]">
+                        <circle cx="250" cy="130" r="75" fill="none" stroke="#06b6d4" stroke-width="5" stroke-dasharray="30 8" class="animate-spin" style="animation-duration: 18s;" />
+                        <g class="anim-head-bop" transform="translate(200, 80)">
+                            <path d="M 25 25 Q 50 -10 75 25 Q 85 45 75 60 Q 50 70 25 60 Z" fill="#06b6d4" />
+                            <ellipse cx="50" cy="45" rx="22" ry="24" fill="#fed7aa" />
+                            <path d="M 20 68 L 80 68 L 90 120 L 10 120 Z" fill="#1e293b" stroke="#334155" stroke-width="2" />
+                        </g>
+                        <text x="120" y="80" fill="#22d3ee" font-size="22" style="animation: floatEmojiReaction 2s ease-in-out infinite;">🚀</text>
+                        <text x="350" y="90" fill="#ec4899" font-size="22" style="animation: floatEmojiReaction 2.4s ease-in-out 0.5s infinite;">🔥</text>
+                    </svg>
+                `
+            },
+            {
+                num: "PILLAR 5 / 6",
+                title: "Waveform Voice Notes",
+                desc: "In-chat audio recording with live animated waveform visualizers, real-time timers, and scrubbing duration sliders for hands-free async code reviews.",
+                chips: ["Waveform Spectrum", "Async Voice", "Scrubbing Slider"],
+                svg: `
+                    <svg viewBox="0 0 500 280" class="w-full h-auto max-h-[260px]">
+                        <rect x="70" y="100" width="360" height="70" rx="12" fill="#0f172a" stroke="#06b6d4" stroke-width="2" />
+                        <circle cx="110" cy="135" r="18" fill="#06b6d4" />
+                        <polygon points="106,127 118,135 106,143" fill="#090a0f" />
+                        
+                        <line x1="150" y1="135" x2="150" y2="115" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" class="anim-eq-1" />
+                        <line x1="165" y1="135" x2="165" y2="105" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" class="anim-eq-2" />
+                        <line x1="180" y1="135" x2="180" y2="145" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" class="anim-eq-3" />
+                        <line x1="195" y1="135" x2="195" y2="110" stroke="#22d3ee" stroke-width="4" stroke-linecap="round" class="anim-eq-1" />
+
+                        <g class="anim-head-bop" transform="translate(340, 70)">
+                            <path d="M 25 25 Q 50 -10 75 25 Q 85 45 75 60 Q 50 70 25 60 Z" fill="#06b6d4" />
+                            <ellipse cx="50" cy="45" rx="22" ry="24" fill="#fed7aa" />
+                        </g>
+                    </svg>
+                `
+            },
+            {
+                num: "PILLAR 6 / 6",
+                title: "Native Document & File Viewer",
+                desc: "View PDFs, Word documents (.docx), and spreadsheets directly in-app or trigger native app handlers on mobile and desktop without missing MIME headers.",
+                chips: ["Zero Corrupt Downloads", "Native PDF/Docx", "App Handlers"],
+                svg: `
+                    <svg viewBox="0 0 500 280" class="w-full h-auto max-h-[260px]">
+                        <rect x="120" y="40" width="260" height="190" rx="8" fill="#0f172a" stroke="#06b6d4" stroke-width="2" />
+                        <rect x="140" y="65" width="220" height="24" rx="4" fill="#1e293b" />
+                        <text x="150" y="81" fill="#22d3ee" font-family="monospace" font-size="11">Architecture-v3-Sprint.pdf</text>
+                        <g class="anim-head-bop" transform="translate(200, 100)">
+                            <path d="M 25 25 Q 50 -10 75 25 Q 85 45 75 60 Q 50 70 25 60 Z" fill="#06b6d4" />
+                            <ellipse cx="50" cy="45" rx="22" ry="24" fill="#fed7aa" />
+                            <rect x="35" y="40" width="12" height="8" rx="2" fill="#090a0f" stroke="#22d3ee" stroke-width="2" />
+                            <rect x="53" y="40" width="12" height="8" rx="2" fill="#090a0f" stroke="#22d3ee" stroke-width="2" />
+                        </g>
+                    </svg>
+                `
+            }
+        ];
+
+        let currentActivePillarIdx = 0;
+
+        function updatePinnedStoryScroll() {
+            const container = document.getElementById('pinnedStoryContainer');
+            if (!container) return;
+
+            const rect = container.getBoundingClientRect();
+            const totalScrollable = container.offsetHeight - window.innerHeight;
+            if (totalScrollable <= 0) return;
+
+            const currentScroll = -rect.top;
+            if (currentScroll < 0) {
+                if (currentActivePillarIdx !== 0) {
+                    currentActivePillarIdx = 0;
+                    renderPillarStep(0);
+                }
+                return;
+            }
+
+            let progress = currentScroll / totalScrollable;
+            if (isNaN(progress)) progress = 0;
+            progress = Math.max(0, Math.min(1, progress));
+
+            const maxIndex = pillarsData.length - 1;
+            const idx = Math.min(maxIndex, Math.max(0, Math.floor(progress * pillarsData.length)));
+
+            if (idx !== currentActivePillarIdx) {
+                currentActivePillarIdx = idx;
+                renderPillarStep(idx);
+            }
+        }
+
+        function renderPillarStep(idx) {
+            if (typeof idx !== 'number' || isNaN(idx) || idx < 0 || idx >= pillarsData.length) {
+                idx = 0;
+            }
+            const data = pillarsData[idx];
+            if (!data) return;
+
+            document.getElementById('pillarNumber').innerText = data.num;
+            document.getElementById('pillarTitle').innerText = data.title;
+            document.getElementById('pillarDesc').innerText = data.desc;
+
+            const chipsContainer = document.getElementById('pillarChips');
+            chipsContainer.innerHTML = data.chips.map(c => `<span class="px-2 py-1 rounded bg-slate-800 border border-devsup-border">${c}</span>`).join('');
+
+            document.getElementById('animeCharacterStage').innerHTML = data.svg;
+
+            for (let i = 0; i < 6; i++) {
+                const dot = document.getElementById(`dot-${i}`);
+                if (dot) {
+                    if (i === idx) {
+                        dot.className = "w-2.5 h-2.5 rounded-full bg-cyan-400 scale-125 transition-all";
+                    } else {
+                        dot.className = "w-2.5 h-2.5 rounded-full bg-slate-700 transition-all";
+                    }
+                }
+            }
+        }
+
+        window.addEventListener('scroll', updatePinnedStoryScroll);
+
+        // -------------------------------------------------------------
+        // 5. EDGE-TO-EDGE MARQUEE <-> 3D CYLINDER ROTATOR
+        // -------------------------------------------------------------
+        let is3DActive = false;
+        let ringAngle = 0;
+        let cardsList = [];
+        let ringScrollTimer = null;
+
+        function initIdentityStageCards() {
+            cardsList = Array.from(document.querySelectorAll('#marqueeTrackContainer .identity-card'));
+        }
+
+        function enable3DRing() {
+            if (is3DActive) return;
+            is3DActive = true;
+            const container = document.getElementById('marqueeTrackContainer');
+            if (container) container.classList.add('paused');
+
+            cardsList.forEach((card, idx) => {
+                if (idx < 6) {
+                    card.style.position = 'absolute';
+                    card.style.left = '50%';
+                    card.style.top = '50%';
+                    card.style.margin = '-45px 0 0 -128px';
+                    card.style.transition = 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease';
+                } else {
+                    card.style.opacity = '0';
+                    card.style.pointerEvents = 'none';
+                }
+            });
+            update3DRingPositions();
+        }
+
+        function disable3DRing() {
+            if (!is3DActive) return;
+            is3DActive = false;
+            const container = document.getElementById('marqueeTrackContainer');
+
+            cardsList.forEach((card) => {
+                card.style.position = '';
+                card.style.left = '';
+                card.style.top = '';
+                card.style.margin = '';
+                card.style.transform = '';
+                card.style.opacity = '1';
+                card.style.pointerEvents = 'auto';
+            });
+            if (container) container.classList.remove('paused');
+        }
+
+        function on3DRingWheel(e) {
+            e.preventDefault();
+            if (!is3DActive) {
+                enable3DRing();
+            }
+            const delta = Math.sign(e.deltaY);
+            ringAngle += delta * 45;
+            update3DRingPositions();
+
+            // Revert back to horizontal marquee after scrolling stops
+            if (ringScrollTimer) clearTimeout(ringScrollTimer);
+            ringScrollTimer = setTimeout(() => {
+                disable3DRing();
+            }, 1200);
+        }
+
+        function update3DRingPositions() {
+            if (!is3DActive) return;
+            const radius = 280;
+            const total = 6;
+
+            for (let i = 0; i < total; i++) {
+                const card = cardsList[i];
+                if (!card) continue;
+                const angle = (360 / total) * i + ringAngle;
+                const rad = (angle * Math.PI) / 180;
+                const x = Math.sin(rad) * radius;
+                const z = Math.cos(rad) * radius;
+
+                const depthScale = (z + radius + 150) / (radius * 2 + 150);
+                const opacity = depthScale * 0.75 + 0.25;
+
+                card.style.transform = `translate3d(${x}px, 0px, ${z}px) rotateY(${angle}deg) scale(${depthScale})`;
+                card.style.opacity = opacity.toFixed(2);
+                card.style.zIndex = Math.round(z + radius);
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 6. CODE SNIPPET SWITCHER & VECTOR WHITEBOARD HANDLERS
+        // -------------------------------------------------------------
+        const codeSnippets = {
+            ts: {
+                file: 'sync_engine.ts',
+                code: `<span class="code-keyword">import</span> { DevSupMesh } <span class="code-keyword">from</span> <span class="code-str">'@devsup/ws'</span>;\n\n<span class="code-keyword">export async function</span> <span class="code-func">syncDelta</span>(payload: <span class="code-type">Payload</span>) {\n  <span class="code-keyword">const</span> node = <span class="code-keyword">await</span> DevSupMesh.<span class="code-func">connect</span>();\n  node.<span class="code-func">broadcast</span>(<span class="code-str">'STATE_UPDATE'</span>, payload);\n}`
+            },
+            py: {
+                file: 'ws_cluster.py',
+                code: `<span class="code-keyword">from</span> devsup.async_engine <span class="code-keyword">import</span> ClusterMesh\n\n<span class="code-keyword">async def</span> <span class="code-func">stream_telemetry</span>(channel_id: <span class="code-type">str</span>):\n    cluster = <span class="code-keyword">await</span> ClusterMesh.<span class="code-func">join</span>(channel_id)\n    <span class="code-keyword">await</span> cluster.<span class="code-func">emit_binary</span>(<span class="code-str">b"OPUS_48K_CHUNK"</span>)`
+            },
+            rs: {
+                file: 'peer_mesh.rs',
+                code: `<span class="code-keyword">use</span> devsup_core::webrtc::<span class="code-type">MeshPeer</span>;\n\n<span class="code-keyword">pub async fn</span> <span class="code-func">initiate_session</span>() -> <span class="code-type">Result</span>&lt;(), MeshErr&gt; {\n    <span class="code-keyword">let</span> peer = MeshPeer::<span class="code-func">new_encrypted</span>().<span class="code-keyword">await</span>?;\n    peer.<span class="code-func">bind_ice_candidates</span>().<span class="code-keyword">await</span>\n}`
+            },
+            go: {
+                file: 'router.go',
+                code: `<span class="code-keyword">package</span> main\n\n<span class="code-keyword">func</span> <span class="code-func">HandleWebSocket</span>(w http.ResponseWriter, r *http.Request) {\n    conn, _ := upgrader.<span class="code-func">Upgrade</span>(w, r, nil)\n    <span class="code-keyword">go</span> cluster.<span class="code-func">ListenEvents</span>(conn)\n}`
+            }
+        };
+
+        function switchLang(lang) {
+            const data = codeSnippets[lang];
+            if (!data) return;
+            const nameEl = document.getElementById('codeFileName');
+            const blockEl = document.getElementById('codeBlockDisplay');
+            if (nameEl) nameEl.innerText = data.file;
+            if (blockEl) blockEl.innerHTML = data.code;
+
+            ['ts', 'py', 'rs', 'go'].forEach(l => {
+                const btn = document.getElementById(`tab-${l}`);
+                if (btn) {
+                    if (l === lang) {
+                        btn.className = "px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-medium";
+                    } else {
+                        btn.className = "px-2 py-0.5 rounded text-devsup-subtle hover:text-white";
+                    }
+                }
+            });
+        }
+
+        // Voice Note Player
+        let isPlayingAudio = false;
+        function initAudioWaveform() {
+            const container = document.getElementById('audioBars');
+            if (!container) return;
+            container.innerHTML = '';
+            for (let i = 0; i < 28; i++) {
+                const bar = document.createElement('div');
+                const h = Math.floor(Math.random() * 14) + 4;
+                bar.className = 'w-1 bg-slate-700 rounded-full transition-all duration-300';
+                bar.style.height = `${h}px`;
+                container.appendChild(bar);
+            }
+        }
+
+        function toggleAudio() {
+            isPlayingAudio = !isPlayingAudio;
+            const icon = document.getElementById('audioIcon');
+            const bars = document.querySelectorAll('#audioBars div');
+            if (isPlayingAudio) {
+                if (icon) icon.setAttribute('data-lucide', 'pause');
+                bars.forEach(b => {
+                    b.classList.remove('bg-slate-700');
+                    b.classList.add('bg-cyan-400', 'animate-pulse');
+                });
+            } else {
+                if (icon) icon.setAttribute('data-lucide', 'play');
+                bars.forEach(b => {
+                    b.classList.remove('bg-cyan-400', 'animate-pulse');
+                    b.classList.add('bg-slate-700');
+                });
+            }
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Whiteboard Canvas Handlers
+        let whiteboardCtx, drawing = false, penColor = '#06b6d4';
+
+        function initWhiteboard() {
+            const canvas = document.getElementById('whiteboardCanvas');
+            if (!canvas) return;
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            whiteboardCtx = canvas.getContext('2d');
+            whiteboardCtx.lineWidth = 2.5;
+            whiteboardCtx.lineCap = 'round';
+            whiteboardCtx.strokeStyle = penColor;
+
+            function startDraw(e) {
+                drawing = true;
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+                const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+                whiteboardCtx.beginPath();
+                whiteboardCtx.moveTo(x, y);
+            }
+
+            function drawMove(e) {
+                if (!drawing) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+                const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+                whiteboardCtx.lineTo(x, y);
+                whiteboardCtx.stroke();
+            }
+
+            function stopDraw() { drawing = false; }
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', drawMove);
+            window.addEventListener('mouseup', stopDraw);
+
+            canvas.addEventListener('touchstart', startDraw, { passive: true });
+            canvas.addEventListener('touchmove', drawMove, { passive: true });
+            window.addEventListener('touchend', stopDraw);
+        }
+
+        function setPenColor(color) {
+            penColor = color;
+            if (whiteboardCtx) whiteboardCtx.strokeStyle = color;
+        }
+
+        function clearCanvas() {
+            const canvas = document.getElementById('whiteboardCanvas');
+            if (whiteboardCtx && canvas) {
+                whiteboardCtx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function commitDiagramToChat() {
+            const stream = document.getElementById('chatMessageStream');
+            if (stream) {
+                const card = document.createElement('div');
+                card.className = "p-2.5 rounded-lg bg-slate-900 border border-cyan-500/40 font-mono text-xs text-cyan-300 flex items-center justify-between";
+                card.innerHTML = `<span>🎨 Committed Diagram to #frontend-engineers</span><span class="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold">Vector Stream</span>`;
+                stream.appendChild(card);
+                stream.scrollTop = stream.scrollHeight;
+            } else {
+                // If stream is not present in mock, flash button confirmation
+                const btn = event?.currentTarget;
+                if (btn) {
+                    const original = btn.innerText;
+                    btn.innerText = "✓ Diagram Committed";
+                    setTimeout(() => { btn.innerText = original; }, 2000);
+                }
+            }
+        }
+
+        // WhatsApp Story Modal Handler
+        function openStoryModal(name, role, avatar, caption) {
+            const userEl = document.getElementById('storyUser');
+            const roleEl = document.getElementById('storyRole');
+            const avEl = document.getElementById('storyAvatar');
+            const capEl = document.getElementById('storyCaption');
+            if (userEl) userEl.innerText = name;
+            if (roleEl) roleEl.innerText = role;
+            if (avEl) avEl.src = avatar;
+            if (capEl) capEl.innerText = caption;
+
+            const modal = document.getElementById('storyModal');
+            const bar = document.getElementById('storyProgress');
+            if (modal) {
+                modal.classList.remove('hidden');
+                setTimeout(() => { if (bar) bar.style.width = '100%'; }, 50);
+            }
+        }
+
+        function closeStoryModal() {
+            const modal = document.getElementById('storyModal');
+            const bar = document.getElementById('storyProgress');
+            if (modal) modal.classList.add('hidden');
+            if (bar) bar.style.width = '0%';
+        }
+    </script>
+</body>
+</html>
