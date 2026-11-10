@@ -1713,9 +1713,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     cursor: el.isLocked ? 'default' : 'move',
                                     zIndex: draggingElementId === el.id ? 1000 : elementZIndex,
                                     boxSizing: 'border-box',
-                                    outline: isSelected 
-                                        ? (el.isLocked ? '2px dashed #EF4444' : '2px solid #06B6D4') 
-                                        : (draggingElementId === el.id ? '1px dashed #06B6D4' : 'none'),
+                                    outline: isSelected ? '2px solid #06B6D4' : (draggingElementId === el.id ? '1px dashed #06B6D4' : 'none'),
                                     outlineOffset: '2px',
                                     userSelect: 'none'
                                 }}
@@ -2017,34 +2015,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     />
                                 </div>
                                 
-                                {/* Lock Badge when Element is Locked */}
-                                {el.isLocked && (
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            top: '6px',
-                                            right: '6px',
-                                            backgroundColor: '#EF4444',
-                                            color: '#FFFFFF',
-                                            borderRadius: '4px',
-                                            padding: '2px 6px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            fontSize: '0.68rem',
-                                            fontWeight: '700',
-                                            zIndex: 30,
-                                            pointerEvents: 'none',
-                                            boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
-                                        }}
-                                    >
-                                        <Lock size={11} style={{ width: '11px', height: '11px', flexShrink: 0 }} />
-                                        <span>Locked</span>
-                                    </div>
-                                )}
-
                                 {/* 4-Corner Professional Selection & Resize Handles */}
-                                {isSelected && !el.isLocked && (
+                                {isSelected && (
                                     <>
                                         {/* Top-Left */}
                                         <div style={{ position: 'absolute', top: -5, left: -5, width: 9, height: 9, backgroundColor: '#FFFFFF', border: '2px solid #06B6D4', borderRadius: 2, pointerEvents: 'none', zIndex: 22 }} />
@@ -2053,24 +2025,26 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                         {/* Bottom-Left */}
                                         <div style={{ position: 'absolute', bottom: -5, left: -5, width: 9, height: 9, backgroundColor: '#FFFFFF', border: '2px solid #06B6D4', borderRadius: 2, pointerEvents: 'none', zIndex: 22 }} />
                                         {/* Bottom-Right (Interactive Resize Handle) */}
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                bottom: -6,
-                                                right: -6,
-                                                width: 13,
-                                                height: 13,
-                                                backgroundColor: '#06B6D4',
-                                                border: '2px solid #FFFFFF',
-                                                borderRadius: 3,
-                                                cursor: 'nwse-resize',
-                                                zIndex: 25,
-                                                boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
-                                            }}
-                                            title="Drag to resize"
-                                            onMouseDown={(e) => handleResizeMouseDown(e, el)}
-                                            onTouchStart={(e) => handleResizeMouseDown(e, el)}
-                                        />
+                                        {!el.isLocked && (
+                                            <div
+                                                style={{
+                                                    position: 'absolute',
+                                                    bottom: -6,
+                                                    right: -6,
+                                                    width: 13,
+                                                    height: 13,
+                                                    backgroundColor: '#06B6D4',
+                                                    border: '2px solid #FFFFFF',
+                                                    borderRadius: 3,
+                                                    cursor: 'nwse-resize',
+                                                    zIndex: 25,
+                                                    boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
+                                                }}
+                                                title="Drag to resize"
+                                                onMouseDown={(e) => handleResizeMouseDown(e, el)}
+                                                onTouchStart={(e) => handleResizeMouseDown(e, el)}
+                                            />
+                                        )}
                                     </>
                                 )}
                             </div>
