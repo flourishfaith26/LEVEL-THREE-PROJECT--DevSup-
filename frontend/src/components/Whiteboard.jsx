@@ -1,6 +1,10 @@
 import { useRef, useState, useEffect } from 'react';
 import { styled } from '../stitches.config.js';
-import { X, Brush, Eraser, Trash2, Undo2, Redo2, ChevronDown, ChevronRight, Square, ArrowUpToLine, ArrowDownToLine, Send, Lock, Unlock } from 'lucide-react';
+import { 
+    X, Brush, Eraser, Trash2, Undo2, Redo2, ChevronDown, ChevronRight, 
+    Square, ArrowUpToLine, ArrowDownToLine, Send, Lock, Unlock, 
+    Image as ImageIcon, Video as VideoIcon, Copy, Plus, Minus
+} from 'lucide-react';
 import { MOCKUP_TYPES, MOCKUP_CATEGORIES } from './MockupComponents';
 import html2canvas from 'html2canvas';
 
@@ -210,7 +214,10 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     const [resizingElementId, setResizingElementId] = useState(null);
     const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, w: 0, h: 0 });
 
-    const [expandedCategories, setExpandedCategories] = useState(['layout']);
+    const [expandedCategories, setExpandedCategories] = useState(['media', 'basic', 'actions', 'layout']);
+    const [editingElementId, setEditingElementId] = useState(null);
+    const imageInputRef = useRef(null);
+    const videoInputRef = useRef(null);
 
     // Group selection state
     const [lastTap, setLastTap] = useState(0);
@@ -223,8 +230,74 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     const [contextMenu, setContextMenu] = useState(null);
     const SNAP_THRESHOLD = 8;
 
-    // Element Color State
+    // Element Styling State & Updates
     const [elementColor, setElementColor] = useState('transparent');
+
+    const handleUpdateElement = (id, updates) => {
+        setDroppedElements(prev => {
+            const updated = prev.map(el => el.id === id ? { ...el, ...updates } : el);
+            if (socket && conversationId) {
+                socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+            }
+            return updated;
+        });
+    };
+
+    const handleImportMedia = (file, isVideo) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const rect = containerRef.current?.getBoundingClientRect() || { width: 800, height: 600 };
+            const newEl = {
+                id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+                type: isVideo ? 'videoEmbed' : 'imageBlock',
+                src: e.target?.result,
+                name: file.name,
+                x: Math.max(20, Math.round(((rect.width || 800) - (isVideo ? 360 : 280)) / 2)),
+                y: Math.max(20, Math.round(((rect.height || 600) - (isVideo ? 220 : 200)) / 2)),
+                w: isVideo ? 360 : 280,
+                h: isVideo ? 220 : 200,
+                ownerId: mongoUserId,
+                allowOthersToEdit: false
+            };
+            const updated = [...droppedElements, newEl];
+            setDroppedElements(updated);
+            setSelectedElements([newEl.id]);
+            if (socket && conversationId) {
+                socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedElements.length === 0) return;
+        const updated = droppedElements.filter(el => !selectedElements.includes(el.id));
+        setDroppedElements(updated);
+        setSelectedElements([]);
+        if (socket && conversationId) {
+            socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+        }
+    };
+
+    const handleDuplicateSelected = () => {
+        if (selectedElements.length === 0) return;
+        const toDup = droppedElements.filter(el => selectedElements.includes(el.id));
+        const newEls = toDup.map(el => ({
+            ...el,
+            id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+            x: el.x + 24,
+            y: el.y + 24,
+            ownerId: mongoUserId,
+            allowOthersToEdit: false
+        }));
+        const updated = [...droppedElements, ...newEls];
+        setDroppedElements(updated);
+        setSelectedElements(newEls.map(el => el.id));
+        if (socket && conversationId) {
+            socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+        }
+    };
 
     const handleElementColorChange = (e) => {
         const newColor = e.target.value;
@@ -232,7 +305,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
         if (selectedElements.length > 0) {
             const updated = droppedElements.map(el => {
                 if (selectedElements.includes(el.id)) {
-                    return { ...el, color: newColor };
+                    return { ...el, bgColor: newColor };
                 }
                 return el;
             });
@@ -276,6 +349,24 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
         
         return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
     };
+
+    // Keyboard shortcuts for selected design elements (Delete, Duplicate)
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (editingElementId) return;
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElements.length > 0) {
+                e.preventDefault();
+                handleDeleteSelected();
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && selectedElements.length > 0) {
+                e.preventDefault();
+                handleDuplicateSelected();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedElements, droppedElements, editingElementId]);
 
     const saveState = () => {
         const canvas = canvasRef.current;
@@ -600,9 +691,6 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
 
     const handleDrop = (e) => {
         e.preventDefault();
-        const type = e.dataTransfer ? e.dataTransfer.getData('type') : draggedItem;
-        if (!type || !MOCKUP_TYPES[type]) return;
-
         const rect = containerRef.current.getBoundingClientRect();
         
         let clientX = e.clientX;
@@ -613,19 +701,115 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
             clientY = e.changedTouches[0].clientY;
         }
 
+        // Support direct file drop from desktop/files (Images & Videos)
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0];
+            const isVideo = file.type.startsWith('video/');
+            const isImage = file.type.startsWith('image/');
+            if (isVideo || isImage) {
+                const reader = new FileReader();
+                reader.onload = (uploadEvent) => {
+                    const newEl = {
+                        id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+                        type: isVideo ? 'videoEmbed' : 'imageBlock',
+                        src: uploadEvent.target?.result,
+                        name: file.name,
+                        x: Math.max(0, clientX - rect.left - (isVideo ? 170 : 120)),
+                        y: Math.max(0, clientY - rect.top - (isVideo ? 100 : 90)),
+                        w: isVideo ? 340 : 240,
+                        h: isVideo ? 200 : 180,
+                        ownerId: mongoUserId,
+                        allowOthersToEdit: false
+                    };
+                    const updated = [...droppedElements, newEl];
+                    setDroppedElements(updated);
+                    setSelectedElements([newEl.id]);
+                    if (socket && conversationId) {
+                        socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+                    }
+                };
+                reader.readAsDataURL(file);
+                return;
+            }
+        }
+
+        const type = e.dataTransfer ? e.dataTransfer.getData('type') : draggedItem;
+        if (!type || !MOCKUP_TYPES[type]) return;
+
+        const typeConfig = MOCKUP_TYPES[type];
+
+        // Specific element defaults
+        const defaults = {};
+        if (type === 'heading') {
+            defaults.text = 'Heading Title';
+            defaults.textColor = '#F8FAFC';
+            defaults.fontSize = 28;
+            defaults.fontWeight = '700';
+        } else if (type === 'paragraph') {
+            defaults.text = 'Enter your copy or UI description text here...';
+            defaults.textColor = '#94A3B8';
+            defaults.fontSize = 15;
+        } else if (type === 'button') {
+            defaults.text = 'Get Started';
+            defaults.bgColor = '#06B6D4';
+            defaults.textColor = '#0B0F19';
+            defaults.borderRadius = 8;
+        } else if (type === 'badge') {
+            defaults.text = 'Featured';
+            defaults.bgColor = 'rgba(6, 182, 212, 0.15)';
+            defaults.textColor = '#06B6D4';
+            defaults.borderRadius = 999;
+        } else if (type === 'container') {
+            defaults.bgColor = '#1E293B';
+            defaults.borderColor = '#334155';
+            defaults.borderRadius = 12;
+        } else if (type === 'navbar') {
+            defaults.brand = 'DevSup Platform';
+            defaults.bgColor = '#0F172A';
+            defaults.textColor = '#F8FAFC';
+        } else if (type === 'textInput') {
+            defaults.text = 'Enter text...';
+            defaults.bgColor = '#0F172A';
+            defaults.textColor = '#F8FAFC';
+            defaults.borderRadius = 6;
+        } else if (type === 'textarea') {
+            defaults.text = 'Type notes or feedback...';
+            defaults.bgColor = '#0F172A';
+            defaults.textColor = '#F8FAFC';
+            defaults.borderRadius = 6;
+        } else if (type === 'switch') {
+            defaults.text = 'Active toggle';
+            defaults.checked = true;
+        } else if (type === 'checkbox') {
+            defaults.text = 'Enable option';
+            defaults.checked = true;
+        } else if (type === 'dropdown') {
+            defaults.text = 'Option 1';
+        } else if (type === 'infoCard') {
+            defaults.title = 'Analytics Feature';
+            defaults.text = 'Detailed design specifications and interactive component description.';
+            defaults.bgColor = '#1E293B';
+        } else if (type === 'avatar') {
+            defaults.text = 'UX';
+            defaults.bgColor = '#3B82F6';
+            defaults.textColor = '#FFFFFF';
+        }
+
         const newElement = {
-            id: Date.now().toString(),
+            id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
             type,
-            x: clientX - rect.left - (MOCKUP_TYPES[type].defaultW / 2),
-            y: clientY - rect.top - (MOCKUP_TYPES[type].defaultH / 2),
-            w: MOCKUP_TYPES[type].defaultW,
-            h: MOCKUP_TYPES[type].defaultH,
+            x: Math.max(0, clientX - rect.left - (typeConfig.defaultW / 2)),
+            y: Math.max(0, clientY - rect.top - (typeConfig.defaultH / 2)),
+            w: typeConfig.defaultW,
+            h: typeConfig.defaultH,
             ownerId: mongoUserId,
-            allowOthersToEdit: false
+            allowOthersToEdit: false,
+            ...defaults
         };
 
         const updatedElements = [...droppedElements, newElement];
         setDroppedElements(updatedElements);
+        setSelectedElements([newElement.id]);
         setDraggedItem(null);
 
         if (socket && conversationId) {
@@ -986,14 +1170,81 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                 </ToolsGroup>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* Media File Inputs */}
+                    <input 
+                        type="file" 
+                        ref={imageInputRef} 
+                        accept="image/*" 
+                        style={{ display: 'none' }} 
+                        onChange={(e) => {
+                            if (e.target.files?.[0]) handleImportMedia(e.target.files[0], false);
+                            e.target.value = '';
+                        }} 
+                    />
+                    <input 
+                        type="file" 
+                        ref={videoInputRef} 
+                        accept="video/*" 
+                        style={{ display: 'none' }} 
+                        onChange={(e) => {
+                            if (e.target.files?.[0]) handleImportMedia(e.target.files[0], true);
+                            e.target.value = '';
+                        }} 
+                    />
+
+                    {/* Import Buttons */}
+                    <button
+                        type="button"
+                        onClick={() => imageInputRef.current?.click()}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            backgroundColor: 'rgba(6, 182, 212, 0.12)',
+                            border: '1px solid rgba(6, 182, 212, 0.35)',
+                            borderRadius: '6px',
+                            color: '#06B6D4',
+                            fontSize: '0.82rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                        }}
+                        title="Import image asset from computer"
+                    >
+                        <ImageIcon size={15} /> Import Image
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => videoInputRef.current?.click()}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            backgroundColor: 'rgba(168, 85, 247, 0.12)',
+                            border: '1px solid rgba(168, 85, 247, 0.35)',
+                            borderRadius: '6px',
+                            color: '#C084FC',
+                            fontSize: '0.82rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                        }}
+                        title="Import video asset with real playback"
+                    >
+                        <VideoIcon size={15} /> Import Video
+                    </button>
+
                     {onSendToChat && (
                         <button 
                             onClick={exportToChat}
                             disabled={isSendingToChat}
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: isSendingToChat ? 'var(--colors-border)' : 'var(--colors-accent)', color: '#fff', border: 'none', borderRadius: '4px', cursor: isSendingToChat ? 'not-allowed' : 'pointer', fontSize: '0.9rem', fontWeight: '500', opacity: isSendingToChat ? 0.7 : 1 }}
-                            title="Send Mock-up to Chat"
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: isSendingToChat ? 'var(--colors-border)' : 'var(--colors-accent)', color: '#fff', border: 'none', borderRadius: '6px', cursor: isSendingToChat ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: '600', opacity: isSendingToChat ? 0.7 : 1 }}
+                            title="Send design to chat"
                         >
-                            <Send size={16} /> {isSendingToChat ? 'Sending…' : 'Send to Chat'}
+                            <Send size={15} /> {isSendingToChat ? 'Sending…' : 'Send to Chat'}
                         </button>
                     )}
                     <IconButton title="Close Whiteboard" onClick={onClose}>
@@ -1018,7 +1269,9 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                 onMouseLeave={handleElementMouseUp}
             >
                 <Sidebar>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--colors-textMuted)', marginBottom: '8px' }}>Mockup UI</div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '700', color: '#06B6D4', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '0.2px' }}>
+                        🎨 UI/UX Components
+                    </div>
                     
                     {MOCKUP_CATEGORIES.map(category => {
                         const isExpanded = expandedCategories.includes(category.id);
@@ -1083,10 +1336,11 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                         <div style={{ position: 'absolute', left: 0, right: 0, top: alignmentLines.h, height: '1px', backgroundColor: '#d946ef', zIndex: 9999, pointerEvents: 'none' }} />
                     )}
 
-                    {/* Render Dropped Mockup Elements */}
+                    {/* Render Dropped UI/UX Design Elements */}
                     {droppedElements.map(el => {
                         const Component = MOCKUP_TYPES[el.type]?.component;
                         if (!Component) return null;
+                        const isSelected = selectedElements.includes(el.id);
                         
                         return (
                             <div
@@ -1098,17 +1352,20 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     width: el.w,
                                     height: el.h,
                                     cursor: 'move',
-                                    zIndex: 10,
-                                    // Add a slight outline on hover for grabbing visibility
-                                    outline: (draggingElementId === el.id || selectedElements.includes(el.id)) ? '2px solid #06b6d4' : 'none',
+                                    zIndex: isSelected ? 25 : 10,
+                                    boxSizing: 'border-box',
+                                    outline: isSelected ? '2px solid #06B6D4' : (draggingElementId === el.id ? '1px dashed #06B6D4' : 'none'),
+                                    outlineOffset: '2px',
                                     userSelect: 'none'
                                 }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedElements([el.id]);
+                                }}
                                 onMouseDown={(e) => {
-                                    if (selectedElements.includes(el.id)) return;
                                     handleElementMouseDown(e, el.id);
                                 }}
                                 onTouchStart={(e) => {
-                                    if (selectedElements.includes(el.id)) return;
                                     handleElementMouseDown(e, el.id);
                                 }}
                                 onContextMenu={(e) => {
@@ -1120,16 +1377,132 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     setContextMenu({ x: e.clientX, y: e.clientY });
                                 }}
                             >
+                                {/* Floating Design Inspector Bar for Selected Element */}
+                                {isSelected && selectedElements.length === 1 && (
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '-46px',
+                                            left: 0,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            backgroundColor: '#0F172A',
+                                            border: '1px solid #06B6D4',
+                                            borderRadius: '8px',
+                                            padding: '4px 8px',
+                                            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                                            zIndex: 9999,
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                    >
+                                        {/* Fill Color */}
+                                        <label title="Background Fill Color" style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600' }}>
+                                            Fill
+                                            <input 
+                                                type="color" 
+                                                value={el.bgColor || '#1E293B'} 
+                                                onChange={(e) => handleUpdateElement(el.id, { bgColor: e.target.value })} 
+                                                style={{ width: '22px', height: '22px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '4px' }}
+                                            />
+                                        </label>
+
+                                        {/* Text Color */}
+                                        {el.textColor !== undefined && (
+                                            <label title="Text Color" style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600' }}>
+                                                Text
+                                                <input 
+                                                    type="color" 
+                                                    value={el.textColor || '#FFFFFF'} 
+                                                    onChange={(e) => handleUpdateElement(el.id, { textColor: e.target.value })} 
+                                                    style={{ width: '22px', height: '22px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '4px' }}
+                                                />
+                                            </label>
+                                        )}
+
+                                        {/* Font Size (+ / -) */}
+                                        {el.fontSize !== undefined && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', borderLeft: '1px solid #334155', paddingLeft: '6px' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateElement(el.id, { fontSize: Math.max(10, (el.fontSize || 16) - 2) })}
+                                                    style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '2px 4px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                                    title="Decrease font size"
+                                                >
+                                                    A-
+                                                </button>
+                                                <span style={{ fontSize: '0.72rem', color: '#CBD5E1', minWidth: '24px', textAlign: 'center' }}>
+                                                    {el.fontSize}px
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleUpdateElement(el.id, { fontSize: Math.min(72, (el.fontSize || 16) + 2) })}
+                                                    style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '2px 4px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                                    title="Increase font size"
+                                                >
+                                                    A+
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Border Radius */}
+                                        {el.borderRadius !== undefined && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', borderLeft: '1px solid #334155', paddingLeft: '6px' }}>
+                                                <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Radius:</span>
+                                                {[0, 6, 12, 999].map(r => (
+                                                    <button
+                                                        key={r}
+                                                        type="button"
+                                                        onClick={() => handleUpdateElement(el.id, { borderRadius: r })}
+                                                        style={{
+                                                            background: (el.borderRadius ?? 0) === r ? '#06B6D4' : 'rgba(255,255,255,0.08)',
+                                                            color: (el.borderRadius ?? 0) === r ? '#0B0F19' : '#CBD5E1',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            padding: '2px 5px',
+                                                            fontSize: '0.7rem',
+                                                            fontWeight: '600',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        {r === 999 ? 'pill' : `${r}`}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Duplicate */}
+                                        <button
+                                            type="button"
+                                            onClick={handleDuplicateSelected}
+                                            title="Duplicate element (Ctrl+D)"
+                                            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                        >
+                                            <Copy size={14} />
+                                        </button>
+
+                                        {/* Delete */}
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteSelected}
+                                            title="Delete element (Del)"
+                                            style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                                    <Component />
-                                    {el.color && (
-                                        <div style={{
-                                            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                                            backgroundColor: el.color,
-                                            mixBlendMode: 'color',
-                                            pointerEvents: 'none'
-                                        }} />
-                                    )}
+                                    <Component 
+                                        el={el} 
+                                        onUpdate={(updates) => handleUpdateElement(el.id, updates)}
+                                        isSelected={isSelected}
+                                        isEditing={editingElementId === el.id}
+                                        setIsEditing={(editing) => setEditingElementId(editing ? el.id : null)}
+                                    />
                                 </div>
                                 
                                 {/* Resize Handle */}
@@ -1141,7 +1514,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                         width: '16px',
                                         height: '16px',
                                         cursor: 'se-resize',
-                                        background: 'linear-gradient(135deg, transparent 50%, #0ea5e9 50%)',
+                                        background: 'linear-gradient(135deg, transparent 50%, #06b6d4 50%)',
                                         zIndex: 20
                                     }}
                                     onMouseDown={(e) => handleResizeMouseDown(e, el)}
