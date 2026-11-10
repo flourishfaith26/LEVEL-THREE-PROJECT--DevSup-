@@ -330,7 +330,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const handleBringToFront = (e) => {
-        e.stopPropagation();
+        if (e && e.stopPropagation) e.stopPropagation();
         if (selectedElements.length === 0) return;
         const unselected = droppedElements.filter(el => !selectedElements.includes(el.id));
         const selected = droppedElements.filter(el => selectedElements.includes(el.id));
@@ -340,13 +340,84 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const handleSendToBack = (e) => {
-        e.stopPropagation();
+        if (e && e.stopPropagation) e.stopPropagation();
         if (selectedElements.length === 0) return;
         const unselected = droppedElements.filter(el => !selectedElements.includes(el.id));
         const selected = droppedElements.filter(el => selectedElements.includes(el.id));
         const updated = [...selected, ...unselected];
         setDroppedElements(updated);
         if (socket && conversationId) socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+    };
+
+    // --- Dedicated Element Action Handlers (100% functional, bulletproof) ---
+    const handleToggleElementLock = (targetEl, e) => {
+        if (e) e.stopPropagation();
+        if (targetEl.ownerId && targetEl.ownerId !== mongoUserId) {
+            alert("Only the owner can lock or unlock this element.");
+            return;
+        }
+        const updated = droppedElements.map(item => {
+            if (item.id === targetEl.id) {
+                return { ...item, allowOthersToEdit: !item.allowOthersToEdit };
+            }
+            return item;
+        });
+        setDroppedElements(updated);
+        if (socket && conversationId) {
+            socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+        }
+    };
+
+    const handleSendElementToBack = (targetEl, e) => {
+        if (e) e.stopPropagation();
+        const unselected = droppedElements.filter(item => item.id !== targetEl.id);
+        const updated = [targetEl, ...unselected];
+        setDroppedElements(updated);
+        if (socket && conversationId) {
+            socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+        }
+    };
+
+    const handleBringElementToFront = (targetEl, e) => {
+        if (e) e.stopPropagation();
+        const unselected = droppedElements.filter(item => item.id !== targetEl.id);
+        const updated = [...unselected, targetEl];
+        setDroppedElements(updated);
+        if (socket && conversationId) {
+            socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+        }
+    };
+
+    const handleDuplicateElement = (targetEl, e) => {
+        if (e) e.stopPropagation();
+        const newEl = {
+            ...JSON.parse(JSON.stringify(targetEl)),
+            id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+            x: targetEl.x + 24,
+            y: targetEl.y + 24,
+            ownerId: mongoUserId,
+            allowOthersToEdit: false
+        };
+        const updated = [...droppedElements, newEl];
+        setDroppedElements(updated);
+        setSelectedElements([newEl.id]);
+        if (socket && conversationId) {
+            socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+        }
+    };
+
+    const handleDeleteElement = (targetEl, e) => {
+        if (e) e.stopPropagation();
+        if (!canEditElement(targetEl)) {
+            alert("You don't have permission to delete this element.");
+            return;
+        }
+        const updated = droppedElements.filter(item => item.id !== targetEl.id);
+        setDroppedElements(updated);
+        setSelectedElements([]);
+        if (socket && conversationId) {
+            socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+        }
     };
 
     const getGroupBoundingBox = () => {
@@ -1650,18 +1721,25 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     <div
                                         style={{
                                             position: 'absolute',
-                                            top: el.y < 55 ? `${el.h + 8}px` : '-48px',
-                                            left: 0,
+                                            top: el.y < 55 ? `${el.h + 10}px` : '-50px',
+                                            left: el.x + 400 > 4000 ? 'auto' : '0px',
+                                            right: el.x + 400 > 4000 ? '0px' : 'auto',
                                             display: 'flex',
                                             alignItems: 'center',
+                                            flexWrap: 'nowrap',
+                                            width: 'max-content',
+                                            minWidth: 'max-content',
+                                            maxWidth: 'none',
                                             gap: '6px',
-                                            backgroundColor: '#0F172A',
-                                            border: '1px solid #06B6D4',
+                                            backgroundColor: '#0B0F19',
+                                            border: '1.5px solid #06B6D4',
                                             borderRadius: '8px',
-                                            padding: '4px 10px',
-                                            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                                            padding: '4px 8px',
+                                            boxShadow: '0 8px 30px rgba(0,0,0,0.7)',
                                             zIndex: 9999,
-                                            whiteSpace: 'nowrap'
+                                            whiteSpace: 'nowrap',
+                                            userSelect: 'none',
+                                            pointerEvents: 'auto'
                                         }}
                                         onClick={(e) => e.stopPropagation()}
                                         onMouseDown={(e) => e.stopPropagation()}
@@ -1675,51 +1753,53 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                                     setEditingElementId(el.id);
                                                 }}
                                                 style={{
-                                                    display: 'flex',
+                                                    display: 'inline-flex',
                                                     alignItems: 'center',
-                                                    gap: '4px',
+                                                    gap: '5px',
+                                                    height: '32px',
                                                     background: editingElementId === el.id ? '#06B6D4' : 'rgba(255,255,255,0.08)',
                                                     color: editingElementId === el.id ? '#0B0F19' : '#F8FAFC',
                                                     border: 'none',
-                                                    borderRadius: '4px',
-                                                    padding: '3px 8px',
-                                                    fontSize: '0.72rem',
+                                                    borderRadius: '6px',
+                                                    padding: '0 10px',
+                                                    fontSize: '0.78rem',
                                                     fontWeight: '600',
-                                                    cursor: 'pointer'
+                                                    cursor: 'pointer',
+                                                    flexShrink: 0
                                                 }}
                                                 title="Edit text content (or double-click text directly)"
                                             >
-                                                <Type size={12} /> Edit Text
+                                                <Type size={13} style={{ width: '13px', height: '13px', minWidth: '13px', minHeight: '13px', flexShrink: 0 }} /> Edit Text
                                             </button>
                                         )}
 
                                         {/* Fill Color */}
-                                        <label title="Background Fill Color" style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600' }}>
+                                        <label title="Background Fill Color" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600', height: '32px', padding: '0 4px', flexShrink: 0 }}>
                                             Fill
                                             <input 
                                                 type="color" 
                                                 value={el.bgColor || '#1E293B'} 
                                                 onChange={(e) => handleUpdateElement(el.id, { bgColor: e.target.value })} 
-                                                style={{ width: '22px', height: '22px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '4px' }}
+                                                style={{ width: '22px', height: '22px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', borderRadius: '4px', padding: 0 }}
                                             />
                                         </label>
 
                                         {/* Text Color */}
                                         {el.textColor !== undefined && (
-                                            <label title="Text Color" style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600' }}>
+                                            <label title="Text Color" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600', height: '32px', padding: '0 4px', flexShrink: 0 }}>
                                                 Text
                                                 <input 
                                                     type="color" 
                                                     value={el.textColor || '#FFFFFF'} 
                                                     onChange={(e) => handleUpdateElement(el.id, { textColor: e.target.value })} 
-                                                    style={{ width: '22px', height: '22px', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '4px' }}
+                                                    style={{ width: '22px', height: '22px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', borderRadius: '4px', padding: 0 }}
                                                 />
                                             </label>
                                         )}
 
                                         {/* Font Size (+ / -) */}
                                         {el.fontSize !== undefined && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', borderLeft: '1px solid #334155', paddingLeft: '6px' }}>
+                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', borderLeft: '1px solid rgba(255,255,255,0.12)', paddingLeft: '6px', height: '32px', flexShrink: 0 }}>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUpdateElement(el.id, { fontSize: Math.max(10, (el.fontSize || 16) - 2) })}
@@ -1728,7 +1808,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                                 >
                                                     A-
                                                 </button>
-                                                <span style={{ fontSize: '0.72rem', color: '#CBD5E1', minWidth: '24px', textAlign: 'center' }}>
+                                                <span style={{ fontSize: '0.75rem', color: '#CBD5E1', minWidth: '26px', textAlign: 'center' }}>
                                                     {el.fontSize}px
                                                 </span>
                                                 <button
@@ -1744,8 +1824,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
 
                                         {/* Border Radius */}
                                         {el.borderRadius !== undefined && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', borderLeft: '1px solid #334155', paddingLeft: '6px' }}>
-                                                <span style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Radius:</span>
+                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', borderLeft: '1px solid rgba(255,255,255,0.12)', paddingLeft: '6px', height: '32px', flexShrink: 0 }}>
+                                                <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Radius:</span>
                                                 {[0, 6, 12, 999].map(r => (
                                                     <button
                                                         key={r}
@@ -1768,116 +1848,135 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                             </div>
                                         )}
 
-                                        {/* Lock / Unlock Toggle */}
+                                        {/* Subtle Section Divider before Action Buttons */}
+                                        <div style={{ width: '1px', height: '22px', backgroundColor: 'rgba(255, 255, 255, 0.15)', margin: '0 2px', flexShrink: 0 }} />
+
+                                        {/* 1. Lock / Unlock Toggle Button (Image 2) */}
                                         <button
                                             type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleUpdateElement(el.id, { allowOthersToEdit: !el.allowOthersToEdit });
-                                            }}
+                                            onClick={(e) => handleToggleElementLock(el, e)}
                                             title={el.allowOthersToEdit ? "Editable by everyone (Click to lock)" : "Locked to you (Click to unlock)"}
                                             style={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
-                                                gap: '5px',
-                                                padding: '5px 9px',
+                                                gap: '6px',
+                                                height: '32px',
+                                                padding: '0 12px',
                                                 backgroundColor: el.allowOthersToEdit ? '#10B981' : '#EF4444',
                                                 color: '#FFFFFF',
                                                 border: 'none',
                                                 borderRadius: '6px',
                                                 cursor: 'pointer',
-                                                fontSize: '0.75rem',
-                                                fontWeight: '600',
-                                                marginLeft: '4px'
+                                                fontSize: '0.82rem',
+                                                fontWeight: '700',
+                                                flexShrink: 0,
+                                                minWidth: 'fit-content'
                                             }}
                                         >
-                                            {el.allowOthersToEdit ? <Unlock size={14} /> : <Lock size={14} />}
+                                            {el.allowOthersToEdit ? (
+                                                <Unlock size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0 }} />
+                                            ) : (
+                                                <Lock size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0 }} />
+                                            )}
                                             <span>{el.allowOthersToEdit ? 'Unlocked' : 'Lock'}</span>
                                         </button>
 
-                                        {/* Layering (Send to Back & Bring to Front) */}
-                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
-                                            <button
-                                                type="button"
-                                                onClick={handleSendToBack}
-                                                title="Send to Back"
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    padding: '5px 8px',
-                                                    backgroundColor: '#0EA5E9',
-                                                    color: '#FFFFFF',
-                                                    border: 'none',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                <ArrowDownToLine size={15} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={handleBringToFront}
-                                                title="Bring to Front"
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    padding: '5px 8px',
-                                                    backgroundColor: '#0EA5E9',
-                                                    color: '#FFFFFF',
-                                                    border: 'none',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                <ArrowUpToLine size={15} />
-                                            </button>
-                                        </div>
-
-                                        {/* Duplicate Button */}
+                                        {/* 2. Send to Back Button (Image 2) */}
                                         <button
                                             type="button"
-                                            onClick={handleDuplicateSelected}
-                                            title="Duplicate Element (Ctrl+D)"
+                                            onClick={(e) => handleSendElementToBack(el, e)}
+                                            title="Send to Back (Lower Layer)"
                                             style={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
-                                                gap: '5px',
-                                                padding: '5px 12px',
+                                                justifyContent: 'center',
+                                                width: '32px',
+                                                height: '32px',
+                                                minWidth: '32px',
+                                                minHeight: '32px',
                                                 backgroundColor: '#0EA5E9',
                                                 color: '#FFFFFF',
                                                 border: 'none',
                                                 borderRadius: '6px',
                                                 cursor: 'pointer',
-                                                fontSize: '0.78rem',
-                                                fontWeight: '700',
-                                                marginLeft: '4px'
+                                                flexShrink: 0
                                             }}
                                         >
-                                            <Copy size={14} />
+                                            <ArrowDownToLine size={16} style={{ width: '16px', height: '16px', minWidth: '16px', minHeight: '16px', flexShrink: 0 }} />
+                                        </button>
+
+                                        {/* 3. Bring to Front Button (Image 2) */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleBringElementToFront(el, e)}
+                                            title="Bring to Front (Upper Layer)"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '32px',
+                                                height: '32px',
+                                                minWidth: '32px',
+                                                minHeight: '32px',
+                                                backgroundColor: '#0EA5E9',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                flexShrink: 0
+                                            }}
+                                        >
+                                            <ArrowUpToLine size={16} style={{ width: '16px', height: '16px', minWidth: '16px', minHeight: '16px', flexShrink: 0 }} />
+                                        </button>
+
+                                        {/* 4. Duplicate Button (Image 2) */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleDuplicateElement(el, e)}
+                                            title="Duplicate Element (Ctrl+D)"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                height: '32px',
+                                                padding: '0 14px',
+                                                backgroundColor: '#0EA5E9',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.82rem',
+                                                fontWeight: '700',
+                                                flexShrink: 0,
+                                                minWidth: 'fit-content'
+                                            }}
+                                        >
+                                            <Copy size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0 }} />
                                             <span>Duplicate</span>
                                         </button>
 
-                                        {/* Delete Button */}
+                                        {/* 5. Delete Button (Image 2) */}
                                         <button
                                             type="button"
-                                            onClick={handleDeleteSelected}
+                                            onClick={(e) => handleDeleteElement(el, e)}
                                             title="Delete Element (Del)"
                                             style={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                padding: '5px 8px',
-                                                backgroundColor: 'rgba(239, 68, 68, 0.25)',
-                                                border: '1px solid #EF4444',
+                                                width: '32px',
+                                                height: '32px',
+                                                minWidth: '32px',
+                                                minHeight: '32px',
+                                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                                border: '1.5px solid #EF4444',
                                                 color: '#EF4444',
                                                 borderRadius: '6px',
                                                 cursor: 'pointer',
-                                                marginLeft: '4px'
+                                                flexShrink: 0
                                             }}
                                         >
-                                            <Trash2 size={15} />
+                                            <Trash2 size={16} style={{ width: '16px', height: '16px', minWidth: '16px', minHeight: '16px', flexShrink: 0 }} />
                                         </button>
                                     </div>
                                 )}
@@ -1948,15 +2047,41 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     {/* Toolbar over the Group Bounding Box */}
                                     <div
                                         style={{
-                                            position: 'absolute', top: '-36px', right: 0, 
-                                            display: 'flex', gap: '8px',
+                                            position: 'absolute', 
+                                            top: box.y < 50 ? `${box.h + 8}px` : '-48px', 
+                                            right: 0, 
+                                            display: 'flex', 
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            backgroundColor: '#0B0F19',
+                                            border: '1.5px solid #06B6D4',
+                                            borderRadius: '8px',
+                                            padding: '4px 8px',
+                                            boxShadow: '0 8px 30px rgba(0,0,0,0.7)',
+                                            zIndex: 9999,
+                                            whiteSpace: 'nowrap'
                                         }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onMouseDown={(e) => e.stopPropagation()}
                                     >
                                         {selectedElements.every(id => droppedElements.find(el => el.id === id)?.ownerId === mongoUserId) && (
-                                            <div
+                                            <button
+                                                type="button"
                                                 title={droppedElements.find(el => el.id === selectedElements[0])?.allowOthersToEdit ? "Revoke edit permission from group" : "Allow others to edit"}
                                                 style={{
-                                                    padding: '6px', backgroundColor: droppedElements.find(el => el.id === selectedElements[0])?.allowOthersToEdit ? '#10B981' : '#ef4444', color: 'white', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    height: '32px',
+                                                    padding: '0 12px',
+                                                    backgroundColor: droppedElements.find(el => el.id === selectedElements[0])?.allowOthersToEdit ? '#10B981' : '#EF4444',
+                                                    color: '#FFFFFF',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.82rem',
+                                                    fontWeight: '700',
+                                                    flexShrink: 0
                                                 }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -1970,80 +2095,121 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                                     setDroppedElements(updated);
                                                     if (socket && conversationId) socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
                                                 }}
-                                                onTouchStart={(e) => {
-                                                    e.stopPropagation();
-                                                    const isCurrentlyAllowed = droppedElements.find(el => el.id === selectedElements[0])?.allowOthersToEdit;
-                                                    const updated = droppedElements.map(el => {
-                                                        if (selectedElements.includes(el.id) && el.ownerId === mongoUserId) {
-                                                            return { ...el, allowOthersToEdit: !isCurrentlyAllowed };
-                                                        }
-                                                        return el;
-                                                    });
-                                                    setDroppedElements(updated);
-                                                    if (socket && conversationId) socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
-                                                }}
                                             >
-                                                {droppedElements.find(el => el.id === selectedElements[0])?.allowOthersToEdit ? <Unlock size={16} /> : <Lock size={16} />}
-                                            </div>
+                                                {droppedElements.find(el => el.id === selectedElements[0])?.allowOthersToEdit ? (
+                                                    <Unlock size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0 }} />
+                                                ) : (
+                                                    <Lock size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0 }} />
+                                                )}
+                                                <span>{droppedElements.find(el => el.id === selectedElements[0])?.allowOthersToEdit ? 'Unlocked' : 'Lock'}</span>
+                                            </button>
                                         )}
-                                        <div
+                                        <button
+                                            type="button"
                                             title="Send to Back"
                                             style={{
-                                                padding: '6px', backgroundColor: '#0ea5e9', color: 'white', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '32px',
+                                                height: '32px',
+                                                minWidth: '32px',
+                                                minHeight: '32px',
+                                                backgroundColor: '#0EA5E9',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                flexShrink: 0
                                             }}
                                             onClick={handleSendToBack}
-                                            onTouchStart={handleSendToBack}
                                         >
-                                            <ArrowDownToLine size={16} />
-                                        </div>
-                                        <div
+                                            <ArrowDownToLine size={16} style={{ width: '16px', height: '16px', minWidth: '16px', minHeight: '16px', flexShrink: 0 }} />
+                                        </button>
+                                        <button
+                                            type="button"
                                             title="Bring to Front"
                                             style={{
-                                                padding: '6px', backgroundColor: '#0ea5e9', color: 'white', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '32px',
+                                                height: '32px',
+                                                minWidth: '32px',
+                                                minHeight: '32px',
+                                                backgroundColor: '#0EA5E9',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                flexShrink: 0
                                             }}
                                             onClick={handleBringToFront}
-                                            onTouchStart={handleBringToFront}
                                         >
-                                            <ArrowUpToLine size={16} />
-                                        </div>
-                                        <div
-                                            title="Duplicate"
+                                            <ArrowUpToLine size={16} style={{ width: '16px', height: '16px', minWidth: '16px', minHeight: '16px', flexShrink: 0 }} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            title="Duplicate (Ctrl+D)"
                                             style={{
-                                                padding: '6px 12px', backgroundColor: '#0ea5e9', color: 'white', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                height: '32px',
+                                                padding: '0 14px',
+                                                backgroundColor: '#0EA5E9',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.82rem',
+                                                fontWeight: '700',
+                                                flexShrink: 0
                                             }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const newElements = droppedElements.filter(el => selectedElements.includes(el.id)).map(el => ({
-                                                ...el,
-                                                id: Date.now().toString() + Math.random(),
-                                                x: el.x + 20,
-                                                y: el.y + 20,
-                                                ownerId: mongoUserId,
-                                                allowOthersToEdit: false
-                                            }));
-                                            const updated = [...droppedElements, ...newElements];
-                                            setDroppedElements(updated);
-                                            setSelectedElements(newElements.map(el => el.id));
-                                            if (socket && conversationId) socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
-                                        }}
-                                        onTouchStart={(e) => {
-                                            e.stopPropagation();
-                                            const newElements = droppedElements.filter(el => selectedElements.includes(el.id)).map(el => ({
-                                                ...el,
-                                                id: Date.now().toString() + Math.random(),
-                                                x: el.x + 20,
-                                                y: el.y + 20,
-                                                ownerId: mongoUserId,
-                                                allowOthersToEdit: false
-                                            }));
-                                            const updated = [...droppedElements, ...newElements];
-                                            setDroppedElements(updated);
-                                            setSelectedElements(newElements.map(el => el.id));
-                                            if (socket && conversationId) socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
-                                        }}
-                                    >
-                                        Duplicate
-                                    </div>
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const newElements = droppedElements.filter(el => selectedElements.includes(el.id)).map(el => ({
+                                                    ...JSON.parse(JSON.stringify(el)),
+                                                    id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+                                                    x: el.x + 24,
+                                                    y: el.y + 24,
+                                                    ownerId: mongoUserId,
+                                                    allowOthersToEdit: false
+                                                }));
+                                                const updated = [...droppedElements, ...newElements];
+                                                setDroppedElements(updated);
+                                                setSelectedElements(newElements.map(el => el.id));
+                                                if (socket && conversationId) socket.emit('whiteboard_draw', { conversationId, action: 'sync_elements', elements: updated });
+                                            }}
+                                        >
+                                            <Copy size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0 }} />
+                                            <span>Duplicate</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            title="Delete Group (Del)"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '32px',
+                                                height: '32px',
+                                                minWidth: '32px',
+                                                minHeight: '32px',
+                                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                                border: '1.5px solid #EF4444',
+                                                color: '#EF4444',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                flexShrink: 0
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteSelected();
+                                            }}
+                                        >
+                                            <Trash2 size={16} style={{ width: '16px', height: '16px', minWidth: '16px', minHeight: '16px', flexShrink: 0 }} />
+                                        </button>
                                     </div>
 
                                     {/* Group Resize Handle */}

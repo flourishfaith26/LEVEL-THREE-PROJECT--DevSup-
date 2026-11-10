@@ -72,9 +72,12 @@ export const globalStyles = globalCss({
             minWidth: '44px',
         }
     },
-    'img, svg': {
+    'img': {
         maxWidth: '100%',
         height: 'auto',
+    },
+    'svg': {
+        maxWidth: '100%',
     },
     '#root': {
         height: '100%',
