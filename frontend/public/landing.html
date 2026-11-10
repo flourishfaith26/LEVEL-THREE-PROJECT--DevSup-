@@ -51,7 +51,6 @@
             color: #F8FAFC;
             font-family: 'Inter', sans-serif;
             -webkit-font-smoothing: antialiased;
-            overflow-x: hidden;
         }
 
         /* Hairline Structural Panels */
@@ -196,7 +195,7 @@
         }
     </style>
 </head>
-<body class="bg-devsup-base text-devsup-text selection:bg-cyan-900 selection:text-cyan-200 relative min-h-screen overflow-x-hidden">
+<body class="bg-devsup-base text-devsup-text selection:bg-cyan-900 selection:text-cyan-200 relative min-h-screen">
 
     <!-- DYNAMIC 3D GRID WAVE-LIFT & CURSOR CANVAS BACKGROUND (Hidden on mobile) -->
     <canvas id="bgCanvas" class="fixed inset-0 pointer-events-none z-0 opacity-80 hidden md:block"></canvas>
@@ -284,10 +283,10 @@
         <!-- =================================================================== -->
         <!-- [3] SPIDER WEB & FERRIS WHEEL LIVE WORKSPACE MOCKUP SECTION -->
         <!-- =================================================================== -->
-        <section id="showcase" class="relative border-t border-devsup-border overflow-hidden">
+        <section id="showcase" class="relative border-t border-devsup-border">
             
             <!-- SCROLL TRACK CONTAINER (Drives 360° Ferris Wheel Rotation) -->
-            <div id="ferrisScrollTrack" class="relative h-[420vh]">
+            <div id="ferrisScrollTrack" class="relative h-[220vh]">
                 
                 <!-- STICKY VIEWPORT STAGE -->
                 <div class="sticky top-16 h-[calc(100vh-4rem)] flex flex-col items-center justify-center overflow-hidden">
@@ -298,7 +297,7 @@
                     </div>
 
                     <!-- FERRIS WHEEL & SPIDER WEB STAGE CONTAINER -->
-                    <div id="ferrisStage" class="relative w-full max-w-6xl h-[460px] sm:h-[580px] flex items-center justify-center">
+                    <div id="ferrisStage" class="relative w-full max-w-6xl h-[520px] sm:h-[620px] flex items-center justify-center">
                         
                         <!-- SPIDER WEB SVG LAYER -->
                         <svg id="spiderWebSvg" class="absolute inset-0 w-full h-full pointer-events-none z-10" xmlns="http://www.w3.org/2000/svg">
@@ -518,8 +517,8 @@
         <!-- =================================================================== -->
         <section id="features" class="relative bg-slate-900/40 border-t border-devsup-border">
             
-            <!-- STICKY SCROLL CONTAINER (Height 480vh driving pinned steps) -->
-            <div id="pinnedStoryContainer" class="relative h-[480vh]">
+            <!-- STICKY SCROLL CONTAINER (Height 240vh driving pinned steps) -->
+            <div id="pinnedStoryContainer" class="relative h-[240vh]">
                 
                 <div class="sticky top-16 h-[calc(100vh-4rem)] flex items-center justify-center overflow-hidden">
                     <div class="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8">
@@ -827,8 +826,14 @@
 
         function initFerrisWheel() {
             updateFerrisWheel();
-            window.addEventListener('scroll', updateFerrisWheel);
+            window.addEventListener('scroll', updateFerrisWheel, { passive: true });
             window.addEventListener('resize', updateFerrisWheel);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', updateFerrisWheel);
+        } else {
+            setTimeout(updateFerrisWheel, 50);
         }
 
         function updateFerrisWheel() {
@@ -844,10 +849,8 @@
             const scrollable = track.offsetHeight - window.innerHeight;
             const scrolled = -rect.top;
 
-            if (scrolled < -window.innerHeight || scrolled > track.offsetHeight) return;
-
-            let progress = scrolled / scrollable;
-            progress = Math.max(0, Math.min(1, progress));
+            // Clamp progress smoothly between 0 and 1, ensuring layout on initial page load
+            let progress = scrollable > 0 ? Math.max(0, Math.min(1, scrolled / scrollable)) : 0;
 
             // Smooth 360-degree rotation angle based on scroll position
             currentFerrisAngle = progress * Math.PI * 2 * 1.5;
@@ -860,9 +863,9 @@
             core.style.left = `${cX - 32}px`;
             core.style.top = `${cY - 32}px`;
 
-            const isMobile = window.innerWidth < 640;
-            const rx = isMobile ? Math.min(stageRect.width * 0.26, 100) : Math.min(stageRect.width * 0.38, 360);
-            const ry = isMobile ? Math.min(stageRect.height * 0.28, 130) : Math.min(stageRect.height * 0.38, 190);
+            const isMobile = window.innerWidth < 768;
+            const rx = isMobile ? Math.min(stageRect.width * 0.36, 170) : Math.min(stageRect.width * 0.42, 420);
+            const ry = isMobile ? Math.min(stageRect.height * 0.32, 130) : Math.min(stageRect.height * 0.38, 200);
 
             let panelCoords = [];
             let radSvgHtml = '';
@@ -879,11 +882,11 @@
                 // Depth & scale calculation based on Y position (bottom is foreground)
                 const sinVal = Math.sin(angle);
                 const depthScale = isMobile 
-                    ? (0.68 + 0.32 * ((sinVal + 1) / 2))
-                    : (0.72 + 0.38 * ((sinVal + 1) / 2));
+                    ? (0.75 + 0.25 * ((sinVal + 1) / 2))
+                    : (0.78 + 0.32 * ((sinVal + 1) / 2));
                 const opacity = isMobile 
-                    ? (sinVal > -0.2 ? (0.25 + 0.75 * ((sinVal + 1) / 2)) : 0.08)
-                    : (0.45 + 0.55 * ((sinVal + 1) / 2));
+                    ? (sinVal > -0.3 ? (0.35 + 0.65 * ((sinVal + 1) / 2)) : 0.15)
+                    : (0.50 + 0.50 * ((sinVal + 1) / 2));
                 const zIndex = Math.round(10 + 20 * ((sinVal + 1) / 2));
 
                 panel.style.left = `${x}px`;
@@ -910,23 +913,25 @@
             svgRadGroup.innerHTML = radSvgHtml;
 
             // Draw concentric spider web ring connecting adjacent panels & inner web strands
-            let ringSvgHtml = '';
-            for (let i = 0; i < totalPanels; i++) {
-                const p1 = panelCoords[i];
-                const p2 = panelCoords[(i + 1) % totalPanels];
-                
-                // Outer web perimeter line
-                ringSvgHtml += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" />`;
+            if (panelCoords.length === totalPanels) {
+                let ringSvgHtml = '';
+                for (let i = 0; i < totalPanels; i++) {
+                    const p1 = panelCoords[i];
+                    const p2 = panelCoords[(i + 1) % totalPanels];
+                    if (!p1 || !p2) continue;
+                    
+                    // Outer web perimeter line
+                    ringSvgHtml += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" />`;
 
-                // Inner concentric web strand (50% distance to center)
-                const inner1X = cX + (p1.x - cX) * 0.55;
-                const inner1Y = cY + (p1.y - cY) * 0.55;
-                const inner2X = cX + (p2.x - cX) * 0.55;
-                const inner2Y = cY + (p2.y - cY) * 0.55;
-                ringSvgHtml += `<line x1="${inner1X}" y1="${inner1Y}" x2="${inner2X}" y2="${inner2Y}" stroke-dasharray="2,2" opacity="0.5" />`;
+                    // Inner concentric web strand (50% distance to center)
+                    const inner1X = cX + (p1.x - cX) * 0.55;
+                    const inner1Y = cY + (p1.y - cY) * 0.55;
+                    const inner2X = cX + (p2.x - cX) * 0.55;
+                    const inner2Y = cY + (p2.y - cY) * 0.55;
+                    ringSvgHtml += `<line x1="${inner1X}" y1="${inner1Y}" x2="${inner2X}" y2="${inner2Y}" stroke-dasharray="2,2" opacity="0.5" />`;
+                }
+                svgRingGroup.innerHTML = ringSvgHtml;
             }
-
-            svgRingGroup.innerHTML = ringSvgHtml;
         }
 
         // -------------------------------------------------------------
@@ -1630,7 +1635,7 @@
                 stream.scrollTop = stream.scrollHeight;
             } else {
                 // If stream is not present in mock, flash button confirmation
-                const btn = event?.currentTarget;
+                const btn = typeof event !== 'undefined' ? event?.currentTarget : null;
                 if (btn) {
                     const original = btn.innerText;
                     btn.innerText = "✓ Diagram Committed";
