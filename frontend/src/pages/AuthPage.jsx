@@ -61,36 +61,26 @@ const RightPanel = styled('div', {
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: '2.5rem 2rem',
-    backgroundColor: '#0B0F19',
-    backgroundImage: 'radial-gradient(circle at 50% 10%, rgba(6, 182, 212, 0.05) 0%, transparent 50%)',
+    padding: '3rem 2.5rem',
+    backgroundColor: '#1E293B',
+    borderLeft: '1px solid #334155',
     position: 'relative',
     zIndex: 1,
     overflowY: 'auto',
     '@media (max-width: 768px)': {
-        padding: '2rem 1.25rem env(safe-area-inset-bottom) 1.25rem',
+        padding: '2.5rem 1.5rem env(safe-area-inset-bottom) 1.5rem',
+        borderLeft: 'none',
         width: '100%',
     }
 });
 
-const AuthCard = styled('div', {
+const AuthBox = styled('div', {
     width: '100%',
-    maxWidth: '430px',
-    backgroundColor: '#1E293B',
-    border: '1px solid #334155',
-    borderRadius: '16px',
-    padding: '2.25rem 2rem',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+    maxWidth: '440px',
     display: 'flex',
     flexDirection: 'column',
     gap: '1.25rem',
     position: 'relative',
-    '@media (max-width: 480px)': {
-        padding: '1.75rem 1.25rem',
-        backgroundColor: 'transparent',
-        border: 'none',
-        boxShadow: 'none',
-    }
 });
 
 const TabSwitch = styled('div', {
@@ -498,7 +488,7 @@ export default function AuthPage() {
                     <span>Return to Home</span>
                 </button>
 
-                {/* Brand Logo & Version Tag */}
+                {/* Brand Logo */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.75rem' }}>
                     <div style={{
                         width: '38px',
@@ -519,9 +509,6 @@ export default function AuthPage() {
                     </div>
                     <span style={{ fontSize: '1.6rem', fontWeight: '800', fontFamily: '"JetBrains Mono", monospace', letterSpacing: '-0.02em', color: '#F8FAFC' }}>
                         DevSup
-                    </span>
-                    <span style={{ fontSize: '0.72rem', fontFamily: '"JetBrains Mono", monospace', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#1E293B', border: '1px solid #334155', color: '#06B6D4', fontWeight: '600' }}>
-                        v2.4
                     </span>
                 </div>
 
@@ -548,70 +535,8 @@ export default function AuthPage() {
                     Join the dedicated developer communication workspace. High-fidelity syntax messaging, WebRTC encrypted HD audio, and vector whiteboard diagrams in one unified flow.
                 </p>
 
-                {/* Interactive IDE Mockup Card */}
-                <div style={{
-                    backgroundColor: '#090D16',
-                    border: '1px solid #334155',
-                    borderRadius: '14px',
-                    padding: '16px',
-                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.7)',
-                    maxWidth: '460px',
-                    position: 'relative'
-                }}>
-                    {/* IDE Header */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '10px' }}>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#EF4444' }} />
-                            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#F59E0B' }} />
-                            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#10B981' }} />
-                        </div>
-                        <span style={{ fontSize: '0.75rem', fontFamily: '"JetBrains Mono", monospace', color: '#94A3B8' }}>devsup_mesh.ts</span>
-                        <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', backgroundColor: 'rgba(6,182,212,0.15)', color: '#22D3EE', fontFamily: '"JetBrains Mono", monospace', fontWeight: '600' }}>
-                            ● active
-                        </span>
-                    </div>
-
-                    {/* Code Lines */}
-                    <div style={{ fontFamily: '"JetBrains Mono", Consolas, monospace', fontSize: '0.82rem', lineHeight: '1.7', color: '#E2E8F0' }}>
-                        <div><span style={{ color: '#EC4899', fontWeight: '600' }}>import</span> {'{'} DevSupMesh {'}'} <span style={{ color: '#EC4899', fontWeight: '600' }}>from</span> <span style={{ color: '#10B981' }}>'@devsup/ws'</span>;</div>
-                        <div style={{ marginTop: '2px' }}>
-                            <span style={{ color: '#22D3EE' }}>const</span> session = <span style={{ color: '#EC4899' }}>await</span> DevSupMesh.<span style={{ color: '#38BDF8' }}>connect</span>({'{'}
-                        </div>
-                        <div style={{ paddingLeft: '18px', color: '#94A3B8' }}>
-                            channel: <span style={{ color: '#10B981' }}>'#frontend-engineers'</span>,
-                        </div>
-                        <div style={{ paddingLeft: '18px', color: '#94A3B8' }}>
-                            audio: <span style={{ color: '#F59E0B' }}>'Opus 48kHz'</span>,
-                        </div>
-                        <div style={{ paddingLeft: '18px', color: '#94A3B8' }}>
-                            whiteboard: <span style={{ color: '#22D3EE' }}>true</span>
-                        </div>
-                        <div>{'}'});</div>
-                    </div>
-
-                    {/* Voice Mesh Live Strip */}
-                    <div style={{
-                        marginTop: '12px',
-                        padding: '8px 12px',
-                        backgroundColor: '#1E293B',
-                        borderRadius: '8px',
-                        border: '1px solid #334155',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10B981', boxShadow: '0 0 8px #10B981' }} />
-                            <span style={{ fontSize: '0.78rem', color: '#F8FAFC', fontWeight: '600' }}>WebRTC Mesh Live</span>
-                        </div>
-                        <span style={{ fontSize: '0.72rem', color: '#06B6D4', fontFamily: '"JetBrains Mono", monospace' }}>
-                            18ms latency • P2P
-                        </span>
-                    </div>
-                </div>
-
                 {/* Feature Tags */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '1.75rem', maxWidth: '460px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxWidth: '460px' }}>
                     <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: '#1E293B', border: '1px solid #334155', color: '#CBD5E1', fontSize: '0.75rem', fontFamily: '"JetBrains Mono", monospace' }}>
                         ⚡ Real-Time WebSockets
                     </span>
@@ -627,9 +552,9 @@ export default function AuthPage() {
                 </div>
             </LeftPanel>
 
-            {/* Right Authentication Form Panel */}
+            {/* Right Authentication Form Panel (Fills the second section) */}
             <RightPanel>
-                <AuthCard>
+                <AuthBox>
                     {authMode === 'forgot' ? (
                         <>
                             <div>
@@ -922,7 +847,7 @@ export default function AuthPage() {
                             </div>
                         </>
                     )}
-                </AuthCard>
+                </AuthBox>
             </RightPanel>
 
             {isResolving && <DevSupPumpLoader overlay size={36} />}
