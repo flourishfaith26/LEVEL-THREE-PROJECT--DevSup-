@@ -3,7 +3,7 @@ import { styled } from '../stitches.config.js';
 import { 
     X, Brush, Eraser, Trash2, Undo2, Redo2, ChevronDown, ChevronRight, 
     Square, ArrowUpToLine, ArrowDownToLine, Send, Lock, Unlock, 
-    Image as ImageIcon, Video as VideoIcon, Copy, Plus, Minus
+    Image as ImageIcon, Video as VideoIcon, Copy, Plus, Minus, Type
 } from 'lucide-react';
 import { MOCKUP_TYPES, MOCKUP_CATEGORIES } from './MockupComponents';
 import html2canvas from 'html2canvas';
@@ -1382,7 +1382,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     <div
                                         style={{
                                             position: 'absolute',
-                                            top: '-46px',
+                                            top: el.y < 55 ? `${el.h + 8}px` : '-48px',
                                             left: 0,
                                             display: 'flex',
                                             alignItems: 'center',
@@ -1390,7 +1390,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                             backgroundColor: '#0F172A',
                                             border: '1px solid #06B6D4',
                                             borderRadius: '8px',
-                                            padding: '4px 8px',
+                                            padding: '4px 10px',
                                             boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
                                             zIndex: 9999,
                                             whiteSpace: 'nowrap'
@@ -1398,6 +1398,33 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                         onClick={(e) => e.stopPropagation()}
                                         onMouseDown={(e) => e.stopPropagation()}
                                     >
+                                        {/* Direct Edit Text Button */}
+                                        {(el.text !== undefined || el.title !== undefined) && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditingElementId(el.id);
+                                                }}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    background: editingElementId === el.id ? '#06B6D4' : 'rgba(255,255,255,0.08)',
+                                                    color: editingElementId === el.id ? '#0B0F19' : '#F8FAFC',
+                                                    border: 'none',
+                                                    borderRadius: '4px',
+                                                    padding: '3px 8px',
+                                                    fontSize: '0.72rem',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                                title="Edit text content (or double-click text directly)"
+                                            >
+                                                <Type size={12} /> Edit Text
+                                            </button>
+                                        )}
+
                                         {/* Fill Color */}
                                         <label title="Background Fill Color" style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: '#94A3B8', cursor: 'pointer', fontWeight: '600' }}>
                                             Fill
@@ -1473,12 +1500,47 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                             </div>
                                         )}
 
+                                        {/* Layering (Bring to Front & Send to Back) */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', borderLeft: '1px solid #334155', paddingLeft: '6px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={handleSendToBack}
+                                                title="Send to Back"
+                                                style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
+                                            >
+                                                <ArrowDownToLine size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleBringToFront}
+                                                title="Bring to Front"
+                                                style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
+                                            >
+                                                <ArrowUpToLine size={14} />
+                                            </button>
+                                        </div>
+
+                                        {/* Owner Lock Toggle */}
+                                        {el.ownerId === mongoUserId && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleUpdateElement(el.id, { allowOthersToEdit: !el.allowOthersToEdit });
+                                                }}
+                                                title={el.allowOthersToEdit ? "Editable by everyone (click to lock)" : "Locked to you (click to unlock)"}
+                                                style={{ background: 'transparent', border: 'none', color: el.allowOthersToEdit ? '#10B981' : '#EF4444', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center', borderLeft: '1px solid #334155', paddingLeft: '6px' }}
+                                            >
+                                                {el.allowOthersToEdit ? <Unlock size={14} /> : <Lock size={14} />}
+                                            </button>
+                                        )}
+
                                         {/* Duplicate */}
                                         <button
                                             type="button"
                                             onClick={handleDuplicateSelected}
                                             title="Duplicate element (Ctrl+D)"
-                                            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderLeft: '1px solid #334155', paddingLeft: '6px' }}
                                         >
                                             <Copy size={14} />
                                         </button>
@@ -1524,8 +1586,8 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                         )
                     })}
 
-                    {/* Render Group Selection Box */}
-                    {selectedElements.length > 0 && (
+                    {/* Render Group Selection Box (Only when multiple elements are selected) */}
+                    {selectedElements.length > 1 && (
                         (() => {
                             const box = getGroupBoundingBox();
                             if (!box) return null;

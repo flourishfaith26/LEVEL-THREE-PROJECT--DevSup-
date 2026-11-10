@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
     LayoutTemplate, Square, Type, Image as ImageIcon, Video, Box, Minus, 
     Link, Navigation, PanelTop, List, CheckSquare, CircleDot, ChevronDown, 
@@ -11,6 +11,10 @@ export const RealHeading = ({ el, onUpdate, isEditing, setIsEditing }) => {
     const [localText, setLocalText] = useState(el.text || 'Heading Title');
     const inputRef = useRef(null);
 
+    useEffect(() => {
+        setLocalText(el.text || 'Heading Title');
+    }, [el.text]);
+
     const handleBlur = () => {
         setIsEditing(false);
         if (localText !== el.text) {
@@ -19,6 +23,7 @@ export const RealHeading = ({ el, onUpdate, isEditing, setIsEditing }) => {
     };
 
     const handleKeyDown = (e) => {
+        e.stopPropagation();
         if (e.key === 'Enter') handleBlur();
     };
 
@@ -28,21 +33,25 @@ export const RealHeading = ({ el, onUpdate, isEditing, setIsEditing }) => {
                 ref={inputRef}
                 autoFocus
                 value={localText}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onChange={(e) => setLocalText(e.target.value)}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
                 style={{
                     width: '100%',
                     height: '100%',
-                    background: 'transparent',
-                    border: '1px solid #06b6d4',
+                    background: 'rgba(15, 23, 42, 0.95)',
+                    border: '2px solid #06b6d4',
                     color: el.textColor || '#F8FAFC',
                     fontSize: `${el.fontSize || 24}px`,
                     fontWeight: el.fontWeight || '700',
                     outline: 'none',
-                    padding: '0 4px',
+                    padding: '0 6px',
                     fontFamily: 'inherit',
-                    borderRadius: '4px'
+                    borderRadius: '4px',
+                    boxSizing: 'border-box'
                 }}
             />
         );
@@ -81,6 +90,10 @@ export const RealHeading = ({ el, onUpdate, isEditing, setIsEditing }) => {
 export const RealParagraph = ({ el, onUpdate, isEditing, setIsEditing }) => {
     const [localText, setLocalText] = useState(el.text || 'Enter your body text here...');
 
+    useEffect(() => {
+        setLocalText(el.text || 'Enter your body text here...');
+    }, [el.text]);
+
     const handleBlur = () => {
         setIsEditing(false);
         if (localText !== el.text) {
@@ -93,20 +106,25 @@ export const RealParagraph = ({ el, onUpdate, isEditing, setIsEditing }) => {
             <textarea
                 autoFocus
                 value={localText}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
                 onChange={(e) => setLocalText(e.target.value)}
                 onBlur={handleBlur}
                 style={{
                     width: '100%',
                     height: '100%',
-                    background: 'rgba(15, 23, 42, 0.9)',
-                    border: '1px solid #06b6d4',
+                    background: 'rgba(15, 23, 42, 0.95)',
+                    border: '2px solid #06b6d4',
                     color: el.textColor || '#94A3B8',
                     fontSize: `${el.fontSize || 14}px`,
                     outline: 'none',
                     padding: '6px',
                     fontFamily: 'inherit',
                     borderRadius: '4px',
-                    resize: 'none'
+                    resize: 'none',
+                    boxSizing: 'border-box'
                 }}
             />
         );
@@ -141,6 +159,10 @@ export const RealParagraph = ({ el, onUpdate, isEditing, setIsEditing }) => {
 export const RealButton = ({ el, onUpdate, isEditing, setIsEditing }) => {
     const [localText, setLocalText] = useState(el.text || 'Button');
 
+    useEffect(() => {
+        setLocalText(el.text || 'Button');
+    }, [el.text]);
+
     const handleBlur = () => {
         setIsEditing(false);
         if (localText !== el.text) {
@@ -153,21 +175,28 @@ export const RealButton = ({ el, onUpdate, isEditing, setIsEditing }) => {
             <input
                 autoFocus
                 value={localText}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onChange={(e) => setLocalText(e.target.value)}
                 onBlur={handleBlur}
-                onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+                onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') handleBlur();
+                }}
                 style={{
                     width: '100%',
                     height: '100%',
                     background: el.bgColor || '#06B6D4',
-                    border: '1px solid #FFFFFF',
+                    border: '2px solid #FFFFFF',
                     color: el.textColor || '#0B0F19',
                     fontSize: `${el.fontSize || 14}px`,
                     fontWeight: el.fontWeight || '600',
                     textAlign: 'center',
                     outline: 'none',
                     borderRadius: `${el.borderRadius ?? 8}px`,
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box'
                 }}
             />
         );
@@ -262,6 +291,10 @@ export const RealTextarea = ({ el, onUpdate }) => {
 export const RealBadge = ({ el, onUpdate, isEditing, setIsEditing }) => {
     const [localText, setLocalText] = useState(el.text || 'Badge');
 
+    useEffect(() => {
+        setLocalText(el.text || 'Badge');
+    }, [el.text]);
+
     const handleBlur = () => {
         setIsEditing(false);
         if (localText !== el.text) onUpdate({ text: localText });
@@ -272,20 +305,27 @@ export const RealBadge = ({ el, onUpdate, isEditing, setIsEditing }) => {
             <input
                 autoFocus
                 value={localText}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onChange={(e) => setLocalText(e.target.value)}
                 onBlur={handleBlur}
-                onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+                onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') handleBlur();
+                }}
                 style={{
                     width: '100%',
                     height: '100%',
                     background: el.bgColor || 'rgba(6, 182, 212, 0.15)',
                     color: el.textColor || '#06B6D4',
-                    border: '1px solid #06b6d4',
+                    border: '2px solid #06b6d4',
                     borderRadius: '999px',
                     textAlign: 'center',
                     fontSize: `${el.fontSize || 12}px`,
                     fontWeight: '600',
-                    outline: 'none'
+                    outline: 'none',
+                    boxSizing: 'border-box'
                 }}
             />
         );
