@@ -193,8 +193,10 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     const [isDrawing, setIsDrawing] = useState(false);
     
     const canEditElement = (el) => {
+        if (!el) return false;
+        if (el.isLocked) return false;
         if (!el.ownerId) return true;
-        if (el.ownerId === mongoUserId) return true;
+        if (mongoUserId && el.ownerId === mongoUserId) return true;
         return el.allowOthersToEdit;
     };
     
@@ -351,14 +353,18 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
 
     // --- Dedicated Element Action Handlers (100% functional, bulletproof) ---
     const handleToggleElementLock = (targetEl, e) => {
-        if (e) e.stopPropagation();
-        if (targetEl.ownerId && targetEl.ownerId !== mongoUserId) {
-            alert("Only the owner can lock or unlock this element.");
-            return;
+        if (e) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
         }
         const updated = droppedElements.map(item => {
             if (item.id === targetEl.id) {
-                return { ...item, allowOthersToEdit: !item.allowOthersToEdit };
+                const newLocked = !item.isLocked;
+                return { 
+                    ...item, 
+                    isLocked: newLocked, 
+                    allowOthersToEdit: !newLocked 
+                };
             }
             return item;
         });
@@ -369,7 +375,10 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const handleSendElementToBack = (targetEl, e) => {
-        if (e) e.stopPropagation();
+        if (e) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+        }
         const unselected = droppedElements.filter(item => item.id !== targetEl.id);
         const updated = [targetEl, ...unselected];
         setDroppedElements(updated);
@@ -379,7 +388,10 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const handleBringElementToFront = (targetEl, e) => {
-        if (e) e.stopPropagation();
+        if (e) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+        }
         const unselected = droppedElements.filter(item => item.id !== targetEl.id);
         const updated = [...unselected, targetEl];
         setDroppedElements(updated);
@@ -389,14 +401,18 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const handleDuplicateElement = (targetEl, e) => {
-        if (e) e.stopPropagation();
+        if (e) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+        }
         const newEl = {
             ...JSON.parse(JSON.stringify(targetEl)),
             id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
             x: targetEl.x + 24,
             y: targetEl.y + 24,
             ownerId: mongoUserId,
-            allowOthersToEdit: false
+            isLocked: false,
+            allowOthersToEdit: true
         };
         const updated = [...droppedElements, newEl];
         setDroppedElements(updated);
@@ -407,9 +423,12 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const handleDeleteElement = (targetEl, e) => {
-        if (e) e.stopPropagation();
-        if (!canEditElement(targetEl)) {
-            alert("You don't have permission to delete this element.");
+        if (e) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+        }
+        if (targetEl.isLocked) {
+            alert("This element is locked. Please unlock it before deleting.");
             return;
         }
         const updated = droppedElements.filter(item => item.id !== targetEl.id);
@@ -1676,10 +1695,11 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                     )}
 
                     {/* Render Dropped UI/UX Design Elements */}
-                    {droppedElements.map(el => {
+                    {droppedElements.map((el, index) => {
                         const Component = MOCKUP_TYPES[el.type]?.component;
                         if (!Component) return null;
                         const isSelected = selectedElements.includes(el.id);
+                        const elementZIndex = (index + 1) * 5;
                         
                         return (
                             <div
@@ -1690,10 +1710,12 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     top: el.y,
                                     width: el.w,
                                     height: el.h,
-                                    cursor: 'move',
-                                    zIndex: isSelected ? 25 : 10,
+                                    cursor: el.isLocked ? 'default' : 'move',
+                                    zIndex: draggingElementId === el.id ? 1000 : elementZIndex,
                                     boxSizing: 'border-box',
-                                    outline: isSelected ? '2px solid #06B6D4' : (draggingElementId === el.id ? '1px dashed #06B6D4' : 'none'),
+                                    outline: isSelected 
+                                        ? (el.isLocked ? '2px dashed #EF4444' : '2px solid #06B6D4') 
+                                        : (draggingElementId === el.id ? '1px dashed #06B6D4' : 'none'),
                                     outlineOffset: '2px',
                                     userSelect: 'none'
                                 }}
@@ -1855,36 +1877,39 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                         <button
                                             type="button"
                                             onClick={(e) => handleToggleElementLock(el, e)}
-                                            title={el.allowOthersToEdit ? "Editable by everyone (Click to lock)" : "Locked to you (Click to unlock)"}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            title={el.isLocked ? "Element is locked in place (Click to unlock)" : "Lock element in place"}
                                             style={{
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
                                                 gap: '6px',
                                                 height: '32px',
                                                 padding: '0 12px',
-                                                backgroundColor: el.allowOthersToEdit ? '#10B981' : '#EF4444',
+                                                backgroundColor: el.isLocked ? '#EF4444' : '#1E293B',
+                                                border: el.isLocked ? 'none' : '1px solid rgba(255, 255, 255, 0.25)',
                                                 color: '#FFFFFF',
-                                                border: 'none',
                                                 borderRadius: '6px',
                                                 cursor: 'pointer',
                                                 fontSize: '0.82rem',
                                                 fontWeight: '700',
                                                 flexShrink: 0,
-                                                minWidth: 'fit-content'
+                                                minWidth: 'fit-content',
+                                                transition: 'all 0.15s ease'
                                             }}
                                         >
-                                            {el.allowOthersToEdit ? (
-                                                <Unlock size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0 }} />
+                                            {el.isLocked ? (
+                                                <Lock size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0, color: '#FFFFFF' }} />
                                             ) : (
-                                                <Lock size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0 }} />
+                                                <Unlock size={15} style={{ width: '15px', height: '15px', minWidth: '15px', minHeight: '15px', flexShrink: 0, color: '#94A3B8' }} />
                                             )}
-                                            <span>{el.allowOthersToEdit ? 'Unlocked' : 'Lock'}</span>
+                                            <span>{el.isLocked ? 'Locked' : 'Lock'}</span>
                                         </button>
 
                                         {/* 2. Send to Back Button (Image 2) */}
                                         <button
                                             type="button"
                                             onClick={(e) => handleSendElementToBack(el, e)}
+                                            onMouseDown={(e) => e.stopPropagation()}
                                             title="Send to Back (Lower Layer)"
                                             style={{
                                                 display: 'inline-flex',
@@ -1909,6 +1934,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                         <button
                                             type="button"
                                             onClick={(e) => handleBringElementToFront(el, e)}
+                                            onMouseDown={(e) => e.stopPropagation()}
                                             title="Bring to Front (Upper Layer)"
                                             style={{
                                                 display: 'inline-flex',
@@ -1991,8 +2017,34 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     />
                                 </div>
                                 
+                                {/* Lock Badge when Element is Locked */}
+                                {el.isLocked && (
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '6px',
+                                            right: '6px',
+                                            backgroundColor: '#EF4444',
+                                            color: '#FFFFFF',
+                                            borderRadius: '4px',
+                                            padding: '2px 6px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontSize: '0.68rem',
+                                            fontWeight: '700',
+                                            zIndex: 30,
+                                            pointerEvents: 'none',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
+                                        }}
+                                    >
+                                        <Lock size={11} style={{ width: '11px', height: '11px', flexShrink: 0 }} />
+                                        <span>Locked</span>
+                                    </div>
+                                )}
+
                                 {/* 4-Corner Professional Selection & Resize Handles */}
-                                {isSelected && (
+                                {isSelected && !el.isLocked && (
                                     <>
                                         {/* Top-Left */}
                                         <div style={{ position: 'absolute', top: -5, left: -5, width: 9, height: 9, backgroundColor: '#FFFFFF', border: '2px solid #06B6D4', borderRadius: 2, pointerEvents: 'none', zIndex: 22 }} />
