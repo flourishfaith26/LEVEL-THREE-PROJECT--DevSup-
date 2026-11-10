@@ -1500,59 +1500,116 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                             </div>
                                         )}
 
-                                        {/* Layering (Bring to Front & Send to Back) */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', borderLeft: '1px solid #334155', paddingLeft: '6px' }}>
+                                        {/* Lock / Unlock Toggle */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleUpdateElement(el.id, { allowOthersToEdit: !el.allowOthersToEdit });
+                                            }}
+                                            title={el.allowOthersToEdit ? "Editable by everyone (Click to lock)" : "Locked to you (Click to unlock)"}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '5px',
+                                                padding: '5px 9px',
+                                                backgroundColor: el.allowOthersToEdit ? '#10B981' : '#EF4444',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.75rem',
+                                                fontWeight: '600',
+                                                marginLeft: '4px'
+                                            }}
+                                        >
+                                            {el.allowOthersToEdit ? <Unlock size={14} /> : <Lock size={14} />}
+                                            <span>{el.allowOthersToEdit ? 'Unlocked' : 'Lock'}</span>
+                                        </button>
+
+                                        {/* Layering (Send to Back & Bring to Front) */}
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
                                             <button
                                                 type="button"
                                                 onClick={handleSendToBack}
                                                 title="Send to Back"
-                                                style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '5px 8px',
+                                                    backgroundColor: '#0EA5E9',
+                                                    color: '#FFFFFF',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer'
+                                                }}
                                             >
-                                                <ArrowDownToLine size={14} />
+                                                <ArrowDownToLine size={15} />
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={handleBringToFront}
                                                 title="Bring to Front"
-                                                style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '5px 8px',
+                                                    backgroundColor: '#0EA5E9',
+                                                    color: '#FFFFFF',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer'
+                                                }}
                                             >
-                                                <ArrowUpToLine size={14} />
+                                                <ArrowUpToLine size={15} />
                                             </button>
                                         </div>
 
-                                        {/* Owner Lock Toggle */}
-                                        {el.ownerId === mongoUserId && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleUpdateElement(el.id, { allowOthersToEdit: !el.allowOthersToEdit });
-                                                }}
-                                                title={el.allowOthersToEdit ? "Editable by everyone (click to lock)" : "Locked to you (click to unlock)"}
-                                                style={{ background: 'transparent', border: 'none', color: el.allowOthersToEdit ? '#10B981' : '#EF4444', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center', borderLeft: '1px solid #334155', paddingLeft: '6px' }}
-                                            >
-                                                {el.allowOthersToEdit ? <Unlock size={14} /> : <Lock size={14} />}
-                                            </button>
-                                        )}
-
-                                        {/* Duplicate */}
+                                        {/* Duplicate Button */}
                                         <button
                                             type="button"
                                             onClick={handleDuplicateSelected}
-                                            title="Duplicate element (Ctrl+D)"
-                                            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderLeft: '1px solid #334155', paddingLeft: '6px' }}
+                                            title="Duplicate Element (Ctrl+D)"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '5px',
+                                                padding: '5px 12px',
+                                                backgroundColor: '#0EA5E9',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.78rem',
+                                                fontWeight: '700',
+                                                marginLeft: '4px'
+                                            }}
                                         >
                                             <Copy size={14} />
+                                            <span>Duplicate</span>
                                         </button>
 
-                                        {/* Delete */}
+                                        {/* Delete Button */}
                                         <button
                                             type="button"
                                             onClick={handleDeleteSelected}
-                                            title="Delete element (Del)"
-                                            style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                            title="Delete Element (Del)"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                padding: '5px 8px',
+                                                backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                                                border: '1px solid #EF4444',
+                                                color: '#EF4444',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                marginLeft: '4px'
+                                            }}
                                         >
-                                            <Trash2 size={14} />
+                                            <Trash2 size={15} />
                                         </button>
                                     </div>
                                 )}
