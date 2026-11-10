@@ -3,7 +3,8 @@ import { styled } from '../stitches.config.js';
 import { 
     X, Brush, Eraser, Trash2, Undo2, Redo2, ChevronDown, ChevronRight, 
     Square, ArrowUpToLine, ArrowDownToLine, Send, Lock, Unlock, 
-    Image as ImageIcon, Video as VideoIcon, Copy, Plus, Minus, Type
+    Image as ImageIcon, Video as VideoIcon, Copy, Plus, Minus, Type,
+    MousePointer2, Download, Grid, Search, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import { MOCKUP_TYPES, MOCKUP_CATEGORIES } from './MockupComponents';
 import html2canvas from 'html2canvas';
@@ -14,7 +15,7 @@ const WhiteboardOverlay = styled('div', {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: '#070A12',
     zIndex: 1000,
     display: 'flex',
     flexDirection: 'column',
@@ -23,7 +24,7 @@ const WhiteboardOverlay = styled('div', {
             true: {
                 position: 'relative',
                 zIndex: 1,
-                backgroundColor: 'transparent',
+                backgroundColor: '#070A12',
                 flex: 1,
                 height: '100%',
                 width: '100%',
@@ -33,20 +34,21 @@ const WhiteboardOverlay = styled('div', {
 });
 
 const Toolbar = styled('div', {
-    height: '60px',
-    backgroundColor: '$surface',
-    borderBottom: '1px solid $border',
+    height: '56px',
+    backgroundColor: '#0B0F19',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
     display: 'flex',
     alignItems: 'center',
-    padding: '0 $4',
-    gap: '$3',
+    padding: '0 16px',
+    gap: '8px',
     justifyContent: 'space-between',
+    zIndex: 20,
 });
 
 const ToolsGroup = styled('div', {
     display: 'flex',
     alignItems: 'center',
-    gap: '$2',
+    gap: '4px',
 });
 
 const IconButton = styled('button', {
@@ -54,31 +56,32 @@ const IconButton = styled('button', {
     border: 'none',
     color: '$textMuted',
     cursor: 'pointer',
-    padding: '8px',
-    borderRadius: '$1',
+    padding: '7px 9px',
+    borderRadius: '6px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s',
+    transition: 'all 0.15s ease',
     '&:hover': {
-        backgroundColor: '$bg',
+        backgroundColor: 'rgba(255, 255, 255, 0.06)',
         color: '$textMain',
     },
     '&:disabled': {
-        opacity: 0.5,
+        opacity: 0.35,
         cursor: 'not-allowed',
     },
     variants: {
         active: {
             true: {
-                backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                color: '$accent',
+                backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                color: '#06B6D4',
+                border: '1px solid rgba(6, 182, 212, 0.35)',
             }
         },
         danger: {
             true: {
                 '&:hover': {
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
                     color: '$danger',
                 }
             }
@@ -119,20 +122,22 @@ const MainArea = styled('div', {
     display: 'flex',
     flex: 1,
     overflow: 'hidden',
+    position: 'relative',
     '@media (max-width: 768px)': {
         flexDirection: 'column-reverse',
     }
 });
 
 const Sidebar = styled('div', {
-    width: '200px',
-    backgroundColor: '$surface',
-    borderRight: '1px solid $border',
+    width: '260px',
+    backgroundColor: '#0B0F19',
+    borderRight: '1px solid rgba(255, 255, 255, 0.08)',
     display: 'flex',
     flexDirection: 'column',
-    padding: '16px',
-    gap: '12px',
+    padding: '14px',
+    gap: '10px',
     overflowY: 'auto',
+    transition: 'width 0.2s ease, padding 0.2s ease',
     '@media (max-width: 768px)': {
         width: '100%',
         flexDirection: 'row',
@@ -141,21 +146,28 @@ const Sidebar = styled('div', {
         overflowX: 'auto',
         overflowY: 'hidden',
         borderRight: 'none',
-        borderTop: '1px solid $border',
+        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
     }
 });
 
 const SidebarItem = styled('div', {
-    padding: '12px',
-    backgroundColor: '$bg',
-    border: '1px solid $border',
-    borderRadius: '4px',
+    padding: '10px 12px',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    border: '1px solid rgba(255, 255, 255, 0.07)',
+    borderRadius: '6px',
     cursor: 'grab',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    fontSize: '0.9rem',
+    gap: '10px',
+    fontSize: '0.84rem',
+    fontWeight: '500',
     color: '$textMain',
+    transition: 'all 0.15s ease',
+    '&:hover': {
+        backgroundColor: 'rgba(6, 182, 212, 0.08)',
+        borderColor: 'rgba(6, 182, 212, 0.3)',
+        transform: 'translateX(2px)'
+    },
     '&:active': {
         cursor: 'grabbing',
     }
@@ -165,7 +177,7 @@ const CanvasContainer = styled('div', {
     flex: 1,
     position: 'relative',
     overflow: 'auto',
-    cursor: 'crosshair',
+    backgroundColor: '#080C16',
 });
 
 const CanvasInner = styled('div', {
@@ -187,9 +199,12 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
     
     const [color, setColor] = useState('#06B6D4');
-    const [bgColor, setBgColor] = useState('transparent');
+    const [bgColor, setBgColor] = useState('#080C16');
     const [size, setSize] = useState(2);
-    const [tool, setTool] = useState('pencil'); // 'pencil' or 'eraser'
+    const [tool, setTool] = useState('select'); // 'select', 'pencil', 'eraser'
+    const [showGrid, setShowGrid] = useState(true);
+    const [componentSearch, setComponentSearch] = useState('');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isSendingToChat, setIsSendingToChat] = useState(false);
     
     const [history, setHistory] = useState([]);
@@ -350,7 +365,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
         return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
     };
 
-    // Keyboard shortcuts for selected design elements (Delete, Duplicate)
+    // Keyboard shortcuts for selected design elements (Delete, Duplicate) and tool switching
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (editingElementId) return;
@@ -362,6 +377,12 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
             } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && selectedElements.length > 0) {
                 e.preventDefault();
                 handleDuplicateSelected();
+            } else if (e.key.toLowerCase() === 'v' && !e.ctrlKey && !e.metaKey) {
+                setTool('select');
+            } else if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey) {
+                setTool('pencil');
+            } else if (e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey) {
+                setTool('eraser');
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -528,6 +549,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const startDrawing = (e) => {
+        if (tool !== 'pencil' && tool !== 'eraser') return;
         const coords = getCoordinates(e);
         setIsDrawing(true);
         const ctx = canvasRef.current.getContext('2d');
@@ -550,7 +572,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     };
 
     const draw = (e) => {
-        if (!isDrawing) return;
+        if (!isDrawing || (tool !== 'pencil' && tool !== 'eraser')) return;
         const coords = getCoordinates(e);
         const ctx = canvasRef.current.getContext('2d');
         ctx.lineTo(coords.x, coords.y);
@@ -673,6 +695,51 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
             alert("Failed to export whiteboard as image. " + err.message);
         } finally {
             setIsSendingToChat(false);
+        }
+    };
+
+    const handleExportPNG = async () => {
+        if (!containerRef.current) return;
+        try {
+            setSelectedElements([]);
+            setContextMenu(null);
+            await new Promise(r => setTimeout(r, 100));
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            if (droppedElements.length > 0) {
+                droppedElements.forEach(el => {
+                    if (el.x < minX) minX = el.x;
+                    if (el.y < minY) minY = el.y;
+                    if (el.x + el.w > maxX) maxX = el.x + el.w;
+                    if (el.y + el.h > maxY) maxY = el.y + el.h;
+                });
+            } else {
+                minX = 0; minY = 0; maxX = 1200; maxY = 800;
+            }
+
+            const padding = 40;
+            const captureX = Math.max(0, minX - padding);
+            const captureY = Math.max(0, minY - padding);
+            const captureW = Math.max(400, (maxX - minX) + padding * 2);
+            const captureH = Math.max(300, (maxY - minY) + padding * 2);
+
+            const canvas = await html2canvas(containerRef.current, {
+                x: captureX,
+                y: captureY,
+                width: captureW,
+                height: captureH,
+                backgroundColor: bgColor === 'transparent' ? '#080C16' : bgColor,
+                scale: 2,
+                useCORS: true,
+                logging: false,
+            });
+
+            const link = document.createElement('a');
+            link.download = `DevSup-Design-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (err) {
+            console.error('Failed to export image:', err);
         }
     };
 
@@ -1093,79 +1160,101 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
         <WhiteboardOverlay embedded={embedded}>
             <Toolbar>
                 <ToolsGroup>
-                    <IconButton 
-                        title="Pencil" 
-                        active={tool === 'pencil'} 
-                        onClick={() => setTool('pencil')}
-                    >
-                        <Brush size={20} />
-                    </IconButton>
-                    <IconButton 
-                        title="Eraser" 
-                        active={tool === 'eraser'} 
-                        onClick={() => setTool('eraser')}
-                    >
-                        <Eraser size={20} />
-                    </IconButton>
-                    
-                    <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--colors-border)', margin: '0 8px' }}></div>
-                    
-                    <ColorPickerContainer>
-                        Pen:
-                        <ColorPicker 
-                            type="color" 
-                            value={color} 
-                            onChange={(e) => setColor(e.target.value)}
-                            disabled={tool === 'eraser'}
-                            title="Pen Color"
-                        />
-                    </ColorPickerContainer>
+                    {/* Tool Mode Selector */}
+                    <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: '8px', padding: '3px', gap: '2px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                        <IconButton 
+                            title="Select / Move tool (V)" 
+                            active={tool === 'select'} 
+                            onClick={() => setTool('select')}
+                            style={{ gap: '6px', padding: '5px 10px', height: '32px' }}
+                        >
+                            <MousePointer2 size={16} />
+                            <span style={{ fontSize: '0.78rem', fontWeight: '600' }}>Select</span>
+                        </IconButton>
+                        <IconButton 
+                            title="Pen / Freehand Draw (P)" 
+                            active={tool === 'pencil'} 
+                            onClick={() => setTool('pencil')}
+                            style={{ gap: '6px', padding: '5px 10px', height: '32px' }}
+                        >
+                            <Brush size={16} />
+                            <span style={{ fontSize: '0.78rem', fontWeight: '600' }}>Draw</span>
+                        </IconButton>
+                        <IconButton 
+                            title="Eraser tool (E)" 
+                            active={tool === 'eraser'} 
+                            onClick={() => setTool('eraser')}
+                            style={{ gap: '6px', padding: '5px 10px', height: '32px' }}
+                        >
+                            <Eraser size={16} />
+                            <span style={{ fontSize: '0.78rem', fontWeight: '600' }}>Eraser</span>
+                        </IconButton>
+                    </div>
 
-                    <ColorPickerContainer>
-                        Bg:
+                    <div style={{ width: '1px', height: '22px', backgroundColor: 'rgba(255, 255, 255, 0.1)', margin: '0 4px' }}></div>
+
+                    {/* Dot Grid Toggle */}
+                    <IconButton 
+                        title={showGrid ? "Hide Dot Grid" : "Show Dot Grid"} 
+                        active={showGrid} 
+                        onClick={() => setShowGrid(!showGrid)}
+                        style={{ gap: '6px', padding: '5px 9px', height: '32px' }}
+                    >
+                        <Grid size={16} />
+                        <span style={{ fontSize: '0.78rem', fontWeight: '600' }}>Grid</span>
+                    </IconButton>
+
+                    <div style={{ width: '1px', height: '22px', backgroundColor: 'rgba(255, 255, 255, 0.1)', margin: '0 4px' }}></div>
+
+                    {/* Canvas Background Color */}
+                    <ColorPickerContainer title="Canvas Background Color">
+                        <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: '600' }}>Canvas:</span>
                         <ColorPicker 
                             type="color" 
                             value={bgColor} 
                             onChange={handleBgColorChange}
-                            title="Background Color"
+                            title="Canvas Background Color"
                         />
                     </ColorPickerContainer>
 
-                    <ColorPickerContainer>
-                        Element:
-                        <ColorPicker 
-                            type="color" 
-                            value={elementColor} 
-                            onChange={handleElementColorChange}
-                            title="Selected Element Color"
-                        />
-                    </ColorPickerContainer>
-                    
-                    <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--colors-border)', margin: '0 8px' }}></div>
+                    {/* Pen Drawing Controls (visible when pen or eraser active) */}
+                    {tool !== 'select' && (
+                        <>
+                            <div style={{ width: '1px', height: '22px', backgroundColor: 'rgba(255, 255, 255, 0.1)', margin: '0 4px' }}></div>
+                            <ColorPickerContainer title="Pen Stroke Color">
+                                <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: '600' }}>Pen:</span>
+                                <ColorPicker 
+                                    type="color" 
+                                    value={color} 
+                                    onChange={(e) => setColor(e.target.value)}
+                                    disabled={tool === 'eraser'}
+                                    title="Pen Color"
+                                />
+                            </ColorPickerContainer>
 
-                    <SizeInput 
-                        type="range" 
-                        min="1" 
-                        max="20" 
-                        value={size} 
-                        onChange={(e) => setSize(parseInt(e.target.value))}
-                        title="Brush Size"
-                    />
-                    <span style={{ fontSize: '0.8rem', color: 'var(--colors-textMuted)' }}>{size}px</span>
+                            <SizeInput 
+                                type="range" 
+                                min="1" 
+                                max="24" 
+                                value={size} 
+                                onChange={(e) => setSize(parseInt(e.target.value))}
+                                title="Brush Stroke Size"
+                            />
+                            <span style={{ fontSize: '0.78rem', color: '#94A3B8', minWidth: '32px' }}>{size}px</span>
+                        </>
+                    )}
 
-                    <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--colors-border)', margin: '0 8px' }}></div>
+                    <div style={{ width: '1px', height: '22px', backgroundColor: 'rgba(255, 255, 255, 0.1)', margin: '0 4px' }}></div>
 
-                    <IconButton title="Undo" onClick={handleUndo} disabled={historyStep <= 0}>
-                        <Undo2 size={20} />
+                    <IconButton title="Undo (Ctrl+Z)" onClick={handleUndo} disabled={historyStep <= 0} style={{ padding: '6px' }}>
+                        <Undo2 size={17} />
                     </IconButton>
-                    <IconButton title="Redo" onClick={handleRedo} disabled={historyStep >= history.length - 1}>
-                        <Redo2 size={20} />
+                    <IconButton title="Redo (Ctrl+Y)" onClick={handleRedo} disabled={historyStep >= history.length - 1} style={{ padding: '6px' }}>
+                        <Redo2 size={17} />
                     </IconButton>
 
-                    <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--colors-border)', margin: '0 8px' }}></div>
-
-                    <IconButton title="Clear Canvas" danger={true} onClick={clearCanvas}>
-                        <Trash2 size={20} />
+                    <IconButton title="Clear Canvas Strokes" danger={true} onClick={clearCanvas} style={{ padding: '6px' }}>
+                        <Trash2 size={17} />
                     </IconButton>
                 </ToolsGroup>
 
@@ -1201,18 +1290,18 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                             alignItems: 'center',
                             gap: '6px',
                             padding: '6px 12px',
-                            backgroundColor: 'rgba(6, 182, 212, 0.12)',
+                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
                             border: '1px solid rgba(6, 182, 212, 0.35)',
                             borderRadius: '6px',
                             color: '#06B6D4',
-                            fontSize: '0.82rem',
+                            fontSize: '0.8rem',
                             fontWeight: '600',
                             cursor: 'pointer',
                             transition: 'all 0.15s ease'
                         }}
                         title="Import image asset from computer"
                     >
-                        <ImageIcon size={15} /> Import Image
+                        <ImageIcon size={14} /> Import Image
                     </button>
 
                     <button
@@ -1223,32 +1312,69 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                             alignItems: 'center',
                             gap: '6px',
                             padding: '6px 12px',
-                            backgroundColor: 'rgba(168, 85, 247, 0.12)',
+                            backgroundColor: 'rgba(168, 85, 247, 0.1)',
                             border: '1px solid rgba(168, 85, 247, 0.35)',
                             borderRadius: '6px',
                             color: '#C084FC',
-                            fontSize: '0.82rem',
+                            fontSize: '0.8rem',
                             fontWeight: '600',
                             cursor: 'pointer',
                             transition: 'all 0.15s ease'
                         }}
                         title="Import video asset with real playback"
                     >
-                        <VideoIcon size={15} /> Import Video
+                        <VideoIcon size={14} /> Import Video
+                    </button>
+
+                    {/* Export PNG */}
+                    <button
+                        type="button"
+                        onClick={handleExportPNG}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            borderRadius: '6px',
+                            color: '#F8FAFC',
+                            fontSize: '0.8rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                        }}
+                        title="Download high-resolution design PNG"
+                    >
+                        <Download size={14} /> Export PNG
                     </button>
 
                     {onSendToChat && (
                         <button 
+                            type="button"
                             onClick={exportToChat}
                             disabled={isSendingToChat}
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: isSendingToChat ? 'var(--colors-border)' : 'var(--colors-accent)', color: '#fff', border: 'none', borderRadius: '6px', cursor: isSendingToChat ? 'not-allowed' : 'pointer', fontSize: '0.85rem', fontWeight: '600', opacity: isSendingToChat ? 0.7 : 1 }}
-                            title="Send design to chat"
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                padding: '6px 14px', 
+                                backgroundColor: isSendingToChat ? 'rgba(6, 182, 212, 0.4)' : '#06B6D4', 
+                                color: '#0B0F19', 
+                                border: 'none', 
+                                borderRadius: '6px', 
+                                cursor: isSendingToChat ? 'not-allowed' : 'pointer', 
+                                fontSize: '0.82rem', 
+                                fontWeight: '700', 
+                                transition: 'all 0.15s ease'
+                            }}
+                            title="Send design screenshot directly into conversation chat"
                         >
-                            <Send size={15} /> {isSendingToChat ? 'Sending…' : 'Send to Chat'}
+                            <Send size={14} /> {isSendingToChat ? 'Sending…' : 'Send to Chat'}
                         </button>
                     )}
-                    <IconButton title="Close Whiteboard" onClick={onClose}>
-                        <X size={24} />
+                    <IconButton title="Close Whiteboard" onClick={onClose} style={{ padding: '6px' }}>
+                        <X size={20} />
                     </IconButton>
                 </div>
             </Toolbar>
@@ -1268,65 +1394,207 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                 onTouchEnd={handleElementMouseUp}
                 onMouseLeave={handleElementMouseUp}
             >
-                <Sidebar>
-                    <div style={{ fontSize: '0.92rem', fontWeight: '700', color: '#06B6D4', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px', letterSpacing: '0.2px' }}>
-                        🎨 UI/UX Components
-                    </div>
-                    
-                    {MOCKUP_CATEGORIES.map(category => {
-                        const isExpanded = expandedCategories.includes(category.id);
-                        return (
-                            <div key={category.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '4px' }}>
-                                <div 
-                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', cursor: 'pointer', backgroundColor: isExpanded ? 'rgba(6, 182, 212, 0.1)' : 'transparent', borderRadius: '4px', color: isExpanded ? 'var(--colors-accent)' : 'var(--colors-textMain)' }}
-                                    onClick={() => {
-                                        if (isExpanded) {
-                                            setExpandedCategories(expandedCategories.filter(id => id !== category.id));
-                                        } else {
-                                            setExpandedCategories([...expandedCategories, category.id]);
-                                        }
+                {isSidebarOpen && (
+                    <Sidebar>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <div style={{ fontSize: '0.88rem', fontWeight: '700', color: '#06B6D4', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                🎨 Component Library
+                            </div>
+                            <IconButton 
+                                title="Collapse Library" 
+                                onClick={() => setIsSidebarOpen(false)}
+                                style={{ padding: '4px', height: '26px', width: '26px' }}
+                            >
+                                <PanelLeftClose size={15} />
+                            </IconButton>
+                        </div>
+
+                        {/* Search Bar */}
+                        <div style={{ position: 'relative', marginTop: '2px', marginBottom: '4px' }}>
+                            <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: '#64748B', pointerEvents: 'none' }} />
+                            <input 
+                                type="text"
+                                value={componentSearch}
+                                onChange={(e) => setComponentSearch(e.target.value)}
+                                placeholder="Search components..."
+                                style={{
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                    padding: '6px 24px 6px 28px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '6px',
+                                    color: '#F8FAFC',
+                                    fontSize: '0.78rem',
+                                    outline: 'none'
+                                }}
+                            />
+                            {componentSearch && (
+                                <button
+                                    type="button"
+                                    onClick={() => setComponentSearch('')}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '7px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#94A3B8',
+                                        cursor: 'pointer',
+                                        padding: 0,
+                                        fontSize: '0.75rem'
                                     }}
                                 >
-                                    <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{category.title}</span>
-                                    {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                </div>
-                                
-                                {isExpanded && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '8px' }}>
-                                        {category.items.map(itemKey => {
-                                            const config = MOCKUP_TYPES[itemKey];
-                                            if (!config) return null;
-                                            const Icon = config.icon || Square;
-                                            return (
-                                                <SidebarItem 
-                                                    key={itemKey} 
-                                                    draggable
-                                                    onDragStart={(e) => handleDragStartSidebar(e, itemKey)}
-                                                    onTouchStart={(e) => handleDragStartSidebar(e, itemKey)}
-                                                    onTouchEnd={(e) => handleSidebarTouchEnd(e, itemKey)}
-                                                    style={{ padding: '8px', fontSize: '0.8rem' }}
-                                                >
-                                                    <Icon size={16} />
-                                                    {config.label}
-                                                </SidebarItem>
-                                            );
-                                        })}
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Component List / Search Results */}
+                        {componentSearch.trim() ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
+                                {Object.keys(MOCKUP_TYPES)
+                                    .filter(key => MOCKUP_TYPES[key].label.toLowerCase().includes(componentSearch.toLowerCase()))
+                                    .map(itemKey => {
+                                        const config = MOCKUP_TYPES[itemKey];
+                                        const Icon = config.icon || Square;
+                                        return (
+                                            <SidebarItem 
+                                                key={itemKey} 
+                                                draggable
+                                                onDragStart={(e) => handleDragStartSidebar(e, itemKey)}
+                                                onTouchStart={(e) => handleDragStartSidebar(e, itemKey)}
+                                                onTouchEnd={(e) => handleSidebarTouchEnd(e, itemKey)}
+                                            >
+                                                <Icon size={15} color="#06B6D4" />
+                                                <span>{config.label}</span>
+                                            </SidebarItem>
+                                        );
+                                    })}
+                                {Object.keys(MOCKUP_TYPES).filter(key => MOCKUP_TYPES[key].label.toLowerCase().includes(componentSearch.toLowerCase())).length === 0 && (
+                                    <div style={{ fontSize: '0.78rem', color: '#64748B', textAlign: 'center', padding: '16px 0' }}>
+                                        No components found
                                     </div>
                                 )}
                             </div>
-                        );
-                    })}
-                    
-                    <div style={{ fontSize: '0.75rem', color: 'var(--colors-textMuted)', marginTop: 'auto', lineHeight: '1.4', paddingTop: '16px' }}>
-                        Drag items onto the canvas. Right-click dropped items to remove them. Grab bottom-right to resize.
-                    </div>
-                </Sidebar>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
+                                {MOCKUP_CATEGORIES.map(category => {
+                                    const isExpanded = expandedCategories.includes(category.id);
+                                    return (
+                                        <div key={category.id} style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '3px' }}>
+                                            <div 
+                                                style={{ 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'space-between', 
+                                                    padding: '7px 8px', 
+                                                    cursor: 'pointer', 
+                                                    backgroundColor: isExpanded ? 'rgba(6, 182, 212, 0.08)' : 'transparent', 
+                                                    borderRadius: '6px', 
+                                                    color: isExpanded ? '#06B6D4' : '#E2E8F0',
+                                                    transition: 'all 0.15s ease'
+                                                }}
+                                                onClick={() => {
+                                                    if (isExpanded) {
+                                                        setExpandedCategories(expandedCategories.filter(id => id !== category.id));
+                                                    } else {
+                                                        setExpandedCategories([...expandedCategories, category.id]);
+                                                    }
+                                                }}
+                                            >
+                                                <span style={{ fontSize: '0.8rem', fontWeight: '600' }}>{category.title}</span>
+                                                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                            </div>
+                                            
+                                            {isExpanded && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '6px' }}>
+                                                    {category.items.map(itemKey => {
+                                                        const config = MOCKUP_TYPES[itemKey];
+                                                        if (!config) return null;
+                                                        const Icon = config.icon || Square;
+                                                        return (
+                                                            <SidebarItem 
+                                                                key={itemKey} 
+                                                                draggable
+                                                                onDragStart={(e) => handleDragStartSidebar(e, itemKey)}
+                                                                onTouchStart={(e) => handleDragStartSidebar(e, itemKey)}
+                                                                onTouchEnd={(e) => handleSidebarTouchEnd(e, itemKey)}
+                                                            >
+                                                                <Icon size={15} color="#06B6D4" />
+                                                                <span>{config.label}</span>
+                                                            </SidebarItem>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        
+                        <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 'auto', lineHeight: '1.4', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                            💡 Drag onto canvas. Click to select. Grab handles to resize. Double-click text to edit.
+                        </div>
+                    </Sidebar>
+                )}
 
-                <CanvasContainer style={{ backgroundColor: bgColor }}>
+                <CanvasContainer 
+                    style={{ 
+                        backgroundColor: bgColor,
+                        cursor: tool === 'pencil' ? 'crosshair' : tool === 'eraser' ? 'cell' : 'default'
+                    }}
+                >
+                    {/* Collapsed Library Floating Pill */}
+                    {!isSidebarOpen && (
+                        <button
+                            type="button"
+                            onClick={() => setIsSidebarOpen(true)}
+                            style={{
+                                position: 'absolute',
+                                top: '16px',
+                                left: '16px',
+                                zIndex: 40,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 14px',
+                                backgroundColor: '#0B0F19',
+                                border: '1px solid rgba(6, 182, 212, 0.4)',
+                                borderRadius: '8px',
+                                color: '#06B6D4',
+                                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: '600'
+                            }}
+                            title="Open Component Library"
+                        >
+                            <PanelLeftOpen size={16} />
+                            <span>Components</span>
+                        </button>
+                    )}
+
                     <CanvasInner 
                         ref={containerRef}
                         onDragOver={handleDragOver}
                         onDrop={handleDrop}
+                        onClick={(e) => {
+                            if (tool === 'select') {
+                                setSelectedElements([]);
+                                setEditingElementId(null);
+                            }
+                        }}
+                        style={{
+                            backgroundColor: bgColor,
+                            backgroundImage: showGrid 
+                                ? 'radial-gradient(circle, rgba(255, 255, 255, 0.12) 1.5px, transparent 1.5px)' 
+                                : 'none',
+                            backgroundSize: '24px 24px',
+                            backgroundPosition: '0 0'
+                        }}
                     >
                         {/* Render Alignment Lines */}
                     {alignmentLines.v !== null && (
@@ -1624,21 +1892,36 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                                     />
                                 </div>
                                 
-                                {/* Resize Handle */}
-                                <div
-                                    style={{
-                                        position: 'absolute',
-                                        bottom: 0,
-                                        right: 0,
-                                        width: '16px',
-                                        height: '16px',
-                                        cursor: 'se-resize',
-                                        background: 'linear-gradient(135deg, transparent 50%, #06b6d4 50%)',
-                                        zIndex: 20
-                                    }}
-                                    onMouseDown={(e) => handleResizeMouseDown(e, el)}
-                                    onTouchStart={(e) => handleResizeMouseDown(e, el)}
-                                />
+                                {/* 4-Corner Professional Selection & Resize Handles */}
+                                {isSelected && (
+                                    <>
+                                        {/* Top-Left */}
+                                        <div style={{ position: 'absolute', top: -5, left: -5, width: 9, height: 9, backgroundColor: '#FFFFFF', border: '2px solid #06B6D4', borderRadius: 2, pointerEvents: 'none', zIndex: 22 }} />
+                                        {/* Top-Right */}
+                                        <div style={{ position: 'absolute', top: -5, right: -5, width: 9, height: 9, backgroundColor: '#FFFFFF', border: '2px solid #06B6D4', borderRadius: 2, pointerEvents: 'none', zIndex: 22 }} />
+                                        {/* Bottom-Left */}
+                                        <div style={{ position: 'absolute', bottom: -5, left: -5, width: 9, height: 9, backgroundColor: '#FFFFFF', border: '2px solid #06B6D4', borderRadius: 2, pointerEvents: 'none', zIndex: 22 }} />
+                                        {/* Bottom-Right (Interactive Resize Handle) */}
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                bottom: -6,
+                                                right: -6,
+                                                width: 13,
+                                                height: 13,
+                                                backgroundColor: '#06B6D4',
+                                                border: '2px solid #FFFFFF',
+                                                borderRadius: 3,
+                                                cursor: 'nwse-resize',
+                                                zIndex: 25,
+                                                boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
+                                            }}
+                                            title="Drag to resize"
+                                            onMouseDown={(e) => handleResizeMouseDown(e, el)}
+                                            onTouchStart={(e) => handleResizeMouseDown(e, el)}
+                                        />
+                                    </>
+                                )}
                             </div>
                         )
                     })}
@@ -1779,8 +2062,16 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
 
                     <canvas
                         ref={canvasRef}
-                        style={{ position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'none' }}
+                        style={{ 
+                            position: 'absolute', 
+                            top: 0, 
+                            left: 0, 
+                            zIndex: 1, 
+                            touchAction: 'none',
+                            pointerEvents: tool === 'select' ? 'none' : 'auto'
+                        }}
                         onMouseDown={(e) => {
+                            if (tool !== 'pencil' && tool !== 'eraser') return;
                             const now = Date.now();
                             if (now - lastTap < 300) {
                                 if (droppedElements.length > 0) setSelectedElements(droppedElements.map(el => el.id));
@@ -1794,6 +2085,7 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                         onMouseUp={stopDrawing}
                         onMouseOut={stopDrawing}
                         onTouchStart={(e) => { 
+                            if (tool !== 'pencil' && tool !== 'eraser') return;
                             e.preventDefault(); 
                             const now = Date.now();
                             if (now - lastTap < 300) {
@@ -1804,9 +2096,9 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                             }
                             setLastTap(now);
                         }}
-                        onTouchMove={(e) => { e.preventDefault(); draw(e); }}
-                        onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
-                        onTouchCancel={(e) => { e.preventDefault(); stopDrawing(); }}
+                        onTouchMove={(e) => { if (tool === 'pencil' || tool === 'eraser') { e.preventDefault(); draw(e); } }}
+                        onTouchEnd={(e) => { if (tool === 'pencil' || tool === 'eraser') { e.preventDefault(); stopDrawing(); } }}
+                        onTouchCancel={(e) => { if (tool === 'pencil' || tool === 'eraser') { e.preventDefault(); stopDrawing(); } }}
                     />
 
                     {/* Context Menu */}
