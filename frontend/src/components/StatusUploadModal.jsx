@@ -103,7 +103,10 @@ const StatusUploadModal = ({
                 let finalUrl = uploadData.fileUrl;
                 
                 if (isVideo) {
-                    finalUrl = finalUrl.replace('/upload/', `/upload/so_${trimStart.toFixed(1)},eo_${trimEnd.toFixed(1)}/`);
+                    const isTrimmed = trimStart > 0 || (videoDuration > 30.5) || (videoDuration > 0 && trimEnd < videoDuration - 0.5);
+                    if (isTrimmed) {
+                        finalUrl = finalUrl.replace('/upload/', `/upload/so_${trimStart.toFixed(1)},eo_${trimEnd.toFixed(1)}/`);
+                    }
                 }
                 
                 await onUpload({

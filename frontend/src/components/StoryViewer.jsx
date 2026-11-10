@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Eye, EyeOff, MoreVertical, Forward, RefreshCw, Trash2, Send, Check } from 'lucide-react';
+import { X, Eye, EyeOff, MoreVertical, Forward, RefreshCw, Trash2, Send, Check, Volume2, VolumeX } from 'lucide-react';
 
 const matchesUserId = (target, currentId) => {
     if (!target || !currentId) return false;
@@ -35,6 +35,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
         return firstUnviewed !== -1 ? firstUnviewed : 0;
     });
     const [isPaused, setIsPaused] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
     const [progressState, setProgressState] = useState({ userIndex: initialUserIndex, statusIndex: 0, value: 0 });
     const [showMenu, setShowMenu] = useState(false);
     const [showViewers, setShowViewers] = useState(false);
@@ -46,6 +47,20 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
     const touchCurrentY = useRef(0);
     const containerRef = useRef(null);
     const videoRef = useRef(null);
+
+    const toggleMute = (e) => {
+        if (e) e.stopPropagation();
+        setIsMuted(prev => {
+            const next = !prev;
+            if (videoRef.current) {
+                videoRef.current.muted = next;
+                if (!next && videoRef.current.paused) {
+                    videoRef.current.play().catch(console.error);
+                }
+            }
+            return next;
+        });
+    };
 
     const handleSendReply = (textToSend) => {
         const text = (typeof textToSend === 'string' ? textToSend : replyText || '').trim();
@@ -61,13 +76,24 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
 
     useEffect(() => {
         if (videoRef.current) {
+            videoRef.current.muted = isMuted;
             if (isPaused || showMenu || showViewers) {
                 videoRef.current.pause();
             } else {
-                videoRef.current.play().catch(error => console.log('Auto-play prevented:', error));
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log('Auto-play with sound prevented, attempting fallback:', error);
+                        if (!isMuted && videoRef.current) {
+                            videoRef.current.muted = true;
+                            setIsMuted(true);
+                            videoRef.current.play().catch(e => console.log('Autoplay fallback failed:', e));
+                        }
+                    });
+                }
             }
         }
-    }, [isPaused, showMenu, showViewers, statusIndex]);
+    }, [isPaused, showMenu, showViewers, statusIndex, isMuted]);
     
     const currentUserGroup = groupedStatuses[userIndex];
     const currentStatuses = currentUserGroup?.statuses || [];
@@ -173,6 +199,9 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
             } else if (e.key === ' ' || e.code === 'Space') {
                 e.preventDefault();
                 setIsPaused(prev => !prev);
+            } else if (e.key === 'm' || e.key === 'M') {
+                e.preventDefault();
+                toggleMute();
             }
         };
 
@@ -257,6 +286,32 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {currentStatus.type === 'video' && (
+                        <button 
+                            type="button"
+                            onClick={toggleMute}
+                            title={isMuted ? "Unmute video (M)" : "Mute video (M)"}
+                            aria-label={isMuted ? "Unmute video" : "Mute video"}
+                            style={{ 
+                                background: 'rgba(0, 0, 0, 0.4)', 
+                                border: 'none', 
+                                color: '#fff', 
+                                cursor: 'pointer', 
+                                padding: '8px', 
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'background-color 0.2s',
+                                backdropFilter: 'blur(4px)',
+                                WebkitBackdropFilter: 'blur(4px)'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+                            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.4)'}
+                        >
+                            {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+                        </button>
+                    )}
                     <div style={{ position: 'relative' }}>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); setIsPaused(!showMenu); }} 
@@ -348,7 +403,7 @@ const StoryViewer = ({ groupedStatuses, initialUserIndex = 0, onClose, currentUs
                         ref={videoRef}
                         src={currentStatus.content} 
                         autoPlay 
-                        muted 
+                        muted={isMuted} 
                         playsInline 
                         onEnded={() => {
                             if (!isPaused && !showMenu && !showViewers) handleNext();
