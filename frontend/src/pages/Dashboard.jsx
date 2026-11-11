@@ -33,6 +33,7 @@ import { motion } from 'framer-motion';
 const StatusUploadModal = lazy(() => import('../components/StatusUploadModal'));
 const EventsView = lazy(() => import('../components/EventsView'));
 const LiveCodingWorkspace = lazy(() => import('../components/LiveCodingWorkspace'));
+import CodeReviewBlock from '../components/CodeReviewBlock.jsx';
 import StatusSection from '../components/StatusSection.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import { useNavigate } from 'react-router-dom';
@@ -1073,6 +1074,7 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) 
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    const [playbackRate, setPlaybackRate] = useState(1);
     const [duration, setDuration] = useState(() => {
         if (typeof src === 'string') {
             const match = src.match(/[?&#]duration=([\d.]+)/);
@@ -1234,6 +1236,15 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) 
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     };
 
+    const cyclePlaybackRate = (e) => {
+        e.stopPropagation();
+        const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
+        setPlaybackRate(nextRate);
+        if (audioRef.current) {
+            audioRef.current.playbackRate = nextRate;
+        }
+    };
+
     return (
         <div style={{
             display: 'flex',
@@ -1333,9 +1344,29 @@ const CustomAudioPlayer = ({ src, isOwnMessage, avatarUrl, time, statusTicks }) 
                     fontSize: '0.68rem',
                     lineHeight: 1
                 }}>
-                    <span style={{ color: isOwnMessage ? '#06b6d4' : 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>
-                        {formatTime(isPlaying ? currentTime : (duration || 0))}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ color: isOwnMessage ? '#06b6d4' : 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>
+                            {formatTime(isPlaying ? currentTime : (duration || 0))}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={cyclePlaybackRate}
+                            title="Playback Speed (1x / 1.5x / 2x)"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.16)',
+                                border: 'none',
+                                borderRadius: '8px',
+                                color: '#ffffff',
+                                padding: '1px 5px',
+                                fontSize: '0.62rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                lineHeight: '1.2'
+                            }}
+                        >
+                            {playbackRate}x
+                        </button>
+                    </div>
                     <span style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -2726,6 +2757,27 @@ export default function Dashboard() {
                 newSocket.on('messages_deleted_for_everyone', ({ messageIds, conversationId }) => {
                     if (!Array.isArray(messageIds) || !conversationId) return;
                     completeDeleteForEveryoneRef.current?.(conversationId, messageIds);
+                });
+
+                newSocket.on('code_review_added', ({ messageId, review }) => {
+                    setMessages(prev => prev.map(msg => {
+                        if (String(msg._id) === String(messageId)) {
+                            const existing = msg.codeReviews || [];
+                            return { ...msg, codeReviews: [...existing, review] };
+                        }
+                        return msg;
+                    }));
+                });
+
+                newSocket.on('code_review_updated', ({ messageId, reviewId, resolved }) => {
+                    setMessages(prev => prev.map(msg => {
+                        if (String(msg._id) === String(messageId)) {
+                            const existing = msg.codeReviews || [];
+                            const updated = existing.map(r => String(r._id) === String(reviewId) ? { ...r, resolved } : r);
+                            return { ...msg, codeReviews: updated };
+                        }
+                        return msg;
+                    }));
                 });
 
                 newSocket.on('messages_deleted_for_me', (deletedMsgIds) => {
@@ -5812,26 +5864,70 @@ export default function Dashboard() {
 
                                                                         // If it's a code snippet or pasted code, render the code block with right-aligned timestamp
                                                                         if (isCodeMsg) {
-                                                                            const rawContent = msg.content || '';
-                                                                            const cleanContent = rawContent.trim().startsWith('```') && rawContent.trim().endsWith('```')
-                                                                                ? rawContent.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '')
-                                                                                : rawContent;
-                                                                            const detectedLang = msg.language && msg.language !== 'plaintext'
-                                                                                ? msg.language
-                                                                                : (rawContent.trim().startsWith('```') ? (rawContent.trim().match(/^```([a-zA-Z]+)/)?.[1] || 'text') : 'text');
-
                                                                             return (
                                                                                 <div style={{ width: '100%', overflow: 'hidden' }}>
-                                                                                    <SyntaxHighlighter
-                                                                                        language={detectedLang === 'plaintext' ? 'text' : detectedLang}
-                                                                                        style={vscDarkPlus}
-                                                                                        customStyle={{ borderRadius: '8px', margin: '0', fontSize: '0.88rem', padding: '8px 12px', lineHeight: '1.4', maxHeight: '420px', overflowX: 'auto' }}
-                                                                                    >
-                                                                                        {cleanContent}
-                                                                                    </SyntaxHighlighter>
-                                                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '2px 4px 1px 0' }}>
-                                                                                        {renderInlineTimestamp('0px')}
-                                                                                    </div>
+                                                                                    <CodeReviewBlock
+                                                                                        message={msg}
+                                                                                        isOwnMessage={isOwnMessage}
+                                                                                        onOpenInPairIDE={(snippet, lang) => {
+                                                                                            setIsLiveCodingOpen(true);
+                                                                                        }}
+                                                                                        onAddLineReview={async (messageId, lineNumber, comment) => {
+                                                                                            try {
+                                                                                                const token = await getAccessTokenSilently();
+                                                                                                const res = await fetch(`${BACKEND_URL}/api/messages/${messageId}/code-review`, {
+                                                                                                    method: 'POST',
+                                                                                                    headers: {
+                                                                                                        'Content-Type': 'application/json',
+                                                                                                        'Authorization': `Bearer ${token}`
+                                                                                                    },
+                                                                                                    body: JSON.stringify({ lineNumber, comment })
+                                                                                                });
+                                                                                                if (res.ok) {
+                                                                                                    const data = await res.json();
+                                                                                                    if (data.review) {
+                                                                                                        setMessages(prev => prev.map(m => {
+                                                                                                            if (String(m._id) === String(messageId)) {
+                                                                                                                const existing = m.codeReviews || [];
+                                                                                                                return { ...m, codeReviews: [...existing, data.review] };
+                                                                                                            }
+                                                                                                            return m;
+                                                                                                        }));
+                                                                                                    }
+                                                                                                }
+                                                                                            } catch (e) {
+                                                                                                console.error('Failed to post code review:', e);
+                                                                                            }
+                                                                                        }}
+                                                                                        onToggleResolveReview={async (messageId, reviewId) => {
+                                                                                            try {
+                                                                                                const token = await getAccessTokenSilently();
+                                                                                                const res = await fetch(`${BACKEND_URL}/api/messages/${messageId}/code-review/${reviewId}/resolve`, {
+                                                                                                    method: 'PATCH',
+                                                                                                    headers: { 'Authorization': `Bearer ${token}` }
+                                                                                                });
+                                                                                                if (res.ok) {
+                                                                                                    const data = await res.json();
+                                                                                                    if (data.review) {
+                                                                                                        setMessages(prev => prev.map(m => {
+                                                                                                            if (String(m._id) === String(messageId)) {
+                                                                                                                const existing = m.codeReviews || [];
+                                                                                                                return {
+                                                                                                                    ...m,
+                                                                                                                    codeReviews: existing.map(r => String(r._id) === String(reviewId) ? data.review : r)
+                                                                                                                };
+                                                                                                            }
+                                                                                                            return m;
+                                                                                                        }));
+                                                                                                    }
+                                                                                                }
+                                                                                            } catch (e) {
+                                                                                                console.error('Failed to resolve code review:', e);
+                                                                                            }
+                                                                                        }}
+                                                                                        currentUser={{ _id: mongoUserId, displayName: user?.displayName || user?.name || user?.nickname }}
+                                                                                        renderTimestamp={() => renderInlineTimestamp('0px')}
+                                                                                    />
                                                                                 </div>
                                                                             );
                                                                         }
@@ -7990,7 +8086,7 @@ export default function Dashboard() {
                             padding: '8px 0',
                         }}>
                             {(() => {
-                                const contactIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
+                                const contactIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants?.map(p => p._id) || []))];
                                 const existingMemberIds = activeConversation.participants?.map(p => p._id) || [];
                                 
                                 const availableContacts = allUsers.filter(u => contactIds.includes(u._id) && !existingMemberIds.includes(u._id));

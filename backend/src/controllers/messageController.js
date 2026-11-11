@@ -200,3 +200,79 @@ export const sendMessageHttp = async (req, res) => {
     res.status(500).json({ message: 'Error sending message', error: error.message });
   }
 };
+
+// Add a line review comment to a code snippet message
+export const addCodeReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { lineNumber, comment } = req.body;
+    const auth0Id = req.auth.payload.sub;
+    const currentUser = await User.findOne({ auth0Id });
+
+    if (!currentUser) return res.status(404).json({ message: 'User not found' });
+    if (!comment || typeof lineNumber !== 'number') {
+      return res.status(400).json({ message: 'Line number and comment are required' });
+    }
+
+    const message = await Message.findById(id);
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+
+    const newReview = {
+      lineNumber,
+      author: currentUser._id,
+      authorName: currentUser.displayName || currentUser.username || 'Developer',
+      comment,
+      createdAt: new Date(),
+      resolved: false
+    };
+
+    message.codeReviews.push(newReview);
+    await message.save();
+
+    const populatedReview = message.codeReviews[message.codeReviews.length - 1];
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(String(message.conversationId)).emit('code_review_added', {
+        messageId: message._id,
+        conversationId: message.conversationId,
+        review: populatedReview
+      });
+    }
+
+    res.status(201).json({ success: true, review: populatedReview });
+  } catch (error) {
+    console.error('Error adding code review:', error);
+    res.status(500).json({ message: 'Error adding code review', error: error.message });
+  }
+};
+
+// Toggle resolve status on a line review comment
+export const toggleResolveCodeReview = async (req, res) => {
+  try {
+    const { id, reviewId } = req.params;
+    const message = await Message.findById(id);
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+
+    const review = message.codeReviews.id(reviewId);
+    if (!review) return res.status(404).json({ message: 'Review not found' });
+
+    review.resolved = !review.resolved;
+    await message.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(String(message.conversationId)).emit('code_review_updated', {
+        messageId: message._id,
+        conversationId: message.conversationId,
+        reviewId,
+        resolved: review.resolved
+      });
+    }
+
+    res.status(200).json({ success: true, review });
+  } catch (error) {
+    console.error('Error toggling code review resolve:', error);
+    res.status(500).json({ message: 'Error updating code review', error: error.message });
+  }
+};

@@ -35,6 +35,33 @@ const messageSchema = new mongoose.Schema({
     type: String,
     default: 'plaintext' // e.g., 'javascript', 'python', 'html'
   },
+  codeReviews: [{
+    lineNumber: {
+      type: Number,
+      required: true
+    },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    authorName: {
+      type: String,
+      default: 'Developer'
+    },
+    comment: {
+      type: String,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    resolved: {
+      type: Boolean,
+      default: false
+    }
+  }],
   isEdited: {
     type: Boolean,
     default: false
