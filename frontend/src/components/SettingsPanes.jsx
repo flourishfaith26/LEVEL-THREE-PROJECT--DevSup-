@@ -1182,6 +1182,8 @@ export const KeyboardShortcutsPane = ({ onBack }) => (
         </PaneHeader>
         <Section>
             <SectionCard style={{ padding: '8px 0' }}>
+                <SettingRow><SettingLabel>Command Palette</SettingLabel><span style={{color: 'var(--colors-accent)', fontSize: '0.85rem', fontWeight: '500', backgroundColor: 'rgba(6, 182, 212, 0.1)', padding: '4px 8px', borderRadius: '6px'}}>Ctrl + K / ⌘K</span></SettingRow>
+                <SettingRow><SettingLabel>Quick Open</SettingLabel><span style={{color: 'var(--colors-accent)', fontSize: '0.85rem', fontWeight: '500', backgroundColor: 'rgba(6, 182, 212, 0.1)', padding: '4px 8px', borderRadius: '6px'}}>Ctrl + P / ⌘P</span></SettingRow>
                 <SettingRow><SettingLabel>Mark unread</SettingLabel><span style={{color: 'var(--colors-accent)', fontSize: '0.85rem', fontWeight: '500', backgroundColor: 'rgba(6, 182, 212, 0.1)', padding: '4px 8px', borderRadius: '6px'}}>Ctrl + Shift + U</span></SettingRow>
                 <SettingRow><SettingLabel>Archive chat</SettingLabel><span style={{color: 'var(--colors-accent)', fontSize: '0.85rem', fontWeight: '500', backgroundColor: 'rgba(6, 182, 212, 0.1)', padding: '4px 8px', borderRadius: '6px'}}>Ctrl + Alt + E</span></SettingRow>
                 <SettingRow><SettingLabel>Pin chat</SettingLabel><span style={{color: 'var(--colors-accent)', fontSize: '0.85rem', fontWeight: '500', backgroundColor: 'rgba(6, 182, 212, 0.1)', padding: '4px 8px', borderRadius: '6px'}}>Ctrl + Alt + P</span></SettingRow>

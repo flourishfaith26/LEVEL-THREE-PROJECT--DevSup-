@@ -149,3 +149,4 @@ export const sendPushNotificationToUser = async (userId, payload) => {
 };
 
 export default router;
+

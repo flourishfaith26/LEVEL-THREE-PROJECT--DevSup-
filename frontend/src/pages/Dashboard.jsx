@@ -43,6 +43,7 @@ import { useNavigate } from 'react-router-dom';
 import { normalizeUsername } from '../utils/username.js';
 import DevSupLogo from '../components/DevSupLogo.jsx';
 import { getAvatarUrl } from '../utils/defaultAvatar.js';
+import CommandPalette from '../components/CommandPalette.jsx';
 import { applyTheme } from '../utils/theme.js';
 
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -2013,6 +2014,7 @@ export default function Dashboard() {
     const [mediaViewer, setMediaViewer] = useState(null);
     const [documentViewer, setDocumentViewer] = useState(null);
     const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
+    const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -2053,6 +2055,19 @@ export default function Dashboard() {
 
     useEffect(() => {
         const handleGlobalShortcuts = (e) => {
+            // Global Command Palette: Ctrl + K or Cmd + K (works anywhere)
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+                e.preventDefault();
+                setIsCommandPaletteOpen(prev => !prev);
+                return;
+            }
+            // Quick Open: Ctrl + P or Cmd + P
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+                e.preventDefault();
+                setIsCommandPaletteOpen(prev => !prev);
+                return;
+            }
+
             const tag = e.target?.tagName?.toLowerCase();
             const isEditing = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
 
@@ -4750,6 +4765,26 @@ export default function Dashboard() {
                                         width: '100%'
                                     }}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCommandPaletteOpen(true)}
+                                    title="Open Command Palette (Ctrl + K)"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: '2px 6px',
+                                        borderRadius: '5px',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                                        color: 'var(--colors-accent, #06B6D4)',
+                                        fontSize: '0.7rem',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    ⌘K
+                                </button>
                             </div>
                             <div style={{ display: 'none' }}></div>
                         </div>
@@ -8467,6 +8502,69 @@ export default function Dashboard() {
                     getAccessTokenSilently={getAccessTokenSilently}
                 />
             )}
+
+            <CommandPalette
+                isOpen={isCommandPaletteOpen}
+                onClose={() => setIsCommandPaletteOpen(false)}
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                onSelectConversation={(convId) => {
+                    setActiveTab('chats');
+                    setActiveConversationId(convId);
+                }}
+                onOpenPairCoding={() => {
+                    if (isMobileViewport) {
+                        showToast('Live coding workspace is optimized for desktop.');
+                        return;
+                    }
+                    setCommunityTab('code');
+                    setIsLiveCodingOpen(true);
+                }}
+                onOpenWhiteboard={() => {
+                    if (isMobileViewport) {
+                        showToast('Architecture whiteboard is optimized for desktop.');
+                        return;
+                    }
+                    setIsWhiteboardOpen(true);
+                }}
+                onToggleHuddle={() => {
+                    if (activeHuddle) {
+                        setActiveHuddle(null);
+                        showToast('Left audio huddle.');
+                    } else if (activeConversationId) {
+                        setActiveHuddle({
+                            conversationId: activeConversationId,
+                            channelName: activeConversation?.name || 'Channel Lounge'
+                        });
+                        showToast('Joined audio huddle.');
+                    } else {
+                        showToast('Open a channel or direct chat to start an audio huddle.');
+                    }
+                }}
+                onOpenWebhooks={() => {
+                    if (!activeConversationId) {
+                        showToast('Select a channel to configure webhooks.');
+                        return;
+                    }
+                    setIsWebhookModalOpen(true);
+                }}
+                onTriggerAi={() => {
+                    setMessageInput('@devsup-ai ');
+                    if (inputRef.current) inputRef.current.focus();
+                }}
+                onOpenSetting={(paneName) => {
+                    setActiveTab('settings');
+                    setActiveSettingTab(paneName);
+                }}
+                onToggleTheme={() => {
+                    const nextTheme = appSettings.theme === 'light' ? 'dark' : 'light';
+                    updateSetting('theme', nextTheme);
+                    applyTheme(nextTheme);
+                    showToast(`Theme switched to ${nextTheme}`);
+                }}
+                currentTheme={appSettings.theme || 'dark'}
+                mongoUserId={mongoUserId}
+            />
 
             {isStatusModalOpen && (
                 <Suspense fallback={null}><StatusUploadModal

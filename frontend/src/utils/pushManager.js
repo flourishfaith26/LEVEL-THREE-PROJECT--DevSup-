@@ -101,3 +101,4 @@ export async function unsubscribeFromPushNotifications(getAccessTokenSilently) {
         console.warn('Error unsubscribing from push notifications:', err.message);
     }
 }
+
