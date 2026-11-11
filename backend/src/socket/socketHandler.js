@@ -389,7 +389,7 @@ export const setupSocket = (io) => {
         });
 
         // 5. WebRTC Signaling
-        socket.on('call_user', async ({ userToCall, signalData, from, callerInfo, callType }, acknowledge) => {
+        socket.on('call_user', async ({ userToCall, signalData, from, callerInfo, callType, conversationId }, acknowledge) => {
             try {
                 const [callerUser, calleeUser] = await Promise.all([
                     User.findById(from).select('blockedUsers'),
@@ -412,7 +412,8 @@ export const setupSocket = (io) => {
                 signal: signalData,
                 from: String(from),
                 callerInfo,
-                callType
+                callType: (callType === 'video') ? 'video' : 'audio',
+                conversationId: conversationId || undefined
             };
 
             // Retry delivering the call for up to 10 seconds to handle Render cold-start
@@ -464,28 +465,43 @@ export const setupSocket = (io) => {
 
         socket.on('log_call', async ({ callerId, receiverId, conversationId, type, status }) => {
             try {
+                // Normalize type: both 'audio' and 'voice' map to 'audio', ensuring both voice and video calls log reliably
+                const normalizedType = (type === 'video') ? 'video' : 'audio';
+                const normalizedStatus = ['completed', 'missed', 'rejected'].includes(status) ? status : 'completed';
+
+                let convId = conversationId;
+                if (!convId && callerId && receiverId) {
+                    const directConv = await Conversation.findOne({
+                        type: 'direct',
+                        participants: { $all: [callerId, receiverId] }
+                    });
+                    if (directConv) {
+                        convId = String(directConv._id);
+                    }
+                }
+
                 const newLog = await CallLog.create({
                     caller: callerId,
                     receiver: receiverId || undefined,
-                    conversation: conversationId || undefined,
-                    type,
-                    status
+                    conversation: convId || undefined,
+                    type: normalizedType,
+                    status: normalizedStatus
                 });
                 const populatedLog = await CallLog.findById(newLog._id).populate('caller receiver conversation');
                 
-                if (conversationId) {
-                    const conv = await Conversation.findById(conversationId);
+                if (convId) {
+                    const conv = await Conversation.findById(convId);
                     if (conv && conv.participants) {
                         conv.participants.forEach(pId => {
                             io.to(getUserRoom(pId)).emit('call_logged', populatedLog);
                         });
 
                         const newMessage = new Message({
-                            conversationId: conversationId,
+                            conversationId: convId,
                             sender: callerId,
-                            content: `$CALL_LOG$|${type}|${status}`,
+                            content: `$CALL_LOG$|${normalizedType}|${normalizedStatus}`,
                             caption: '',
-                            sequence: await getNextMessageSequence(conversationId)
+                            sequence: await getNextMessageSequence(convId)
                         });
                         
                         await newMessage.save();
@@ -493,7 +509,7 @@ export const setupSocket = (io) => {
                             { path: 'sender', select: 'displayName avatarUrl' }
                         ]);
                         
-                        await Conversation.findByIdAndUpdate(conversationId, {
+                        await Conversation.findByIdAndUpdate(convId, {
                             lastMessage: newMessage._id,
                             updatedAt: new Date()
                         });

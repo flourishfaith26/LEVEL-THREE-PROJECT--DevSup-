@@ -148,26 +148,18 @@ const SmallAvatarImg = styled('img', {
 });
 
 const pulseAnimation = keyframes({
-    '0%': { boxShadow: '0 0 0 0 rgba(6, 182, 212, 0.6), 0 0 0 0 rgba(6, 182, 212, 0.4)' },
-    '50%': { boxShadow: '0 0 0 28px rgba(6, 182, 212, 0), 0 0 0 55px rgba(6, 182, 212, 0.1)' },
-    '100%': { boxShadow: '0 0 0 0 rgba(6, 182, 212, 0), 0 0 0 0 rgba(6, 182, 212, 0)' },
+    '0%': { transform: 'scale(0.97)', opacity: 0.9 },
+    '50%': { transform: 'scale(1.03)', opacity: 1 },
+    '100%': { transform: 'scale(0.97)', opacity: 0.9 },
 });
 
 const CallingAnimation = styled('div', {
     position: 'relative',
-    animation: `${pulseAnimation} 2s cubic-bezier(0.4, 0, 0.6, 1) infinite`,
-    borderRadius: '50%',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: -10, left: -10, right: -10, bottom: -10,
-        borderRadius: '50%',
-        background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2))',
-        zIndex: 1,
-    }
+    borderRadius: '50%',
+    animation: `${pulseAnimation} 2.5s ease-in-out infinite`,
 });
 
 const ControlsBar = styled('div', {
@@ -175,12 +167,12 @@ const ControlsBar = styled('div', {
     bottom: '40px',
     display: 'flex',
     gap: '20px',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    padding: '18px 28px',
+    backgroundColor: 'rgba(17, 27, 33, 0.88)',
+    padding: '14px 28px',
     borderRadius: '40px',
     backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.12)',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
     zIndex: 100,
 });
 
@@ -194,31 +186,28 @@ const ControlButton = styled('button', {
     justifyContent: 'center',
     cursor: 'pointer',
     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     color: '#fff',
     backdropFilter: 'blur(10px)',
     boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-    '&:hover': { transform: 'translateY(-3px) scale(1.05)' },
+    '&:hover': { transform: 'translateY(-2px) scale(1.05)', backgroundColor: 'rgba(255, 255, 255, 0.14)' },
     variants: {
         variant: {
             danger: {
                 backgroundColor: '#EF4444',
-                boxShadow: '0 10px 25px rgba(239, 68, 68, 0.4)',
-                '&:hover': { backgroundColor: '#DC2626', boxShadow: '0 15px 30px rgba(239, 68, 68, 0.5)' }
+                boxShadow: '0 8px 24px rgba(239, 68, 68, 0.45)',
+                '&:hover': { backgroundColor: '#DC2626', boxShadow: '0 12px 28px rgba(239, 68, 68, 0.55)' }
             },
             success: {
                 backgroundColor: '#10B981',
-                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)',
+                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.45)',
                 '&:hover': { backgroundColor: '#059669' }
             },
             active: {
-                backgroundColor: 'rgba(6, 182, 212, 0.25)',
-                color: '#06B6D4',
-                border: '1px solid rgba(6, 182, 212, 0.5)',
+                backgroundColor: 'rgba(0, 229, 255, 0.2)',
+                color: '#00e5ff',
+                border: '1px solid rgba(0, 229, 255, 0.5)',
             },
-        },
-        pulsing: {
-            true: { animation: `${pulseAnimation} 2s infinite` }
         }
     }
 });
@@ -402,14 +391,18 @@ const CallOverlay = ({
     const handleEndCall = useCallback((emitEvent = true) => {
         clearInterval(timerRef.current);
         if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
-        if (socket && callConfig && !callConfig.isReceiving) {
+        if (socket && callConfig) {
             const isGroup = activeConversation?.type === 'group';
             const otherUserId = isGroup ? null : getOtherParticipantId();
+            const convId = activeConversation?._id || callConfig.conversationId || callConfig.callerData?.conversationId;
+            const callerId = callConfig.isReceiving ? (callConfig.callerData?.from || otherUserId) : mongoUserId;
+            const receiverId = callConfig.isReceiving ? mongoUserId : otherUserId;
+            
             socket.emit('log_call', {
-                callerId: mongoUserId,
-                receiverId: otherUserId,
-                conversationId: activeConversation?._id,
-                type: callConfig.callType,
+                callerId,
+                receiverId,
+                conversationId: convId,
+                type: (callConfig.callType === 'video') ? 'video' : 'audio',
                 status: callAcceptedRef.current ? 'completed' : 'missed'
             });
         }
@@ -498,7 +491,8 @@ const CallOverlay = ({
                     name: currentUserData?.displayName || 'Someone',
                     avatarUrl: currentUserData?.avatarUrl || ''
                 },
-                callType: callConfig.callType
+                callType: (callConfig.callType === 'video') ? 'video' : 'audio',
+                conversationId: activeConversation?._id
             });
 
             if (!response?.ok) {
@@ -702,28 +696,128 @@ const CallOverlay = ({
             {!callAccepted ? (
                 <CallerInfo>
                     <CallingAnimation>
-                        <AvatarImg src={callerAvatar} alt={callerName} onError={e => { e.target.onerror = null; e.target.src = avatarFallback(callerName); }} />
+                        <AvatarImg 
+                            src={callerAvatar} 
+                            alt={callerName} 
+                            onError={e => { e.target.onerror = null; e.target.src = avatarFallback(callerName); }} 
+                            style={{
+                                width: '124px',
+                                height: '124px',
+                                borderRadius: '50%',
+                                border: '3px solid #00e5ff',
+                                boxShadow: '0 0 35px rgba(0, 229, 255, 0.35)',
+                                objectFit: 'cover'
+                            }}
+                        />
                     </CallingAnimation>
                     <CallerNameText>
-                        {callConfig.isReceiving ? `${callerName} is calling…` : `Calling ${callerName}…`}
+                        {callerName}
                     </CallerNameText>
-                    <CallStatusText>{isVideoCall ? '📹 Video Call' : '🎙️ Voice Call'}</CallStatusText>
+                    <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        backdropFilter: 'blur(10px)',
+                        color: '#00e5ff',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        marginTop: '4px',
+                        border: '1px solid rgba(0, 229, 255, 0.25)'
+                    }}>
+                        {isVideoCall ? <Video size={14} color="#00e5ff" /> : <Phone size={14} color="#00e5ff" />}
+                        <span>{isVideoCall ? 'DevSup Video Call' : 'DevSup Voice Call'}</span>
+                    </div>
+                    <CallStatusText>
+                        {callConfig.isReceiving ? 'Incoming call…' : 'Ringing…'}
+                    </CallStatusText>
 
-                    {callConfig.isReceiving && (
-                        <div style={{ display: 'flex', gap: '32px', marginTop: '44px' }}>
-                            <ControlButton variant="danger" onClick={() => handleEndCall(true)} title="Decline">
-                                <PhoneOff size={26} />
-                            </ControlButton>
-                            <ControlButton
-                                variant="success"
-                                pulsing={!isAnswering}
-                                onClick={answerCall}
-                                title={isAnswering ? 'Connecting' : 'Accept'}
-                                disabled={isAnswering}
-                                style={{ opacity: isAnswering ? 0.7 : 1, cursor: isAnswering ? 'wait' : 'pointer' }}
+                    {callConfig.isReceiving ? (
+                        <div style={{ display: 'flex', gap: '56px', marginTop: '48px', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleEndCall(true)}
+                                    title="Decline"
+                                    style={{
+                                        width: '64px',
+                                        height: '64px',
+                                        borderRadius: '50%',
+                                        border: 'none',
+                                        backgroundColor: '#ef4444',
+                                        color: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 8px 24px rgba(239, 68, 68, 0.45)',
+                                        transition: 'transform 0.15s ease'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
+                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                >
+                                    <PhoneOff size={28} />
+                                </button>
+                                <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.75)', fontWeight: '500' }}>Decline</span>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                    type="button"
+                                    onClick={answerCall}
+                                    title={isAnswering ? 'Connecting' : 'Accept'}
+                                    disabled={isAnswering}
+                                    style={{
+                                        width: '64px',
+                                        height: '64px',
+                                        borderRadius: '50%',
+                                        border: 'none',
+                                        backgroundColor: '#10b981',
+                                        color: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: isAnswering ? 'wait' : 'pointer',
+                                        boxShadow: '0 8px 24px rgba(16, 185, 129, 0.45)',
+                                        opacity: isAnswering ? 0.7 : 1,
+                                        transition: 'transform 0.15s ease'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
+                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                >
+                                    {isAnswering ? <span style={{ fontSize: '1.2rem' }}>…</span> : <Phone size={28} />}
+                                </button>
+                                <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.75)', fontWeight: '500' }}>Accept</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ marginTop: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                type="button"
+                                onClick={() => handleEndCall(true)}
+                                title="End Call"
+                                style={{
+                                    width: '64px',
+                                    height: '64px',
+                                    borderRadius: '50%',
+                                    border: 'none',
+                                    backgroundColor: '#ef4444',
+                                    color: '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 8px 24px rgba(239, 68, 68, 0.45)',
+                                    transition: 'transform 0.15s ease'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                             >
-                                {isAnswering ? <span>…</span> : <Phone size={26} />}
-                            </ControlButton>
+                                <PhoneOff size={28} />
+                            </button>
+                            <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.75)', fontWeight: '500' }}>Cancel</span>
                         </div>
                     )}
                 </CallerInfo>
@@ -732,14 +826,14 @@ const CallOverlay = ({
                 <VideoGrid>
                     {/* Remote tile */}
                     <VideoWrapper>
-                                <video
+                        <video
                             ref={remoteVideoCallbackRef}
                             autoPlay
                             playsInline
-                                    muted
-                                    onPlaying={() => setRemoteVideoActive(true)}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: remoteVideoActive ? 'block' : 'none' }}
-                                />
+                            muted
+                            onPlaying={() => setRemoteVideoActive(true)}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: remoteVideoActive ? 'block' : 'none' }}
+                        />
                         {!remoteVideoActive && (
                             <AvatarFallback>
                                 <SmallAvatarImg src={callerAvatar} alt={callerName} onError={e => { e.target.onerror = null; e.target.src = avatarFallback(callerName); }} />
@@ -771,11 +865,31 @@ const CallOverlay = ({
             ) : (
                 /* Audio call UI */
                 <CallerInfo>
-                    <CallingAnimation>
-                        <AvatarImg src={callerAvatar} alt={callerName} onError={e => { e.target.onerror = null; e.target.src = avatarFallback(callerName); }} style={{ border: '4px solid #10B981' }} />
-                    </CallingAnimation>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <AvatarImg 
+                            src={callerAvatar} 
+                            alt={callerName} 
+                            onError={e => { e.target.onerror = null; e.target.src = avatarFallback(callerName); }} 
+                            style={{ 
+                                width: '124px',
+                                height: '124px',
+                                borderRadius: '50%',
+                                border: '3px solid #00e5ff', 
+                                boxShadow: '0 0 35px rgba(0, 229, 255, 0.35)',
+                                objectFit: 'cover'
+                            }} 
+                        />
+                    </div>
                     <CallerNameText>{callerName}</CallerNameText>
-                    <CallStatusText style={{ color: '#10B981' }}>{formatDuration(callDuration)}</CallStatusText>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
+                        <span style={{ color: '#00e5ff', fontSize: '1.2rem', fontWeight: '600', letterSpacing: '1px' }}>
+                            {formatDuration(callDuration)}
+                        </span>
+                    </div>
+                    <div style={{ marginTop: '12px', fontSize: '0.78rem', color: 'rgba(255, 255, 255, 0.55)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>🔒 End-to-end encrypted</span>
+                    </div>
                     <video ref={remoteVideoCallbackRef} autoPlay playsInline muted style={{ display: 'none' }} />
                     <video ref={localVideoCallbackRef} autoPlay playsInline muted style={{ display: 'none' }} />
                 </CallerInfo>
@@ -791,21 +905,21 @@ const CallOverlay = ({
             )}
 
             {/* Controls */}
-            {(!callConfig.isReceiving || callAccepted) && (
+            {callAccepted && (
                 <ControlsBar>
                     <ControlButton variant={isMuted ? 'danger' : undefined} onClick={toggleMute} title={isMuted ? 'Unmute' : 'Mute'}>
-                        {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+                        {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
                     </ControlButton>
                     {isVideoCall && (
                         <ControlButton variant={isVideoOff ? 'danger' : undefined} onClick={toggleVideo} title={isVideoOff ? 'Turn Video On' : 'Turn Video Off'}>
-                            {isVideoOff ? <VideoOff size={20} /> : <Video size={20} />}
+                            {isVideoOff ? <VideoOff size={22} /> : <Video size={22} />}
                         </ControlButton>
                     )}
                     <ControlButton onClick={() => setIsAddingPerson(true)} title="Add Person">
-                        <UserPlus size={20} />
+                        <UserPlus size={22} />
                     </ControlButton>
                     <ControlButton variant="danger" onClick={() => handleEndCall(true)} title="End Call">
-                        <PhoneOff size={20} />
+                        <PhoneOff size={22} />
                     </ControlButton>
                 </ControlsBar>
             )}

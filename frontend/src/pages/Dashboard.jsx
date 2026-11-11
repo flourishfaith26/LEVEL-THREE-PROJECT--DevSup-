@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2 } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2 } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -1523,6 +1523,21 @@ const formatMessageClock = (dateString) => {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
+const formatCallTimestamp = (ts) => {
+    if (!ts) return '';
+    const date = new Date(ts);
+    if (Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    if (isToday) return `Today, ${timeStr}`;
+    if (isYesterday) return `Yesterday, ${timeStr}`;
+    return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${timeStr}`;
+};
+
 const compareMessages = (a, b) => {
     // Pending messages always go last (optimistic UI)
     if (Boolean(a.pending) !== Boolean(b.pending)) return a.pending ? 1 : -1;
@@ -2609,7 +2624,8 @@ export default function Dashboard() {
                         active: true,
                         isReceiving: true,
                         callerData: data,
-                        callType: data.callType
+                        callType: (data.callType === 'video') ? 'video' : 'audio',
+                        conversationId: data.conversationId
                     });
                 });
 
@@ -4218,33 +4234,48 @@ export default function Dashboard() {
                                         <AvatarWrapper style={{ flexShrink: 0 }}>
                                             <Avatar
                                                 src={log.contactAvatar || '/default-avatar.svg'}
-                                                style={{ width: '40px', height: '40px', border: 'none' }}
+                                                style={{ width: '44px', height: '44px', borderRadius: '50%', border: '1px solid rgba(255, 255, 255, 0.08)' }}
                                                 onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
                                             />
                                         </AvatarWrapper>
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '32px', justifyContent: 'space-between', boxSizing: 'border-box' }}>
-                                            <span style={{ fontSize: '0.94rem', color: log.status === 'missed' ? '#EF4444' : 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15 }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', gap: '3px', boxSizing: 'border-box' }}>
+                                            <span style={{ fontSize: '0.96rem', fontWeight: '500', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                 {log.contactName}
                                             </span>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--colors-textMuted)', lineHeight: 1.15 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: (log.direction === 'incoming' && log.status === 'missed') ? '#ef4444' : 'var(--colors-textMuted)', lineHeight: 1.2 }}>
                                                 {log.direction === 'incoming' ? (
-                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill={log.status === 'missed' ? '#EF4444' : '#10B981'}><path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41L20 5.41z"></path></svg>
+                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill={log.status === 'missed' ? '#ef4444' : '#10b981'}>
+                                                        <path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41L20 5.41z"></path>
+                                                    </svg>
                                                 ) : (
-                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="#06B6D4"><path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z"></path></svg>
+                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="var(--colors-accent, #00e5ff)">
+                                                        <path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z"></path>
+                                                    </svg>
                                                 )}
-                                                <span>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}</span>
+                                                <span>{formatCallTimestamp(log.timestamp)}</span>
                                             </div>
                                         </div>
-                                        {!isCallLogsSelectionMode && <IconButton
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                openConversationWith(log.contactId, log.type === 'video' ? 'video' : 'audio');
-                                            }}
-                                            style={{ color: 'var(--colors-textMuted)' }}
-                                            title={log.type === 'video' ? 'Start video call' : 'Start voice call'}
-                                        >
-                                            {log.type === 'video' ? <Video size={20} /> : <Phone size={20} />}
-                                        </IconButton>}
+                                        {!isCallLogsSelectionMode && (
+                                            <IconButton
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openConversationWith(log.contactId, log.type === 'video' ? 'video' : 'audio');
+                                                }}
+                                                style={{ 
+                                                    color: 'var(--colors-accent, #00e5ff)',
+                                                    backgroundColor: 'rgba(0, 229, 255, 0.08)',
+                                                    width: '38px',
+                                                    height: '38px',
+                                                    borderRadius: '50%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
+                                                title={log.type === 'video' ? 'Start video call' : 'Start voice call'}
+                                            >
+                                                {log.type === 'video' ? <Video size={18} /> : <Phone size={18} />}
+                                            </IconButton>
+                                        )}
                                     </ChannelItem>
                                 ))}
                             </div>
@@ -5547,7 +5578,8 @@ export default function Dashboard() {
                                                                         const isCallLog = msg.content && typeof msg.content === 'string' && msg.content.startsWith('$CALL_LOG$');
                                                                         if (isCallLog) {
                                                                             const parts = msg.content.split('|');
-                                                                            const callType = parts[1] || 'voice';
+                                                                            const rawType = (parts[1] || 'audio').toLowerCase();
+                                                                            const isVideo = rawType === 'video';
                                                                             const callStatus = parts[2] || 'completed';
                                                                             const isMissed = callStatus === 'missed';
                                                                             const isDeclined = callStatus === 'rejected';
@@ -5561,28 +5593,34 @@ export default function Dashboard() {
 
                                                                             const isMissedIncoming = !isOwnMessage && isMissed;
                                                                             const statusColor = isMissedIncoming ? '#ef4444' : 'var(--colors-textMuted)';
-                                                                            const iconColor = isMissedIncoming ? '#ef4444' : 'var(--colors-accent)';
+                                                                            const iconColor = isMissedIncoming ? '#ef4444' : 'var(--colors-accent, #00e5ff)';
 
                                                                             return (
-                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', minWidth: '170px' }}>
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', minWidth: '190px' }}>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                                                         <div style={{
-                                                                                            width: '32px',
-                                                                                            height: '32px',
+                                                                                            width: '38px',
+                                                                                            height: '38px',
                                                                                             borderRadius: '50%',
-                                                                                            backgroundColor: isMissedIncoming ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                                                                            backgroundColor: isMissedIncoming ? 'rgba(239, 68, 68, 0.16)' : 'rgba(0, 229, 255, 0.14)',
                                                                                             display: 'flex',
                                                                                             alignItems: 'center',
                                                                                             justifyContent: 'center',
                                                                                             flexShrink: 0
                                                                                         }}>
-                                                                                            {callType === 'video' ? <Video size={16} color={iconColor} /> : <Phone size={16} color={iconColor} />}
+                                                                                            {isVideo ? (
+                                                                                                <Video size={18} color={iconColor} />
+                                                                                            ) : isMissedIncoming ? (
+                                                                                                <PhoneOff size={18} color={iconColor} />
+                                                                                            ) : (
+                                                                                                <Phone size={18} color={iconColor} />
+                                                                                            )}
                                                                                         </div>
                                                                                         <div>
-                                                                                            <div style={{ fontWeight: '600', color: 'var(--colors-textMain)', fontSize: '0.92rem' }}>
-                                                                                                {callType === 'video' ? 'Video call' : 'Voice call'}
+                                                                                            <div style={{ fontWeight: '600', color: 'var(--colors-textMain)', fontSize: '0.94rem' }}>
+                                                                                                {isVideo ? 'Video call' : 'Voice call'}
                                                                                             </div>
-                                                                                            <div style={{ fontSize: '0.8rem', color: statusColor, fontWeight: isMissedIncoming ? '600' : 'normal' }}>
+                                                                                            <div style={{ fontSize: '0.8rem', color: statusColor, fontWeight: isMissedIncoming ? '600' : 'normal', marginTop: '2px' }}>
                                                                                                 {statusText}
                                                                                             </div>
                                                                                         </div>
