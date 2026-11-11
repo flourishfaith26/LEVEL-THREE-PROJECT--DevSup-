@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { styled, keyframes } from '../stitches.config.js';
-import { Phone, PhoneOff, Video, Mic, MicOff, VideoOff, UserPlus, X } from 'lucide-react';
+import { Phone, PhoneOff, Video, Mic, MicOff, VideoOff, UserPlus, X, ChevronLeft } from 'lucide-react';
 import { playWhatsAppCallSound } from '../utils/audio.js';
 
 const OverlayContainer = styled('div', {
@@ -713,23 +713,6 @@ const CallOverlay = ({
                     <CallerNameText>
                         {callerName}
                     </CallerNameText>
-                    <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                        backdropFilter: 'blur(10px)',
-                        color: '#00e5ff',
-                        fontSize: '0.85rem',
-                        fontWeight: '600',
-                        marginTop: '4px',
-                        border: '1px solid rgba(0, 229, 255, 0.25)'
-                    }}>
-                        {isVideoCall ? <Video size={14} color="#00e5ff" /> : <Phone size={14} color="#00e5ff" />}
-                        <span>{isVideoCall ? 'DevSup Video Call' : 'DevSup Voice Call'}</span>
-                    </div>
                     <CallStatusText>
                         {callConfig.isReceiving ? 'Incoming call…' : 'Ringing…'}
                     </CallStatusText>
@@ -823,44 +806,204 @@ const CallOverlay = ({
                 </CallerInfo>
 
             ) : isVideoCall ? (
-                <VideoGrid>
-                    {/* Remote tile */}
-                    <VideoWrapper>
+                <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#080f15' }}>
+                    {/* Top Header Controls (Back chevron button + duration badge) */}
+                    <div style={{
+                        position: 'absolute',
+                        top: 'max(16px, env(safe-area-inset-top))',
+                        left: '16px',
+                        right: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        zIndex: 60,
+                        pointerEvents: 'none'
+                    }}>
+                        <button
+                            type="button"
+                            onClick={() => handleEndCall(true)}
+                            title="Minimize / Exit Call"
+                            style={{
+                                pointerEvents: 'auto',
+                                width: '42px',
+                                height: '42px',
+                                borderRadius: '50%',
+                                backgroundColor: 'rgba(0, 0, 0, 0.45)',
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'transform 0.15s ease'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                            <ChevronLeft size={24} />
+                        </button>
+
+                        <div style={{
+                            pointerEvents: 'auto',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '20px',
+                            padding: '6px 14px',
+                            fontSize: '0.88rem',
+                            fontWeight: '600',
+                            color: '#00e5ff'
+                        }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+                            <span>{formatDuration(callDuration)}</span>
+                        </div>
+                    </div>
+
+                    {/* Main Fullscreen Video (Remote participant fills 100% of the screen) */}
+                    <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
                         <video
                             ref={remoteVideoCallbackRef}
                             autoPlay
                             playsInline
                             muted
                             onPlaying={() => setRemoteVideoActive(true)}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: remoteVideoActive ? 'block' : 'none' }}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: remoteVideoActive ? 'block' : 'none'
+                            }}
                         />
-                        {!remoteVideoActive && (
-                            <AvatarFallback>
-                                <SmallAvatarImg src={callerAvatar} alt={callerName} onError={e => { e.target.onerror = null; e.target.src = avatarFallback(callerName); }} />
-                                <span style={{ color: '#94A3B8', fontSize: '0.9rem' }}>Connecting…</span>
-                            </AvatarFallback>
-                        )}
-                        <VideoLabel>{callerName}</VideoLabel>
-                    </VideoWrapper>
 
-                    {/* Local tile */}
-                    <VideoWrapper isLocal={true}>
+                        {!remoteVideoActive && (
+                            <div style={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '16px',
+                                backgroundColor: '#080f15'
+                            }}>
+                                <img
+                                    src={callerAvatar}
+                                    alt={callerName}
+                                    onError={e => { e.currentTarget.src = avatarFallback(callerName); }}
+                                    style={{
+                                        width: '110px',
+                                        height: '110px',
+                                        borderRadius: '50%',
+                                        border: '3px solid #00e5ff',
+                                        boxShadow: '0 0 35px rgba(0, 229, 255, 0.35)',
+                                        objectFit: 'cover'
+                                    }}
+                                />
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '1.4rem', fontWeight: '700', color: '#ffffff' }}>{callerName}</span>
+                                    <span style={{ color: '#00e5ff', fontSize: '0.92rem', fontWeight: '500' }}>Connecting…</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Remote User label pill in bottom-left */}
+                        {remoteVideoActive && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '115px',
+                                left: '20px',
+                                backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                backdropFilter: 'blur(8px)',
+                                borderRadius: '12px',
+                                padding: '6px 14px',
+                                fontSize: '0.85rem',
+                                fontWeight: '600',
+                                color: '#ffffff',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                zIndex: 10
+                            }}>
+                                {callerName}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Floating Picture-in-Picture Local Video (WhatsApp style across mobile & desktop) */}
+                    <div
+                        title="Your camera"
+                        style={{
+                            position: 'absolute',
+                            top: 'max(70px, env(safe-area-inset-top) + 60px)',
+                            right: '18px',
+                            width: 'clamp(100px, 26vw, 175px)',
+                            aspectRatio: '3/4',
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            backgroundColor: '#0c1622',
+                            border: '2px solid rgba(0, 229, 255, 0.5)',
+                            boxShadow: '0 12px 35px rgba(0, 0, 0, 0.75)',
+                            zIndex: 50,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'transform 0.2s ease'
+                        }}
+                    >
                         <video
                             ref={localVideoCallbackRef}
                             autoPlay
                             playsInline
                             muted
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: isVideoOff ? 'none' : 'block' }}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                transform: 'scaleX(-1)',
+                                display: isVideoOff ? 'none' : 'block'
+                            }}
                         />
+
                         {isVideoOff && (
-                            <AvatarFallback>
-                                <SmallAvatarImg src={myAvatar} alt={myName} onError={e => { e.target.onerror = null; e.target.src = avatarFallback(myName); }} />
-                                <span style={{ color: '#94A3B8', fontSize: '0.9rem' }}>Camera off</span>
-                            </AvatarFallback>
+                            <div style={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                padding: '10px',
+                                textAlign: 'center',
+                                backgroundColor: '#0f172a'
+                            }}>
+                                <img
+                                    src={myAvatar}
+                                    alt={myName}
+                                    onError={e => { e.currentTarget.src = avatarFallback(myName); }}
+                                    style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                                <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: '500' }}>Camera off</span>
+                            </div>
                         )}
-                        <VideoLabel>You {isMuted ? '🔇' : ''}</VideoLabel>
-                    </VideoWrapper>
-                </VideoGrid>
+
+                        <div style={{
+                            position: 'absolute',
+                            bottom: '6px',
+                            left: '6px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                            borderRadius: '6px',
+                            padding: '2px 6px',
+                            fontSize: '0.68rem',
+                            fontWeight: '600',
+                            color: '#ffffff'
+                        }}>
+                            You {isMuted ? '🔇' : ''}
+                        </div>
+                    </div>
+                </div>
 
             ) : (
                 /* Audio call UI */
@@ -896,13 +1039,6 @@ const CallOverlay = ({
             )}
 
             <audio ref={remoteAudioCallbackRef} autoPlay playsInline />
-
-            {/* Duration badge (video calls) */}
-            {callAccepted && isVideoCall && (
-                <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', borderRadius: '20px', padding: '6px 16px', fontSize: '0.9rem', fontWeight: '600', color: '#10B981', letterSpacing: '1px' }}>
-                    {formatDuration(callDuration)}
-                </div>
-            )}
 
             {/* Controls */}
             {callAccepted && (
@@ -957,7 +1093,7 @@ const CallOverlay = ({
                 </div>
             )}
 
-            {/* WhatsApp Call Unavailable Dialog */}
+            {/* Call Unavailable Dialog (DevSup Theme) */}
             {callDialog && (
                 <div style={{
                     position: 'fixed',
@@ -965,8 +1101,8 @@ const CallOverlay = ({
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                    backdropFilter: 'blur(8px)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.82)',
+                    backdropFilter: 'blur(10px)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -974,51 +1110,52 @@ const CallOverlay = ({
                     padding: '20px'
                 }}>
                     <div style={{
-                        backgroundColor: '#1f2c34',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        borderRadius: '20px',
+                        backgroundColor: '#0c1622',
+                        border: '1px solid rgba(0, 229, 255, 0.25)',
+                        borderRadius: '24px',
                         width: '100%',
-                        maxWidth: '360px',
-                        padding: '28px 24px 20px',
+                        maxWidth: '380px',
+                        padding: '30px 24px 24px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         textAlign: 'center',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
-                        color: '#e9edef'
+                        boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 229, 255, 0.1)',
+                        color: '#ffffff'
                     }}>
-                        <div style={{ position: 'relative', marginBottom: '16px' }}>
+                        <div style={{ position: 'relative', marginBottom: '18px' }}>
                             <img
                                 src={callerAvatar}
                                 alt={callerName}
                                 onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
-                                style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover' }}
+                                style={{ width: '68px', height: '68px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(0, 229, 255, 0.35)' }}
                             />
                             <div style={{
                                 position: 'absolute',
                                 bottom: '-2px',
                                 right: '-2px',
-                                width: '24px',
-                                height: '24px',
+                                width: '26px',
+                                height: '26px',
                                 borderRadius: '50%',
                                 backgroundColor: '#ef4444',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                border: '2px solid #1f2c34'
+                                border: '2px solid #0c1622',
+                                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
                             }}>
-                                <PhoneOff size={13} color="#fff" />
+                                <PhoneOff size={14} color="#fff" />
                             </div>
                         </div>
 
-                        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 600, color: '#e9edef' }}>
+                        <h3 style={{ margin: '0 0 10px 0', fontSize: '1.25rem', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.3px' }}>
                             {callDialog.title}
                         </h3>
-                        <p style={{ margin: '0 0 24px 0', fontSize: '0.88rem', color: '#8696a0', lineHeight: 1.45 }}>
+                        <p style={{ margin: '0 0 26px 0', fontSize: '0.9rem', color: '#94a3b8', lineHeight: 1.5 }}>
                             {callDialog.message}
                         </p>
 
-                        <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                        <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -1027,16 +1164,18 @@ const CallOverlay = ({
                                 }}
                                 style={{
                                     flex: 1,
-                                    padding: '10px 16px',
+                                    padding: '11px 16px',
                                     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    border: '1px solid rgba(255, 255, 255, 0.12)',
                                     borderRadius: '24px',
-                                    color: '#e9edef',
-                                    fontSize: '0.9rem',
+                                    color: '#e2e8f0',
+                                    fontSize: '0.92rem',
                                     fontWeight: 500,
                                     cursor: 'pointer',
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.15s ease'
                                 }}
+                                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.14)'}
+                                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
                             >
                                 Cancel
                             </button>
@@ -1048,16 +1187,19 @@ const CallOverlay = ({
                                 }}
                                 style={{
                                     flex: 1,
-                                    padding: '10px 16px',
-                                    backgroundColor: '#00a884',
+                                    padding: '11px 16px',
+                                    backgroundColor: '#00e5ff',
                                     border: 'none',
                                     borderRadius: '24px',
-                                    color: '#111b21',
-                                    fontSize: '0.9rem',
-                                    fontWeight: 600,
+                                    color: '#080f15',
+                                    fontSize: '0.92rem',
+                                    fontWeight: 700,
                                     cursor: 'pointer',
-                                    transition: 'all 0.2s'
+                                    boxShadow: '0 4px 18px rgba(0, 229, 255, 0.38)',
+                                    transition: 'all 0.15s ease'
                                 }}
+                                onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#06b6d4'; e.currentTarget.style.color = '#ffffff'; }}
+                                onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#00e5ff'; e.currentTarget.style.color = '#080f15'; }}
                             >
                                 Message
                             </button>
