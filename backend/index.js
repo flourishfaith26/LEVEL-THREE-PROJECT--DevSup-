@@ -22,6 +22,7 @@ import callRoutes from './src/routers/callRoutes.js';
 import callConfigRoutes from './src/routers/callConfigRoutes.js';
 import githubRoutes from './src/routers/githubRoutes.js';
 import aiRoutes from './src/routers/aiRoutes.js';
+import codeRunnerRoutes from './src/routers/codeRunnerRoutes.js';
 
 connectDB();
 
@@ -71,6 +72,7 @@ app.use('/api/call-config', callConfigRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/auth/github', githubRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/code', codeRunnerRoutes);
 
 const httpServer = createServer(app);
 

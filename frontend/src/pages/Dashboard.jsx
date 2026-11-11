@@ -5498,6 +5498,9 @@ export default function Dashboard() {
                                                 setIsLiveCodingOpen(false);
                                             }}
                                             activeConversationName={activeConversation.name || (otherParticipant?.displayName) || 'Chat'}
+                                            conversationId={activeConversationId}
+                                            socket={socket}
+                                            currentUser={{ _id: mongoUserId, displayName: user?.displayName || user?.name || user?.nickname }}
                                         />
                                     </Suspense>
                                 </div>
@@ -6550,6 +6553,9 @@ export default function Dashboard() {
                                                 setCommunityTab('chat');
                                             }}
                                             activeConversationName={activeConversation.name}
+                                            conversationId={activeConversationId}
+                                            socket={socket}
+                                            currentUser={{ _id: mongoUserId, displayName: user?.displayName || user?.name || user?.nickname }}
                                         />
                                     </Suspense>
                                 </div>

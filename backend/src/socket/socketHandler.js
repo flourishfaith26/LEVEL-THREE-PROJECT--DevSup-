@@ -677,7 +677,55 @@ export const setupSocket = (io) => {
             }
         });
 
-        // 6. Track User Going Offline
+        // 6. Live Pair Programming & Collaborative Code Sync
+        socket.on('code:join', ({ conversationId, user }) => {
+            if (!conversationId) return;
+            const roomName = `code:${conversationId}`;
+            socket.join(roomName);
+            socket.to(roomName).emit('code:peer_joined', { user, socketId: socket.id });
+        });
+
+        socket.on('code:leave', ({ conversationId, user }) => {
+            if (!conversationId) return;
+            const roomName = `code:${conversationId}`;
+            socket.leave(roomName);
+            socket.to(roomName).emit('code:peer_left', { user, socketId: socket.id });
+        });
+
+        socket.on('code:change', ({ conversationId, code, language, cursor, senderId, senderName }) => {
+            if (!conversationId) return;
+            socket.to(`code:${conversationId}`).emit('code:update', {
+                code,
+                language,
+                cursor,
+                senderId,
+                senderName,
+                timestamp: Date.now()
+            });
+        });
+
+        socket.on('code:run:start', ({ conversationId, senderName, language }) => {
+            if (!conversationId) return;
+            socket.to(`code:${conversationId}`).emit('code:run:starting', {
+                senderName,
+                language,
+                timestamp: Date.now()
+            });
+        });
+
+        socket.on('code:run:result', ({ conversationId, output, senderName, language, executionTimeMs, success }) => {
+            if (!conversationId) return;
+            socket.to(`code:${conversationId}`).emit('code:run:completed', {
+                output,
+                senderName,
+                language,
+                executionTimeMs,
+                success,
+                timestamp: Date.now()
+            });
+        });
+
+        // 7. Track User Going Offline
         socket.on('disconnect', () => {
             const userId = socket.data.userId;
             if (userId) {
