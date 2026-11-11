@@ -1010,15 +1010,30 @@ export const parseStatusReply = (content) => {
                 return {
                     statusId: meta.statusId,
                     type: meta.type || 'image',
-                    thumbnail: meta.type !== 'text' ? meta.content : null,
+                    thumbnail: meta.type !== 'text' ? (meta.content || meta.thumbnail) : null,
                     text: meta.caption || (meta.type === 'text' ? meta.content : (meta.type === 'video' ? 'Video status' : 'Photo status')),
                     backgroundColor: meta.backgroundColor || '#1E2B3C',
                     uploaderName: meta.uploaderName || 'Status',
-                    replyText: replyText.trim()
+                    replyText: replyText.trim() || 'Status reply'
                 };
             } catch (e) {
-                // fall through
+                const replyText = content.slice(secondPipe + 1);
+                return {
+                    type: 'image',
+                    thumbnail: null,
+                    text: 'Status',
+                    uploaderName: 'Status',
+                    replyText: replyText.trim() || 'Status reply'
+                };
             }
+        } else {
+            return {
+                type: 'image',
+                thumbnail: null,
+                text: 'Status',
+                uploaderName: 'Status',
+                replyText: 'Status reply'
+            };
         }
     }
 
@@ -4387,94 +4402,79 @@ export default function Dashboard() {
                                                 {selectedCallLogs.includes(log.id) && <Check size={14} strokeWidth={3} />}
                                             </SelectionCheck>
                                         )}
-                                        <AvatarWrapper style={{ flexShrink: 0 }}>
-                                            <Avatar
-                                                src={log.contactAvatar || '/default-avatar.svg'}
-                                                style={{ width: '44px', height: '44px', borderRadius: '50%', border: '1px solid rgba(255, 255, 255, 0.08)' }}
-                                                onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
-                                            />
-                                        </AvatarWrapper>
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', gap: '3px', boxSizing: 'border-box' }}>
-                                            <span style={{ fontSize: '0.96rem', fontWeight: '500', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
-                                                {log.contactName}
-                                            </span>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: (log.direction === 'incoming' && log.status === 'missed') ? '#ef4444' : 'var(--colors-textMuted)', lineHeight: 1.2 }}>
-                                                {log.direction === 'incoming' ? (
-                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill={log.status === 'missed' ? '#ef4444' : '#10b981'}>
-                                                        <path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41L20 5.41z"></path>
-                                                    </svg>
-                                                ) : (
-                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="var(--colors-accent, #00e5ff)">
-                                                        <path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z"></path>
-                                                    </svg>
-                                                )}
-                                                <span>{formatCallTimestamp(log.timestamp)}</span>
-                                            </div>
-                                        </div>
-                                        {!isCallLogsSelectionMode && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                                                <IconButton
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openConversationWith(log.contactId);
-                                                    }}
-                                                    style={{ 
-                                                        color: '#94a3b8',
-                                                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                                                        width: '32px',
-                                                        height: '32px',
-                                                        borderRadius: '50%',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        transition: 'all 0.15s ease'
-                                                    }}
-                                                    title="Message"
-                                                >
-                                                    <MessageSquare size={15} />
-                                                </IconButton>
-                                                <IconButton
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openConversationWith(log.contactId, 'audio');
-                                                    }}
-                                                    style={{ 
-                                                        color: '#94a3b8',
-                                                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                                                        width: '32px',
-                                                        height: '32px',
-                                                        borderRadius: '50%',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        transition: 'all 0.15s ease'
-                                                    }}
-                                                    title="Voice Call"
-                                                >
-                                                    <Phone size={15} />
-                                                </IconButton>
-                                                <IconButton
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openConversationWith(log.contactId, 'video');
-                                                    }}
-                                                    style={{ 
-                                                        color: 'var(--colors-accent, #00e5ff)',
-                                                        backgroundColor: 'rgba(0, 229, 255, 0.08)',
-                                                        width: '32px',
-                                                        height: '32px',
-                                                        borderRadius: '50%',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        transition: 'all 0.15s ease'
-                                                    }}
-                                                    title="Video Call"
-                                                >
-                                                    <Video size={15} />
-                                                </IconButton>
-                                            </div>
-                                        )}
+                                        {(() => {
+                                            const resolvedContact = (() => {
+                                                if (log.contactName && log.contactName !== 'Contact' && log.contactName !== 'Unknown') {
+                                                    return { name: log.contactName, avatar: log.contactAvatar };
+                                                }
+                                                if (log.contactId) {
+                                                    const pool = [...(availableContacts || []), ...(allUsers || [])];
+                                                    const u = pool.find(x => String(x?._id || x) === String(log.contactId));
+                                                    if (u) return { name: u.displayName || u.username || 'Developer', avatar: u.avatarUrl || log.contactAvatar };
+                                                }
+                                                if (log.conversationId) {
+                                                    const c = conversations?.find(cv => String(cv._id) === String(log.conversationId));
+                                                    if (c) {
+                                                        if (c.type === 'group') return { name: c.name || 'Group Call', avatar: c.avatarUrl || log.contactAvatar };
+                                                        const other = c.participants?.find(p => String(p?._id || p) !== String(mongoUserId));
+                                                        if (other) return { name: other.displayName || other.username || 'Developer', avatar: other.avatarUrl || log.contactAvatar };
+                                                    }
+                                                }
+                                                return { name: log.contactName || 'Developer', avatar: log.contactAvatar };
+                                            })();
+
+                                            return (
+                                                <>
+                                                    <AvatarWrapper style={{ flexShrink: 0 }}>
+                                                        <Avatar
+                                                            src={resolvedContact.avatar || '/default-avatar.svg'}
+                                                            style={{ width: '44px', height: '44px', borderRadius: '50%', border: '1px solid rgba(255, 255, 255, 0.08)' }}
+                                                            onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                                        />
+                                                    </AvatarWrapper>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', gap: '3px', boxSizing: 'border-box' }}>
+                                                        <span style={{ fontSize: '0.96rem', fontWeight: '500', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                                                            {resolvedContact.name}
+                                                        </span>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: (log.direction === 'incoming' && log.status === 'missed') ? '#ef4444' : 'var(--colors-textMuted)', lineHeight: 1.2 }}>
+                                                            {log.direction === 'incoming' ? (
+                                                                <svg viewBox="0 0 24 24" width="14" height="14" fill={log.status === 'missed' ? '#ef4444' : '#10b981'}>
+                                                                    <path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41L20 5.41z"></path>
+                                                                </svg>
+                                                            ) : (
+                                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="var(--colors-accent, #00e5ff)">
+                                                                    <path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z"></path>
+                                                                </svg>
+                                                            )}
+                                                            <span>{formatCallTimestamp(log.timestamp)}</span>
+                                                        </div>
+                                                    </div>
+                                                    {!isCallLogsSelectionMode && (
+                                                        <IconButton
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openConversationWith(log.contactId, log.type === 'video' ? 'video' : 'audio');
+                                                            }}
+                                                            style={{ 
+                                                                color: 'var(--colors-accent, #00e5ff)',
+                                                                backgroundColor: 'rgba(0, 229, 255, 0.08)',
+                                                                width: '36px',
+                                                                height: '36px',
+                                                                borderRadius: '50%',
+                                                                flexShrink: 0,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                transition: 'all 0.15s ease'
+                                                            }}
+                                                            title={log.type === 'video' ? 'Video Call' : 'Voice Call'}
+                                                        >
+                                                            {log.type === 'video' ? <Video size={17} /> : <Phone size={17} />}
+                                                        </IconButton>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </ChannelItem>
                                 ))}
                             </div>
@@ -8177,6 +8177,8 @@ export default function Dashboard() {
                 currentUserData={currentUserData}
                 getAccessTokenSilently={getAccessTokenSilently}
                 backendUrl={BACKEND_URL}
+                availableContacts={availableContacts}
+                allUsers={allUsers}
                 onEndCall={() => setCallConfig({ active: false, isReceiving: false, callerData: null, callType: 'video' })}
             /></Suspense>
 
@@ -8556,16 +8558,27 @@ export default function Dashboard() {
                                     }
                                 });
 
+                                if (!newCallSearchQuery.trim()) {
+                                    return (
+                                        <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--colors-textMuted)', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                            <Search size={34} style={{ opacity: 0.35, color: 'var(--colors-accent, #00e5ff)' }} />
+                                            <span>Type a name or username to search for someone to call</span>
+                                        </div>
+                                    );
+                                }
+
+                                const q = newCallSearchQuery.toLowerCase().trim();
                                 const filtered = uniqueContacts.filter(u => {
-                                    if (!newCallSearchQuery.trim()) return true;
-                                    const q = newCallSearchQuery.toLowerCase();
-                                    return (u.displayName?.toLowerCase().includes(q) || u.username?.toLowerCase().includes(q) || u.techDiscipline?.toLowerCase().includes(q));
+                                    const name = (u.displayName || '').toLowerCase();
+                                    const uname = (u.username || '').toLowerCase();
+                                    const disc = (u.techDiscipline || '').toLowerCase();
+                                    return name.includes(q) || uname.includes(q) || disc.includes(q);
                                 });
 
                                 if (filtered.length === 0) {
                                     return (
-                                        <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
-                                            No contacts found
+                                        <div style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
+                                            No users found matching "{newCallSearchQuery}"
                                         </div>
                                     );
                                 }

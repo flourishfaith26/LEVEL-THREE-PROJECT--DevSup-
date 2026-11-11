@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { styled, keyframes } from '../stitches.config.js';
-import { Phone, PhoneOff, Video, Mic, MicOff, VideoOff, UserPlus, X, ChevronLeft } from 'lucide-react';
+import { Phone, PhoneOff, Video, Mic, MicOff, VideoOff, UserPlus, X, ChevronLeft, Search } from 'lucide-react';
 import { playWhatsAppCallSound } from '../utils/audio.js';
 
 const OverlayContainer = styled('div', {
@@ -234,7 +234,9 @@ const CallOverlay = ({
     onEndCall,
     currentUserData,
     getAccessTokenSilently,
-    backendUrl
+    backendUrl,
+    availableContacts = [],
+    allUsers = []
 }) => {
     const [callAccepted, setCallAccepted] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
@@ -242,6 +244,7 @@ const CallOverlay = ({
     const [remoteVideoActive, setRemoteVideoActive] = useState(false);
     const [callDuration, setCallDuration] = useState(0);
     const [isAddingPerson, setIsAddingPerson] = useState(false);
+    const [addPersonSearchQuery, setAddPersonSearchQuery] = useState('');
     const [toastMsg, setToastMsg] = useState(null);
     const [isAnswering, setIsAnswering] = useState(false);
     const [callDialog, setCallDialog] = useState(null);
@@ -770,6 +773,27 @@ const CallOverlay = ({
 
             {!callAccepted ? (
                 <CallerInfo>
+                    {/* DevSup Call Pill (WhatsApp Style with DevSup Theme) */}
+                    <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 18px',
+                        borderRadius: '24px',
+                        border: '1.5px solid rgba(0, 229, 255, 0.45)',
+                        backgroundColor: 'rgba(0, 229, 255, 0.08)',
+                        backdropFilter: 'blur(10px)',
+                        color: '#00e5ff',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        marginBottom: '20px',
+                        boxShadow: '0 4px 16px rgba(0, 229, 255, 0.18)',
+                        userSelect: 'none'
+                    }}>
+                        {isVideoCall ? <Video size={16} color="#00e5ff" /> : <Phone size={16} color="#00e5ff" />}
+                        <span>{isVideoCall ? 'DevSup Video Call' : 'DevSup Voice Call'}</span>
+                    </div>
+
                     <CallingAnimation>
                         <AvatarImg 
                             src={callerAvatar} 
@@ -918,6 +942,26 @@ const CallOverlay = ({
                         >
                             <ChevronLeft size={24} />
                         </button>
+
+                        {/* DevSup Video Call Pill */}
+                        <div style={{
+                            pointerEvents: 'auto',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1.5px solid rgba(0, 229, 255, 0.45)',
+                            borderRadius: '24px',
+                            padding: '6px 16px',
+                            fontSize: '0.88rem',
+                            fontWeight: '600',
+                            color: '#00e5ff',
+                            boxShadow: '0 4px 16px rgba(0, 229, 255, 0.15)'
+                        }}>
+                            <Video size={15} color="#00e5ff" />
+                            <span>DevSup Video Call</span>
+                        </div>
 
                         <div style={{
                             pointerEvents: 'auto',
@@ -1083,6 +1127,27 @@ const CallOverlay = ({
             ) : (
                 /* Audio call UI */
                 <CallerInfo>
+                    {/* DevSup Voice Call Pill (WhatsApp Style with DevSup Theme) */}
+                    <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 18px',
+                        borderRadius: '24px',
+                        border: '1.5px solid rgba(0, 229, 255, 0.45)',
+                        backgroundColor: 'rgba(0, 229, 255, 0.08)',
+                        backdropFilter: 'blur(10px)',
+                        color: '#00e5ff',
+                        fontSize: '0.9rem',
+                        fontWeight: '600',
+                        marginBottom: '20px',
+                        boxShadow: '0 4px 16px rgba(0, 229, 255, 0.18)',
+                        userSelect: 'none'
+                    }}>
+                        <Phone size={16} color="#00e5ff" />
+                        <span>DevSup Voice Call</span>
+                    </div>
+
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <AvatarImg 
                             src={callerAvatar} 
@@ -1126,7 +1191,7 @@ const CallOverlay = ({
                             {isVideoOff ? <VideoOff size={22} /> : <Video size={22} />}
                         </ControlButton>
                     )}
-                    <ControlButton onClick={() => setIsAddingPerson(true)} title="Add Person">
+                    <ControlButton onClick={() => { setIsAddingPerson(true); setAddPersonSearchQuery(''); }} title="Add Person">
                         <UserPlus size={22} />
                     </ControlButton>
                     <ControlButton variant="danger" onClick={() => handleEndCall(true)} title="End Call">
@@ -1135,27 +1200,160 @@ const CallOverlay = ({
                 </ControlsBar>
             )}
 
-            {/* Add person modal */}
+            {/* Add person modal (WhatsApp Style with DevSup Theme) */}
             {isAddingPerson && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, backdropFilter: 'blur(5px)' }}>
-                    <div style={{ width: '90%', maxWidth: '400px', backgroundColor: 'rgba(30, 41, 59, 0.97)', border: '1px solid rgba(6, 182, 212, 0.3)', borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, backdropFilter: 'blur(8px)' }}>
+                    <div style={{ width: '92%', maxWidth: '440px', backgroundColor: '#0f172a', border: '1px solid rgba(0, 229, 255, 0.3)', borderRadius: '24px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>Add to Call</h3>
-                            <button onClick={() => setIsAddingPerson(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={22} /></button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <UserPlus size={20} color="#00e5ff" />
+                                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '600', color: '#ffffff' }}>Add to Ongoing Call</h3>
+                            </div>
+                            <button onClick={() => setIsAddingPerson(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '4px' }}><X size={20} /></button>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '280px', overflowY: 'auto' }}>
-                            {activeConversation?.participants?.filter(p => p._id !== mongoUserId).map(p => (
-                                <div key={p._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: 'rgba(15, 23, 42, 0.6)', borderRadius: '12px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <img src={p.avatarUrl || '/default-avatar.svg'} alt={p.displayName} style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover' }} onError={e => { e.currentTarget.src = '/default-avatar.svg'; }} />
-                                        <span style={{ fontWeight: '500', fontSize: '0.95rem' }}>{p.displayName}</span>
+
+                        {/* Search Input */}
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <Search size={16} style={{ position: 'absolute', left: '12px', color: '#64748b' }} />
+                            <input
+                                type="text"
+                                placeholder="Search by name or username..."
+                                value={addPersonSearchQuery}
+                                onChange={e => setAddPersonSearchQuery(e.target.value)}
+                                autoFocus
+                                style={{
+                                    width: '100%',
+                                    padding: '10px 14px 10px 38px',
+                                    borderRadius: '12px',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    color: '#ffffff',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+
+                        {/* Participant List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+                            {(() => {
+                                const currentParticipantIds = new Set([
+                                    String(mongoUserId || ''),
+                                    String(callConfig?.callerData?._id || callConfig?.callerData || ''),
+                                    String(getOtherParticipantId() || '')
+                                ]);
+
+                                const pool = [];
+                                const seenIds = new Set();
+                                [...(availableContacts || []), ...(allUsers || []), ...(activeConversation?.participants || [])].forEach(u => {
+                                    const id = String(u?._id || u);
+                                    if (id && !currentParticipantIds.has(id) && !seenIds.has(id)) {
+                                        seenIds.add(id);
+                                        pool.push(u);
+                                    }
+                                });
+
+                                const q = addPersonSearchQuery.trim().toLowerCase();
+                                const filtered = pool.filter(u => {
+                                    if (!q) return true;
+                                    const name = (u.displayName || '').toLowerCase();
+                                    const uname = (u.username || '').toLowerCase();
+                                    const disc = (u.techDiscipline || '').toLowerCase();
+                                    return name.includes(q) || uname.includes(q) || disc.includes(q);
+                                });
+
+                                if (filtered.length === 0) {
+                                    return (
+                                        <div style={{ color: '#94A3B8', textAlign: 'center', padding: '30px 16px', fontSize: '0.9rem' }}>
+                                            {addPersonSearchQuery.trim() ? `No contacts found matching "${addPersonSearchQuery}"` : 'No other contacts available to add.'}
+                                        </div>
+                                    );
+                                }
+
+                                return filtered.map(contact => (
+                                    <div
+                                        key={contact._id}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '10px 12px',
+                                            backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(255, 255, 255, 0.06)'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                            <img
+                                                src={contact.avatarUrl || '/default-avatar.svg'}
+                                                alt={contact.displayName || 'User'}
+                                                style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+                                                onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                            />
+                                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                                <span style={{ fontWeight: '600', fontSize: '0.92rem', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {contact.displayName || contact.username || 'Developer'}
+                                                </span>
+                                                <span style={{ fontSize: '0.78rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {contact.techDiscipline || (contact.username ? `@${contact.username}` : 'Available')}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                const targetId = String(contact._id || contact);
+                                                if (!targetId || !socket) return;
+                                                const targetName = contact.displayName || contact.username || 'user';
+                                                try {
+                                                    setToastMsg(`Inviting ${targetName} to call…`);
+                                                    const iceServers = await getIceServers();
+                                                    const pc = buildPeerConnection(targetId, iceServers);
+                                                    const offer = await pc.createOffer();
+                                                    await pc.setLocalDescription(offer);
+
+                                                    socket.emit('call_user', {
+                                                        userToCall: targetId,
+                                                        signalData: offer,
+                                                        from: mongoUserId,
+                                                        callerInfo: {
+                                                            name: currentUserData?.displayName || 'Someone',
+                                                            avatarUrl: currentUserData?.avatarUrl || '',
+                                                            techDiscipline: currentUserData?.techDiscipline || ''
+                                                        },
+                                                        callType: isVideoCall ? 'video' : 'audio',
+                                                        conversationId: activeConversation?._id || callConfig?.conversationId,
+                                                        callSessionId: callSessionIdRef.current,
+                                                        isGroupCall: true
+                                                    });
+
+                                                    setIsAddingPerson(false);
+                                                    setToastMsg(`Invited ${targetName} to the call!`);
+                                                } catch (err) {
+                                                    console.error('Error adding user to call:', err);
+                                                    setToastMsg(`Could not invite ${targetName}`);
+                                                }
+                                            }}
+                                            style={{
+                                                backgroundColor: '#06B6D4',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                padding: '8px 16px',
+                                                borderRadius: '20px',
+                                                cursor: 'pointer',
+                                                fontWeight: '600',
+                                                fontSize: '0.82rem',
+                                                transition: 'all 0.15s ease',
+                                                flexShrink: 0
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0891b2'}
+                                            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#06b6d4'}
+                                        >
+                                            Invite
+                                        </button>
                                     </div>
-                                    <button onClick={() => { setToastMsg(`Ringing ${p.displayName}…`); setIsAddingPerson(false); }} style={{ backgroundColor: '#06B6D4', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: '20px', cursor: 'pointer', fontWeight: '500', fontSize: '0.85rem' }}>Add</button>
-                                </div>
-                            ))}
-                            {(!activeConversation?.participants || activeConversation.participants.filter(p => p._id !== mongoUserId).length === 0) && (
-                                <div style={{ color: '#94A3B8', textAlign: 'center', padding: '20px', fontSize: '0.9rem' }}>No other participants available.</div>
-                            )}
+                                ));
+                            })()}
                         </div>
                     </div>
                 </div>
