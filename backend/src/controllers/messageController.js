@@ -1,6 +1,7 @@
 import Message from '../models/Message.js';
 import User from '../models/User.js';
 import Conversation from '../models/Conversation.js';
+import { sendPushNotificationToUser } from '../routers/pushRoutes.js';
 
 // Fetch all messages for a specific conversation
 export const getMessages = async (req, res) => {
@@ -192,6 +193,22 @@ export const sendMessageHttp = async (req, res) => {
         });
       }
       broadcast.emit('receive_message', messageToEmit);
+
+      // Send Web Push to offline participants
+      if (updatedConv?.participants) {
+        const senderName = currentUser.displayName || currentUser.username || 'Someone';
+        const snippetText = isCodeSnippet ? '[Code Snippet]' : (caption || (typeof content === 'string' ? content.slice(0, 100) : 'New message'));
+        updatedConv.participants.forEach(pId => {
+          if (String(pId) !== String(currentUser._id)) {
+            sendPushNotificationToUser(pId, {
+              title: updatedConv.type === 'group' ? `${senderName} in #${updatedConv.name || 'group'}` : senderName,
+              body: snippetText,
+              icon: currentUser.avatarUrl || '/favicon.ico',
+              conversationId
+            });
+          }
+        });
+      }
     }
 
     res.status(201).json(messageToEmit);

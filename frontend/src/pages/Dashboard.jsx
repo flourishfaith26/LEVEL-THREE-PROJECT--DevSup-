@@ -2092,6 +2092,17 @@ export default function Dashboard() {
         return () => window.removeEventListener('keydown', handleGlobalShortcuts);
     }, [activeConversationId, mutedConversations]);
 
+    // Handle online event to drain offline outbox
+    useEffect(() => {
+        const handleOnline = () => {
+            if (drainOfflineOutboxRef.current) {
+                drainOfflineOutboxRef.current();
+            }
+        };
+        window.addEventListener('online', handleOnline);
+        return () => window.removeEventListener('online', handleOnline);
+    }, []);
+
     const [activeTab, setActiveTab] = useState('chats'); // 'chats', 'status', 'settings'
     const [activeSettingTab, setActiveSettingTab] = useState(null);
     useEffect(() => {
@@ -2590,6 +2601,9 @@ export default function Dashboard() {
                     newSocket.emit('user_connected', mongoUser._id);
                     if (activeConversationIdRef.current) {
                         newSocket.emit('join_room', activeConversationIdRef.current);
+                    }
+                    if (drainOfflineOutboxRef.current) {
+                        drainOfflineOutboxRef.current();
                     }
                 };
 
@@ -3171,10 +3185,84 @@ export default function Dashboard() {
         e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
     };
 
+    const drainOfflineOutboxRef = useRef(null);
+
+    const getOfflineOutbox = () => {
+        try {
+            const raw = localStorage.getItem('devsup_offline_outbox');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
+    };
+
+    const saveOfflineOutbox = (items) => {
+        try {
+            localStorage.setItem('devsup_offline_outbox', JSON.stringify(items));
+        } catch (e) {}
+    };
+
+    const drainOfflineOutbox = async () => {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+        const queue = getOfflineOutbox();
+        if (!queue || queue.length === 0) return;
+
+        let token = null;
+        try {
+            token = await getAccessTokenSilently();
+        } catch (e) {}
+
+        const remaining = [];
+        let anySynced = false;
+
+        for (const item of queue) {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    },
+                    body: JSON.stringify({ ...item.payload, clientMessageId: item.clientMessageId })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.message) {
+                        anySynced = true;
+                        setMessages(previous => {
+                            const index = previous.findIndex(m =>
+                                m.clientMessageId === item.clientMessageId ||
+                                String(m._id) === item.clientMessageId
+                            );
+                            if (index !== -1) {
+                                const next = [...previous];
+                                next[index] = { ...data.message, pending: false, offline: false };
+                                return next;
+                            }
+                            return previous;
+                        });
+                        continue;
+                    }
+                }
+                remaining.push(item);
+            } catch (err) {
+                remaining.push(item);
+            }
+        }
+
+        saveOfflineOutbox(remaining);
+        if (anySynced) {
+            showToast('Offline messages synced.');
+        }
+    };
+    drainOfflineOutboxRef.current = drainOfflineOutbox;
+
     const sendMessage = async (payload) => {
         if (!mongoUserId || !payload?.conversationId) return;
 
         const clientMessageId = `pending-${Date.now()}-${++clientMessageSequenceRef.current}`;
+        const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
         const optimisticMessage = {
             ...payload,
             _id: clientMessageId,
@@ -3186,10 +3274,18 @@ export default function Dashboard() {
                 avatarUrl: currentUserData?.avatarUrl || user?.picture
             },
             createdAt: new Date().toISOString(),
-            pending: true
+            pending: true,
+            offline: isOffline
         };
         // Optimistically display the message immediately
         setMessages(previous => [...previous, optimisticMessage]);
+
+        if (isOffline) {
+            const currentOutbox = getOfflineOutbox();
+            saveOfflineOutbox([...currentOutbox, { payload, clientMessageId, createdAt: Date.now() }]);
+            showToast('Offline: Message queued and will auto-deliver when reconnected.');
+            return;
+        }
 
         const handleConfirm = (confirmedMsg) => {
             if (!confirmedMsg) return;
@@ -3201,7 +3297,7 @@ export default function Dashboard() {
                 );
                 if (index !== -1) {
                     const next = [...previous];
-                    next[index] = { ...confirmedMsg, pending: false };
+                    next[index] = { ...confirmedMsg, pending: false, offline: false };
                     return next;
                 }
                 return previous;
@@ -3257,8 +3353,10 @@ export default function Dashboard() {
                             console.warn('Socket emit timed out or error, falling back to HTTP:', error || response?.error);
                             const fallbackOk = await sendHttpFallback();
                             if (!fallbackOk) {
-                                setMessages(prev => prev.map(m => m.clientMessageId === clientMessageId ? { ...m, pending: false, failed: true } : m));
-                                showToast(response?.error || 'Message delivery failed. Tap to retry.');
+                                const currentOutbox = getOfflineOutbox();
+                                saveOfflineOutbox([...currentOutbox, { payload, clientMessageId, createdAt: Date.now() }]);
+                                setMessages(prev => prev.map(m => m.clientMessageId === clientMessageId ? { ...m, pending: true, offline: true } : m));
+                                showToast('Connection unstable: queued for background auto-delivery.');
                             }
                         } else if (response?.message) {
                             handleConfirm(response.message);
@@ -3274,8 +3372,10 @@ export default function Dashboard() {
         // If socket was not connected, send directly via HTTP fallback
         const fallbackOk = await sendHttpFallback();
         if (!fallbackOk) {
-            setMessages(prev => prev.map(m => m.clientMessageId === clientMessageId ? { ...m, pending: false, failed: true } : m));
-            showToast('Failed to send message. Please check your connection.');
+            const currentOutbox = getOfflineOutbox();
+            saveOfflineOutbox([...currentOutbox, { payload, clientMessageId, createdAt: Date.now() }]);
+            setMessages(prev => prev.map(m => m.clientMessageId === clientMessageId ? { ...m, pending: true, offline: true } : m));
+            showToast('Offline: Message queued for background delivery.');
         }
     };
 
@@ -5165,7 +5265,7 @@ export default function Dashboard() {
                         ) : activeSettingTab === 'Chats' ? (
                             <ChatsPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} getAccessTokenSilently={getAccessTokenSilently} BACKEND_URL={BACKEND_URL} showToast={showToast} />
                         ) : activeSettingTab === 'Notifications' ? (
-                            <NotificationsPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} showToast={showToast} />
+                            <NotificationsPane onBack={() => setActiveSettingTab(null)} settings={appSettings} updateSetting={updateSetting} showToast={showToast} getAccessTokenSilently={getAccessTokenSilently} />
                         ) : activeSettingTab === 'Keyboard shortcuts' ? (
                             <KeyboardShortcutsPane onBack={() => setActiveSettingTab(null)} />
                         ) : activeSettingTab === 'Help' ? (
@@ -5706,6 +5806,15 @@ export default function Dashboard() {
 
                                                     const renderStatusTicks = () => {
                                                         if (!isOwnMessage) return null;
+                                                        if (msg.offline || (msg.pending && typeof navigator !== 'undefined' && !navigator.onLine)) {
+                                                            return <Clock size={13} color="rgba(255,255,255,0.7)" title="Queued offline (auto-delivers when reconnected)" />;
+                                                        }
+                                                        if (msg.pending) {
+                                                            return <Clock size={13} color="rgba(255,255,255,0.4)" title="Sending..." style={{ opacity: 0.8 }} />;
+                                                        }
+                                                        if (msg.failed) {
+                                                            return <ShieldAlert size={13} color="#EF4444" title="Delivery failed. Tap to retry" />;
+                                                        }
                                                         const receiptsEnabled = appSettings.readReceipts !== false;
                                                         const readCount = msg.readBy
                                                             ? msg.readBy.filter(id => String(id?._id || id) !== String(mongoUserId)).length

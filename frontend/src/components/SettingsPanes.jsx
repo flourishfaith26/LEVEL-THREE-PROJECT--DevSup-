@@ -9,6 +9,7 @@ import { techDoodlesSvg, svgToDataUri, wallpaperColors } from '../utils/wallpape
 import { normalizeUsername, validateUsernameFormat } from '../utils/username.js';
 import { applyTheme } from '../utils/theme.js';
 import { playNotificationSound } from '../utils/audio.js';
+import { subscribeToPushNotifications, unsubscribeFromPushNotifications } from '../utils/pushManager.js';
 
 const slideIn = keyframes({
     '0%': { transform: 'translateX(10px)', opacity: 0 },
@@ -1006,8 +1007,56 @@ export const ChatsPane = ({ onBack, settings, updateSetting, getAccessTokenSilen
     );
 };
 
-export const NotificationsPane = ({ onBack, settings, updateSetting, showToast }) => {
+export const NotificationsPane = ({ onBack, settings, updateSetting, showToast, getAccessTokenSilently }) => {
     const [isTestingSound, setIsTestingSound] = React.useState(false);
+    const [pushLoading, setPushLoading] = React.useState(false);
+    const [pushActive, setPushActive] = React.useState(false);
+
+    React.useEffect(() => {
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.pushManager.getSubscription().then(sub => {
+                    setPushActive(!!sub);
+                });
+            }).catch(() => {});
+        }
+    }, []);
+
+    const handleTogglePush = async (e) => {
+        const checked = e.target.checked;
+        setPushLoading(true);
+        try {
+            if (checked) {
+                if (typeof getAccessTokenSilently !== 'function') {
+                    showToast?.('Please sign in to enable push notifications.');
+                    setPushLoading(false);
+                    return;
+                }
+                const res = await subscribeToPushNotifications(getAccessTokenSilently);
+                if (res.success) {
+                    setPushActive(true);
+                    updateSetting('webPushAlerts', true);
+                    showToast?.('Web Push notifications enabled! You will receive alerts even when offline.');
+                } else if (res.reason === 'denied') {
+                    showToast?.('Notification permission was blocked in browser settings.');
+                } else {
+                    showToast?.('Could not activate push notifications: ' + (res.error || 'Check service worker support'));
+                }
+            } else {
+                if (typeof getAccessTokenSilently === 'function') {
+                    await unsubscribeFromPushNotifications(getAccessTokenSilently);
+                }
+                setPushActive(false);
+                updateSetting('webPushAlerts', false);
+                showToast?.('Web Push notifications disabled.');
+            }
+        } catch (err) {
+            console.error('Error toggling push:', err);
+            showToast?.('Failed to update push notification preferences.');
+        } finally {
+            setPushLoading(false);
+        }
+    };
 
     const handleTestSound = () => {
         setIsTestingSound(true);
@@ -1029,7 +1078,7 @@ export const NotificationsPane = ({ onBack, settings, updateSetting, showToast }
                         <IconWrapper><Bell size={20}/></IconWrapper>
                         <SettingText>
                             <SettingLabel>Message notifications</SettingLabel>
-                            <SettingDescription>Show message notifications, including when the app is in the background.</SettingDescription>
+                            <SettingDescription>Show message notifications when active or in background.</SettingDescription>
                         </SettingText>
                         <Toggle
                             checked={settings.messageAlerts !== false}
@@ -1051,6 +1100,21 @@ export const NotificationsPane = ({ onBack, settings, updateSetting, showToast }
                                 }
                                 updateSetting('messageAlerts', enabled);
                             }}
+                        />
+                    </SettingRow>
+                    <SettingRow>
+                        <IconWrapper><Globe size={20}/></IconWrapper>
+                        <SettingText>
+                            <SettingLabel>Web Push Notifications (Offline / Closed Tab)</SettingLabel>
+                            <SettingDescription>
+                                Receive instant alerts via Service Worker even when DevSup is closed.
+                                {pushActive && <span style={{ display: 'block', color: 'var(--colors-accent)', fontSize: '0.78rem', marginTop: '2px' }}>● Device registered for push delivery</span>}
+                            </SettingDescription>
+                        </SettingText>
+                        <Toggle 
+                            checked={pushActive || settings.webPushAlerts === true} 
+                            onChange={handleTogglePush}
+                            disabled={pushLoading}
                         />
                     </SettingRow>
                     <SettingRow>

@@ -3,6 +3,7 @@ import Conversation from '../models/Conversation.js';
 import CallLog from '../models/CallLog.js';
 import User from '../models/User.js';
 import { askGemini } from '../routers/aiRoutes.js';
+import { sendPushNotificationToUser } from '../routers/pushRoutes.js';
 
 // Memory store tracks every active socket for a user across their devices.
 const onlineUsers = new Map();
@@ -183,6 +184,26 @@ export const setupSocket = (io) => {
                 broadcast.emit('receive_message', messageToEmit);
 
                 if (typeof acknowledge === 'function') acknowledge({ ok: true, message: messageToEmit });
+
+                // Send Web Push notification to offline participants
+                if (updatedConv?.participants) {
+                    const senderName = newMessage.sender?.displayName || newMessage.sender?.username || 'Someone';
+                    const snippetText = newMessage.isCodeSnippet ? '[Code Snippet]' : (newMessage.caption || (typeof newMessage.content === 'string' ? newMessage.content.slice(0, 100) : 'New message'));
+                    updatedConv.participants.forEach(pId => {
+                        const pidStr = String(pId);
+                        if (pidStr !== String(messageData.senderId)) {
+                            const userSockets = onlineUsers.get(pidStr);
+                            if (!userSockets || userSockets.size === 0) {
+                                sendPushNotificationToUser(pId, {
+                                    title: updatedConv.type === 'group' ? `${senderName} in #${updatedConv.name || 'group'}` : senderName,
+                                    body: snippetText,
+                                    icon: newMessage.sender?.avatarUrl || '/favicon.ico',
+                                    conversationId: messageData.conversationId
+                                });
+                            }
+                        }
+                    });
+                }
 
                 // In-Chat AI Assistant (@devsup-ai or @ai trigger)
                 const contentStr = typeof messageData.content === 'string' ? messageData.content : '';

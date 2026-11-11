@@ -6,6 +6,30 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(self.clients.claim());
 });
 
+self.addEventListener('push', (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = { title: 'DevSup', body: event.data.text() };
+    }
+  }
+
+  const title = data.title || 'DevSup Notification';
+  const options = {
+    body: data.body || 'You have a new message on DevSup',
+    icon: data.icon || '/favicon.ico',
+    badge: data.badge || '/favicon.ico',
+    vibrate: [100, 50, 100],
+    data: data.data || {},
+    tag: data.data?.conversationId ? `conv-${data.data.conversationId}` : undefined,
+    renotify: true
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const conversationId = event.notification.data?.conversationId;
