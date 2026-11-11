@@ -471,3 +471,4 @@ export default function AudioHuddleBar({
         </div>
     );
 }
+

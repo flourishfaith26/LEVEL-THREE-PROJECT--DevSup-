@@ -3,7 +3,8 @@ import {
     LayoutTemplate, Square, Type, Image as ImageIcon, Video, Box, Minus, 
     Link, Navigation, PanelTop, List, CheckSquare, CircleDot, ChevronDown, 
     Calendar, UploadCloud, Map, BarChart, Table, CreditCard, Monitor, 
-    Share2, PanelLeft, ToggleRight, User as UserIcon, Upload, Play, Check
+    Share2, PanelLeft, ToggleRight, User as UserIcon, Upload, Play, Check,
+    Server, Database, Cpu, Cloud, Layers, Smartphone, Globe, Shield, Activity
 } from 'lucide-react';
 
 // === 1. Real Interactive Heading ===
@@ -809,8 +810,160 @@ export const RealInfoCard = ({ el, onUpdate }) => (
     </div>
 );
 
+// === Architecture & Systems Components ===
+export const RealArchService = ({ el }) => (
+    <div style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#161b22',
+        border: '2px solid #38bdf8',
+        borderRadius: '10px',
+        padding: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        color: '#f0f6fc',
+        boxShadow: '0 8px 24px rgba(56, 189, 248, 0.15)'
+    }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Server size={18} color="#38bdf8" />
+                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{el.text || 'API Service'}</span>
+            </div>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+        </div>
+        <div style={{ fontSize: '0.74rem', color: '#8b949e', fontFamily: 'monospace' }}>
+            PORT {el.port || ':5000'} • Node/Go
+        </div>
+    </div>
+);
+
+export const RealArchDatabase = ({ el }) => (
+    <div style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#161b22',
+        border: '2px solid #a855f7',
+        borderRadius: '10px',
+        padding: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        color: '#f0f6fc',
+        boxShadow: '0 8px 24px rgba(168, 85, 247, 0.15)'
+    }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Database size={18} color="#a855f7" />
+                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{el.text || 'PostgreSQL DB'}</span>
+            </div>
+            <span style={{ fontSize: '0.68rem', backgroundColor: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', padding: '2px 6px', borderRadius: '4px' }}>SQL</span>
+        </div>
+        <div style={{ fontSize: '0.74rem', color: '#8b949e', fontFamily: 'monospace' }}>
+            cluster.primary:5432
+        </div>
+    </div>
+);
+
+export const RealArchCache = ({ el }) => (
+    <div style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#161b22',
+        border: '2px solid #ef4444',
+        borderRadius: '10px',
+        padding: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        color: '#f0f6fc',
+        boxShadow: '0 8px 24px rgba(239, 68, 68, 0.15)'
+    }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Cpu size={18} color="#ef4444" />
+            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{el.text || 'Redis Cache'}</span>
+        </div>
+        <div style={{ fontSize: '0.74rem', color: '#8b949e', fontFamily: 'monospace' }}>
+            In-Memory • :6379
+        </div>
+    </div>
+);
+
+export const RealArchQueue = ({ el }) => (
+    <div style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#161b22',
+        border: '2px solid #f59e0b',
+        borderRadius: '10px',
+        padding: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        color: '#f0f6fc',
+        boxShadow: '0 8px 24px rgba(245, 158, 11, 0.15)'
+    }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Layers size={18} color="#f59e0b" />
+            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{el.text || 'Kafka / RabbitMQ'}</span>
+        </div>
+        <div style={{ fontSize: '0.74rem', color: '#8b949e', fontFamily: 'monospace' }}>
+            Event Stream Pipeline
+        </div>
+    </div>
+);
+
+export const RealArchCloud = ({ el }) => (
+    <div style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(30, 41, 59, 0.3)',
+        border: '2px dashed #64748b',
+        borderRadius: '14px',
+        padding: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        color: '#94a3b8'
+    }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Cloud size={18} color="#64748b" />
+            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{el.text || 'Kubernetes / VPC Cluster'}</span>
+        </div>
+    </div>
+);
+
+export const RealArchClient = ({ el }) => (
+    <div style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#161b22',
+        border: '2px solid #10b981',
+        borderRadius: '10px',
+        padding: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        color: '#f0f6fc',
+        boxShadow: '0 8px 24px rgba(16, 185, 129, 0.15)'
+    }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Globe size={18} color="#10b981" />
+            <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{el.text || 'Web App Client'}</span>
+        </div>
+        <div style={{ fontSize: '0.74rem', color: '#8b949e' }}>
+            Next.js / React SPA
+        </div>
+    </div>
+);
+
 // === Element Categories for Sidebar ===
 export const MOCKUP_CATEGORIES = [
+    {
+        id: 'architecture',
+        title: 'System Architecture',
+        items: ['archService', 'archDatabase', 'archCache', 'archQueue', 'archCloud', 'archClient']
+    },
     {
         id: 'media',
         title: 'Media & Assets',
@@ -840,6 +993,14 @@ export const MOCKUP_CATEGORIES = [
 
 // === Element Registry with Default Dimensions & Icons ===
 export const MOCKUP_TYPES = {
+    // Architecture
+    archService: { component: RealArchService, label: 'API Microservice', defaultW: 240, defaultH: 80, icon: Server },
+    archDatabase: { component: RealArchDatabase, label: 'Database Cluster', defaultW: 240, defaultH: 80, icon: Database },
+    archCache: { component: RealArchCache, label: 'Redis Cache', defaultW: 220, defaultH: 75, icon: Cpu },
+    archQueue: { component: RealArchQueue, label: 'Message Queue', defaultW: 230, defaultH: 75, icon: Layers },
+    archCloud: { component: RealArchCloud, label: 'Cloud / VPC Boundary', defaultW: 480, defaultH: 320, icon: Cloud },
+    archClient: { component: RealArchClient, label: 'Client / Frontend', defaultW: 220, defaultH: 75, icon: Globe },
+
     // Media
     imageBlock: { component: RealImage, label: 'Image Asset', defaultW: 240, defaultH: 180, icon: ImageIcon },
     videoEmbed: { component: RealVideo, label: 'Video Player', defaultW: 340, defaultH: 200, icon: Video },

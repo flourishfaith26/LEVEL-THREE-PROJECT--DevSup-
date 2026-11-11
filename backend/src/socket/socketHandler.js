@@ -8,6 +8,8 @@ import { askGemini } from '../routers/aiRoutes.js';
 const onlineUsers = new Map();
 // Memory store for active audio huddles: conversationId -> Map(userId -> { user, socketId, isMuted, isSpeaking })
 const activeHuddles = new Map();
+// Memory store for collaborative whiteboard: conversationId -> { elements: [], bgColor: '#080C16' }
+const whiteboardRooms = new Map();
 
 const getHuddleSummary = () => {
     const summary = {};
@@ -495,9 +497,41 @@ export const setupSocket = (io) => {
             }
         });
 
-        // 4. Whiteboard Handling
+        // 4. Collaborative Whiteboard & Architecture Canvas Handling
+        socket.on('whiteboard:init', ({ conversationId }, callback) => {
+            if (!conversationId) return;
+            const roomData = whiteboardRooms.get(String(conversationId)) || { elements: [], bgColor: '#080C16' };
+            if (typeof callback === 'function') {
+                callback(roomData);
+            }
+        });
+
         socket.on('whiteboard_draw', (drawData) => {
-            socket.to(drawData.conversationId).emit('whiteboard_draw', drawData);
+            if (!drawData?.conversationId) return;
+            const convId = String(drawData.conversationId);
+
+            // Cache elements or bgColor changes in room memory
+            if (drawData.action === 'sync_elements' && Array.isArray(drawData.elements)) {
+                const current = whiteboardRooms.get(convId) || { elements: [], bgColor: '#080C16' };
+                current.elements = drawData.elements;
+                whiteboardRooms.set(convId, current);
+            } else if (drawData.action === 'bg_color' && drawData.bgColor) {
+                const current = whiteboardRooms.get(convId) || { elements: [], bgColor: '#080C16' };
+                current.bgColor = drawData.bgColor;
+                whiteboardRooms.set(convId, current);
+            }
+
+            socket.to(convId).emit('whiteboard_draw', drawData);
+        });
+
+        socket.on('whiteboard:cursor', ({ conversationId, x, y, user }) => {
+            if (!conversationId) return;
+            socket.to(String(conversationId)).emit('whiteboard:cursor_update', {
+                x,
+                y,
+                user,
+                socketId: socket.id
+            });
         });
 
         // 5. WebRTC Signaling

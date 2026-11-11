@@ -231,7 +231,9 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
     const [resizingElementId, setResizingElementId] = useState(null);
     const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, w: 0, h: 0 });
 
-    const [expandedCategories, setExpandedCategories] = useState(['media', 'basic', 'actions', 'layout']);
+    const [expandedCategories, setExpandedCategories] = useState(['architecture', 'media', 'basic', 'actions', 'layout']);
+    const [remoteCursors, setRemoteCursors] = useState(new Map());
+    const lastCursorEmitRef = useRef(0);
     const [editingElementId, setEditingElementId] = useState(null);
     const imageInputRef = useRef(null);
     const videoInputRef = useRef(null);
@@ -602,10 +604,52 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
 
         socket.on('whiteboard_draw', handleIncomingDraw);
 
+        // Fetch server cached whiteboard state on mount
+        if (conversationId) {
+            socket.emit('whiteboard:init', { conversationId }, (data) => {
+                if (data?.elements && Array.isArray(data.elements) && data.elements.length > 0) {
+                    setDroppedElements(data.elements);
+                }
+                if (data?.bgColor) {
+                    setBgColor(data.bgColor);
+                }
+            });
+        }
+
+        const handleCursorUpdate = (data) => {
+            if (data?.socketId && data.user) {
+                setRemoteCursors(prev => {
+                    const next = new Map(prev);
+                    next.set(data.socketId, { ...data, updatedAt: Date.now() });
+                    return next;
+                });
+            }
+        };
+
+        socket.on('whiteboard:cursor_update', handleCursorUpdate);
+
+        // Clean up stale cursors every 3 seconds
+        const cursorCleaner = setInterval(() => {
+            const now = Date.now();
+            setRemoteCursors(prev => {
+                let changed = false;
+                const next = new Map(prev);
+                next.forEach((val, key) => {
+                    if (now - val.updatedAt > 4000) {
+                        next.delete(key);
+                        changed = true;
+                    }
+                });
+                return changed ? next : prev;
+            });
+        }, 2000);
+
         return () => {
             socket.off('whiteboard_draw', handleIncomingDraw);
+            socket.off('whiteboard:cursor_update', handleCursorUpdate);
+            clearInterval(cursorCleaner);
         };
-    }, [socket]);
+    }, [socket, conversationId]);
 
     const getCoordinates = (e) => {
         const canvas = canvasRef.current;
@@ -1669,6 +1713,28 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                         ref={containerRef}
                         onDragOver={handleDragOver}
                         onDrop={handleDrop}
+                        onMouseMove={(e) => {
+                            if (!socket || !conversationId) return;
+                            const now = Date.now();
+                            if (now - lastCursorEmitRef.current > 45) {
+                                lastCursorEmitRef.current = now;
+                                const rect = containerRef.current?.getBoundingClientRect();
+                                if (rect) {
+                                    const x = Math.round(e.clientX - rect.left);
+                                    const y = Math.round(e.clientY - rect.top);
+                                    socket.emit('whiteboard:cursor', {
+                                        conversationId,
+                                        x,
+                                        y,
+                                        user: {
+                                            id: mongoUserId,
+                                            name: 'Teammate',
+                                            color: '#06b6d4'
+                                        }
+                                    });
+                                }
+                            }
+                        }}
                         onClick={(e) => {
                             if (tool === 'select') {
                                 setSelectedElements([]);
@@ -1684,6 +1750,40 @@ export default function Whiteboard({ socket, conversationId, mongoUserId, onClos
                             backgroundPosition: '0 0'
                         }}
                     >
+                        {/* Remote Live Multi-User Cursors */}
+                        {Array.from(remoteCursors.values()).map(cursor => (
+                            <div
+                                key={cursor.socketId}
+                                style={{
+                                    position: 'absolute',
+                                    left: `${cursor.x}px`,
+                                    top: `${cursor.y}px`,
+                                    pointerEvents: 'none',
+                                    zIndex: 99999,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'flex-start',
+                                    transition: 'left 0.08s linear, top 0.08s linear'
+                                }}
+                            >
+                                <MousePointer2 size={18} fill={cursor.user?.color || '#38bdf8'} color={cursor.user?.color || '#38bdf8'} />
+                                <span style={{
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    color: '#fff',
+                                    backgroundColor: cursor.user?.color || '#0284c7',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    marginLeft: '12px',
+                                    marginTop: '-2px',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    {cursor.user?.name || 'Peer'}
+                                </span>
+                            </div>
+                        ))}
+
                         {/* Render Alignment Lines */}
                     {alignmentLines.v !== null && (
                         <div style={{ position: 'absolute', top: 0, bottom: 0, left: alignmentLines.v, width: '1px', backgroundColor: '#d946ef', zIndex: 9999, pointerEvents: 'none' }} />
