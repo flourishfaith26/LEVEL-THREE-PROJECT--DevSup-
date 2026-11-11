@@ -103,3 +103,100 @@ export const markMessagesReadHttp = async (req, res) => {
     res.status(500).json({ message: 'Error marking messages read', error: error.message });
   }
 };
+
+// Send message via HTTP fallback (guarantees real-time persistence even if socket is disconnected)
+export const sendMessageHttp = async (req, res) => {
+  try {
+    const auth0Id = req.auth.payload.sub;
+    const currentUser = await User.findOne({ auth0Id });
+    if (!currentUser) return res.status(404).json({ message: 'User not found' });
+
+    const {
+      conversationId,
+      content,
+      caption,
+      attachmentName,
+      attachmentType,
+      isCodeSnippet,
+      language,
+      replyTo,
+      clientMessageId
+    } = req.body;
+
+    if (!conversationId || !content) {
+      return res.status(400).json({ message: 'Missing conversationId or content' });
+    }
+
+    const conv = await Conversation.findById(conversationId);
+    if (!conv) return res.status(404).json({ message: 'Conversation not found' });
+
+    // Check block list if direct
+    if (conv.type === 'direct' && conv.participants && conv.participants.length === 2) {
+      const recipientId = conv.participants.find(p => String(p) !== String(currentUser._id));
+      if (recipientId) {
+        const [senderUser, recipientUser] = await Promise.all([
+          User.findById(currentUser._id).select('blockedUsers'),
+          User.findById(recipientId).select('blockedUsers')
+        ]);
+        if (recipientUser?.blockedUsers?.some(id => String(id) === String(currentUser._id))) {
+          return res.status(403).json({ message: 'You cannot send messages to this contact because you are blocked.' });
+        }
+        if (senderUser?.blockedUsers?.some(id => String(id) === String(recipientId))) {
+          return res.status(403).json({ message: 'You have blocked this contact. Unblock them to send messages.' });
+        }
+      }
+    }
+
+    const convSequence = await Conversation.findByIdAndUpdate(
+      conversationId,
+      { $inc: { messageSequence: 1 } },
+      { new: true }
+    );
+    const sequence = convSequence ? convSequence.messageSequence : 1;
+
+    const newMessage = new Message({
+      conversationId,
+      sender: currentUser._id,
+      clientMessageId: clientMessageId || '',
+      content,
+      caption: caption || '',
+      attachmentName: attachmentName || '',
+      attachmentType: attachmentType || '',
+      isCodeSnippet: !!isCodeSnippet,
+      language: language || 'plaintext',
+      replyTo: replyTo || undefined,
+      sequence
+    });
+
+    await newMessage.save();
+    await newMessage.populate([
+      { path: 'sender', select: 'displayName avatarUrl username' },
+      { path: 'replyTo', select: 'content sender isCodeSnippet caption isDeletedForEveryone', populate: { path: 'sender', select: 'displayName username' } }
+    ]);
+
+    const updatedConv = await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: newMessage._id,
+      updatedAt: new Date(),
+      $pull: { deletedFor: currentUser._id }
+    }, { new: true });
+
+    const messageToEmit = newMessage.toObject();
+    if (clientMessageId) messageToEmit.clientMessageId = clientMessageId;
+
+    const io = req.app.get('io');
+    if (io) {
+      let broadcast = io.to(String(conversationId));
+      if (updatedConv?.participants) {
+        updatedConv.participants.forEach(pId => {
+          broadcast = broadcast.to(`user:${String(pId)}`);
+        });
+      }
+      broadcast.emit('receive_message', messageToEmit);
+    }
+
+    res.status(201).json(messageToEmit);
+  } catch (error) {
+    console.error('Error sending message HTTP:', error);
+    res.status(500).json({ message: 'Error sending message', error: error.message });
+  }
+};

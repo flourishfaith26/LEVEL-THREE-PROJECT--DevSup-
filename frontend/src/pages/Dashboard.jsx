@@ -2299,22 +2299,42 @@ export default function Dashboard() {
                     }
                 }
 
-                const statusRes = await fetch(`${BACKEND_URL}/api/status`, { headers: apiHeaders });
-                const fetchedStatuses = await statusRes.json();
-                if (isActive) setStatuses(Array.isArray(fetchedStatuses) ? fetchedStatuses : []);
-
-                const convResponse = await fetch(`${BACKEND_URL}/api/conversations`, {
-                    headers: apiHeaders
-                });
-                const initialConversations = await convResponse.json();
+                // Parallelize initial critical fetches to load dashboard fast
+                const [statusRes, convResponse, callRes] = await Promise.all([
+                    fetch(`${BACKEND_URL}/api/status`, { headers: apiHeaders }).catch(e => {
+                        console.error('Failed to fetch status:', e);
+                        return null;
+                    }),
+                    fetch(`${BACKEND_URL}/api/conversations`, { headers: apiHeaders }).catch(e => {
+                        console.error('Failed to fetch conversations:', e);
+                        return null;
+                    }),
+                    fetch(`${BACKEND_URL}/api/calls`, { headers: apiHeaders }).catch(e => {
+                        console.error('Failed to fetch calls:', e);
+                        return null;
+                    })
+                ]);
 
                 if (!isActive) return;
 
-                if (initialConversations.length > 0) {
-                    setConversations(initialConversations);
-                    if (window.innerWidth > 768) {
-                        setActiveConversationId(initialConversations[0]._id);
-                    }
+                if (statusRes && statusRes.ok) {
+                    try {
+                        const fetchedStatuses = await statusRes.json();
+                        if (isActive) setStatuses(Array.isArray(fetchedStatuses) ? fetchedStatuses : []);
+                    } catch (e) {}
+                }
+
+                let initialConversations = [];
+                if (convResponse && convResponse.ok) {
+                    try {
+                        initialConversations = await convResponse.json();
+                        if (Array.isArray(initialConversations) && initialConversations.length > 0) {
+                            setConversations(initialConversations);
+                            if (window.innerWidth > 768 && !activeConversationIdRef.current) {
+                                setActiveConversationId(initialConversations[0]._id);
+                            }
+                        }
+                    } catch (e) {}
                 }
 
                 // Handle Shared Profile Links (?chatWith=USER_ID)
@@ -2359,25 +2379,39 @@ export default function Dashboard() {
                     }
                 }
 
-                // Fetch call logs
-                try {
-                    const callRes = await fetch(`${BACKEND_URL}/api/calls`, { headers: apiHeaders });
-                    if (callRes.ok) {
+                // Call logs
+                if (callRes && callRes.ok) {
+                    try {
                         const logs = await callRes.json();
-                        setCallLogs(logs.map(log => formatCallLog(log, mongoUser._id)));
+                        if (Array.isArray(logs)) {
+                            setCallLogs(logs.map(log => formatCallLog(log, mongoUser._id)));
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse call logs:', e);
                     }
-                } catch (e) { console.error('Failed to fetch call logs:', e); }
+                }
 
-                newSocket = io(BACKEND_URL);
+                newSocket = io(BACKEND_URL, {
+                    withCredentials: true,
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionAttempts: Infinity,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    timeout: 20000
+                });
 
-                newSocket.on('connect', () => {
+                const onConnectOrReconnect = () => {
                     newSocket.emit('user_connected', mongoUser._id);
-                });
-                newSocket.on('reconnect', () => {
-                    newSocket.emit('user_connected', mongoUser._id);
-                });
+                    if (activeConversationIdRef.current) {
+                        newSocket.emit('join_room', activeConversationIdRef.current);
+                    }
+                };
+
+                newSocket.on('connect', onConnectOrReconnect);
+                newSocket.on('reconnect', onConnectOrReconnect);
                 if (newSocket.connected) {
-                    newSocket.emit('user_connected', mongoUser._id);
+                    onConnectOrReconnect();
                 }
 
                 newSocket.on('presence_update', (onlineUserIds) => {
@@ -2916,8 +2950,8 @@ export default function Dashboard() {
         e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
     };
 
-    const sendMessage = (payload) => {
-        if (!socket || !mongoUserId || !payload?.conversationId) return;
+    const sendMessage = async (payload) => {
+        if (!mongoUserId || !payload?.conversationId) return;
 
         const clientMessageId = `pending-${Date.now()}-${++clientMessageSequenceRef.current}`;
         const optimisticMessage = {
@@ -2933,41 +2967,102 @@ export default function Dashboard() {
             createdAt: new Date().toISOString(),
             pending: true
         };
+        // Optimistically display the message immediately
         setMessages(previous => [...previous, optimisticMessage]);
 
-        socket.timeout(15000).emit(
-            'send_message',
-            { ...payload, clientMessageId },
-            (error, response) => {
-                if (error || !response?.ok) {
-                    setMessages(previous => previous.filter(message => message.clientMessageId !== clientMessageId && message._id !== clientMessageId));
-                    console.error('Message send failed:', error || response?.error || 'Unknown socket error');
-                    showToast(response?.error || 'Message could not be sent. Please try again.');
-                } else if (response?.message) {
-                    const confirmedMsg = response.message;
-                    setMessages(previous => {
-                        const index = previous.findIndex(m =>
-                            m.clientMessageId === clientMessageId ||
-                            String(m._id) === clientMessageId ||
-                            String(m._id) === String(confirmedMsg._id)
-                        );
-                        if (index !== -1) {
-                            const next = [...previous];
-                            next[index] = confirmedMsg;
-                            return next;
-                        }
-                        return previous;
-                    });
+        const handleConfirm = (confirmedMsg) => {
+            if (!confirmedMsg) return;
+            setMessages(previous => {
+                const index = previous.findIndex(m =>
+                    m.clientMessageId === clientMessageId ||
+                    String(m._id) === clientMessageId ||
+                    String(m._id) === String(confirmedMsg._id)
+                );
+                if (index !== -1) {
+                    const next = [...previous];
+                    next[index] = { ...confirmedMsg, pending: false };
+                    return next;
                 }
+                return previous;
+            });
+            // Update sidebar conversation item immediately
+            setConversations(prev => prev.map(c => {
+                if (String(c._id) === String(payload.conversationId)) {
+                    return {
+                        ...c,
+                        lastMessage: confirmedMsg,
+                        updatedAt: confirmedMsg.createdAt || new Date().toISOString()
+                    };
+                }
+                return c;
+            }));
+        };
+
+        const sendHttpFallback = async () => {
+            try {
+                let token = null;
+                try {
+                    token = await getAccessTokenSilently();
+                } catch (e) {}
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                };
+                const res = await fetch(`${BACKEND_URL}/api/messages`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ ...payload, clientMessageId })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.message) {
+                        handleConfirm(data.message);
+                        return true;
+                    }
+                }
+            } catch (err) {
+                console.error('HTTP send fallback error:', err);
             }
-        );
+            return false;
+        };
+
+        if (socket && socket.connected) {
+            try {
+                socket.timeout(6000).emit(
+                    'send_message',
+                    { ...payload, clientMessageId },
+                    async (error, response) => {
+                        if (error || !response?.ok) {
+                            console.warn('Socket emit timed out or error, falling back to HTTP:', error || response?.error);
+                            const fallbackOk = await sendHttpFallback();
+                            if (!fallbackOk) {
+                                setMessages(prev => prev.map(m => m.clientMessageId === clientMessageId ? { ...m, pending: false, failed: true } : m));
+                                showToast(response?.error || 'Message delivery failed. Tap to retry.');
+                            }
+                        } else if (response?.message) {
+                            handleConfirm(response.message);
+                        }
+                    }
+                );
+                return;
+            } catch (sockErr) {
+                console.warn('Socket emit exception, fallback to HTTP:', sockErr);
+            }
+        }
+
+        // If socket was not connected, send directly via HTTP fallback
+        const fallbackOk = await sendHttpFallback();
+        if (!fallbackOk) {
+            setMessages(prev => prev.map(m => m.clientMessageId === clientMessageId ? { ...m, pending: false, failed: true } : m));
+            showToast('Failed to send message. Please check your connection.');
+        }
     };
 
     const handleSendMessage = (e) => {
         if (e && e.preventDefault) e.preventDefault();
         if (isSendingMessageRef.current) return;
         const text = messageInput.trim();
-        if (!text || !socket || !mongoUserId || !activeConversationId) return;
+        if (!text || !mongoUserId || !activeConversationId) return;
 
         isSendingMessageRef.current = true;
         setMessageInput('');
@@ -3640,47 +3735,48 @@ export default function Dashboard() {
     const showChatArea = !!activeConversationId || (activeTab === 'settings' && !!activeSettingTab);
 
     const isAudioUrl = (url, mimeType) => {
+        if (typeof url !== 'string' || url.startsWith('$STATUS_REPLY$') || url.startsWith('$CALL_LOG$')) return false;
         if (mimeType) {
             if (mimeType.startsWith('audio/') || mimeType === 'audio') return true;
             if (mimeType.startsWith('video/') || mimeType.startsWith('image/')) return false;
         }
-        if (typeof url !== 'string') return false;
         if (url.match(/\.(webm|mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i) != null) return true;
         if (url.includes('res.cloudinary') && (url.includes('voice_note') || url.includes('/audio/'))) return true;
         return false;
     };
 
     const isVideoUrl = (url, mimeType) => {
+        if (typeof url !== 'string' || url.startsWith('$STATUS_REPLY$') || url.startsWith('$CALL_LOG$')) return false;
         if (isAudioUrl(url, mimeType)) return false;
         if (mimeType) {
             if (mimeType.startsWith('video/') || mimeType === 'video') return true;
             if (mimeType.startsWith('audio/') || mimeType.startsWith('image/')) return false;
         }
-        if (typeof url !== 'string') return false;
         if (url.match(/\.(mp4|mov|avi|mkv|3gp|flv|wmv)(\?.*)?$/i) != null) return true;
         if (url.includes('/video/upload/') && !/\.(webm|mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i.test(url) && !url.includes('voice_note')) return true;
         return false;
     };
 
     const isImageUrl = (url, mimeType) => {
+        if (typeof url !== 'string' || url.startsWith('$STATUS_REPLY$') || url.startsWith('$CALL_LOG$')) return false;
         if (mimeType) {
             if (mimeType.startsWith('image/') || mimeType === 'image' || mimeType === 'photo' || mimeType === 'whiteboard') return true;
             if (mimeType.startsWith('video/') || mimeType.startsWith('audio/')) return false;
         }
-        if (typeof url !== 'string') return false;
         if (url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i) != null || url.startsWith('data:image/')) return true;
         if (url.includes('/image/upload/') && !/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip)(\?.*)?$/i.test(url)) return true;
         return false;
     };
 
     const isDocumentUrl = (url, mimeType, attachmentName = '') => {
+        if (typeof url !== 'string' || url.startsWith('$STATUS_REPLY$') || url.startsWith('$CALL_LOG$')) return false;
         if (isAudioUrl(url, mimeType) || isVideoUrl(url, mimeType) || isImageUrl(url, mimeType)) return false;
         if (mimeType) {
             if (mimeType.startsWith('application/') || mimeType.startsWith('text/') || mimeType === 'document' || mimeType === 'file') return true;
         }
         const checkStr = `${attachmentName || ''} ${url || ''}`;
         if (/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|7z|tar|gz)(\?.*)?$/i.test(checkStr)) return true;
-        if (typeof url === 'string' && (url.includes('/raw/upload/') || url.includes('res.cloudinary.com'))) return true;
+        if (url.includes('/raw/upload/') || url.includes('res.cloudinary.com')) return true;
         return false;
     };
 
@@ -3928,7 +4024,7 @@ export default function Dashboard() {
         return prefix + 'No messages yet';
     };
 
-    const isCloudinaryUrl = (url) => typeof url === 'string' && url.includes('res.cloudinary.com');
+    const isCloudinaryUrl = (url) => typeof url === 'string' && !url.startsWith('$STATUS_REPLY$') && !url.startsWith('$CALL_LOG$') && url.includes('res.cloudinary.com');
     const openMediaViewer = (src, type = 'image', title = '') => {
         if (src) setMediaViewer({ src, type, title });
     };
@@ -5172,20 +5268,21 @@ export default function Dashboard() {
                                                         (typeof msg.attachmentName === 'string' && msg.attachmentName.toLowerCase().includes('whiteboard')) ||
                                                         (typeof msg.caption === 'string' && msg.caption.toLowerCase().includes('mock-up'))
                                                     );
-                                                    const isImageMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && isImageUrl(msg.content, msg.attachmentType);
-                                                    const isVideoMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && isVideoUrl(msg.content, msg.attachmentType);
-                                                    const isCodeMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && (
+                                                    const isStatusReplyMsg = !msg.isDeletedForEveryone && typeof msg.content === 'string' && (msg.content.startsWith('$STATUS_REPLY$') || msg.content.startsWith('[Status:'));
+                                                    const isImageMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && !isStatusReplyMsg && isImageUrl(msg.content, msg.attachmentType);
+                                                    const isVideoMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && !isStatusReplyMsg && isVideoUrl(msg.content, msg.attachmentType);
+                                                    const isCodeMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && !isStatusReplyMsg && (
                                                         !!msg.isCodeSnippet ||
                                                         (typeof msg.content === 'string' && msg.content.trim().startsWith('```') && msg.content.trim().endsWith('```'))
                                                     );
-                                                    const isDocMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && !isImageMsg && !isVideoMsg && !isCodeMsg && (
+                                                    const isDocMsg = !msg.isDeletedForEveryone && !isWhiteboardMessage && !isStatusReplyMsg && !isImageMsg && !isVideoMsg && !isCodeMsg && (
                                                         (isCloudinaryUrl(msg.content) && !isAudioUrl(msg.content, msg.attachmentType)) ||
                                                         (typeof msg.attachmentName === 'string' && msg.attachmentName.length > 0 && !isAudioUrl(msg.content, msg.attachmentType)) ||
                                                         (msg.attachmentType && !['whiteboard', 'audio'].some(t => msg.attachmentType.includes(t)) && (msg.attachmentType.includes('pdf') || msg.attachmentType.includes('document') || msg.attachmentType.includes('sheet') || msg.attachmentType.includes('zip') || msg.attachmentType.includes('text') || msg.attachmentType.includes('octet-stream')))
                                                     );
                                                     const hasVisualMedia = isImageMsg || isVideoMsg;
                                                     const hasThinBorder = isImageMsg || isVideoMsg || isCodeMsg || isDocMsg;
-                                                    const isMediaMessage = !msg.isDeletedForEveryone && !isWhiteboardMessage && (
+                                                    const isMediaMessage = !msg.isDeletedForEveryone && !isWhiteboardMessage && !isStatusReplyMsg && (
                                                         isCodeMsg || hasVisualMedia || isDocMsg
                                                     );
                                                     const isImageWithCaption = (hasVisualMedia || isDocMsg) && !!msg.caption;
@@ -5408,7 +5505,13 @@ export default function Dashboard() {
                                                                                     ? 'This message was deleted'
                                                                                     : (typeof msg.replyTo.content === 'string' && msg.replyTo.content.startsWith('$CALL_LOG$'))
                                                                                         ? (msg.replyTo.content.includes('|video') ? '📹 Video call' : '📞 Voice call')
-                                                                                        : (msg.replyTo.content || (msg.replyTo.isCodeSnippet ? 'Code Snippet' : 'Media'))}
+                                                                                        : (typeof msg.replyTo.content === 'string' && (msg.replyTo.content.startsWith('$STATUS_REPLY$') || msg.replyTo.content.startsWith('[Status:')))
+                                                                                            ? (() => {
+                                                                                                const parsed = parseStatusReply(msg.replyTo.content);
+                                                                                                const icon = parsed?.type === 'video' ? '🎥' : parsed?.type === 'text' ? '📝' : '📷';
+                                                                                                return `${icon} Status: ${parsed?.replyText || 'Status reply'}`;
+                                                                                            })()
+                                                                                            : (msg.replyTo.content || (msg.replyTo.isCodeSnippet ? 'Code Snippet' : 'Media'))}
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -5825,7 +5928,7 @@ export default function Dashboard() {
                                                                                     </div>
                                                                                 )}
 
-                                                                                {isImageUrl(msg.content, msg.attachmentType) && !isWhiteboardMessage && (
+                                                                                {isImageUrl(msg.content, msg.attachmentType) && !isWhiteboardMessage && !isStatusReplyMsg && (
                                                                                     <div style={{ position: 'relative', display: 'block', width: '100%', lineHeight: 0 }}>
                                                                                         <button
                                                                                             type="button"
@@ -6001,7 +6104,15 @@ export default function Dashboard() {
                                                             {replyingToMessage.sender?.displayName || 'Someone'}
                                                         </span>
                                                         <span style={{ fontSize: '0.9rem', color: 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                            {replyingToMessage.content}
+                                                            {(typeof replyingToMessage.content === 'string' && replyingToMessage.content.startsWith('$CALL_LOG$'))
+                                                                ? (replyingToMessage.content.includes('|video') ? '📹 Video call' : '📞 Voice call')
+                                                                : (typeof replyingToMessage.content === 'string' && (replyingToMessage.content.startsWith('$STATUS_REPLY$') || replyingToMessage.content.startsWith('[Status:')))
+                                                                    ? (() => {
+                                                                        const parsed = parseStatusReply(replyingToMessage.content);
+                                                                        const icon = parsed?.type === 'video' ? '🎥' : parsed?.type === 'text' ? '📝' : '📷';
+                                                                        return `${icon} Status: ${parsed?.replyText || 'Status reply'}`;
+                                                                    })()
+                                                                    : (replyingToMessage.content || (replyingToMessage.isCodeSnippet ? 'Code Snippet' : 'Media'))}
                                                         </span>
                                                     </div>
                                                     <IconButton type="button" onClick={() => setReplyingToMessage(null)} style={{ padding: '4px' }}>
@@ -6635,22 +6746,22 @@ export default function Dashboard() {
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: 'rgba(0, 0, 0, 0.88)',
-                        backdropFilter: 'blur(10px)',
-                        padding: window.innerWidth <= 768 ? '6px' : '20px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.92)',
+                        backdropFilter: 'blur(12px)',
+                        padding: (window.innerWidth <= 768 || isMobileViewport) ? '0' : '20px',
                         animation: 'fadeIn 0.15s ease'
                     }}
                 >
                     <div
                         onClick={(e) => e.stopPropagation()}
                         style={{
-                            width: '100%',
-                            maxWidth: '960px',
-                            height: window.innerWidth <= 768 ? '96vh' : '88vh',
-                            maxHeight: '900px',
+                            width: (window.innerWidth <= 768 || isMobileViewport) ? '100vw' : '100%',
+                            maxWidth: (window.innerWidth <= 768 || isMobileViewport) ? '100vw' : '1020px',
+                            height: (window.innerWidth <= 768 || isMobileViewport) ? '100dvh' : '88vh',
+                            maxHeight: (window.innerWidth <= 768 || isMobileViewport) ? '100dvh' : '920px',
                             backgroundColor: '#111b21',
-                            borderRadius: '16px',
-                            boxShadow: '0 24px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.08)',
+                            borderRadius: (window.innerWidth <= 768 || isMobileViewport) ? '0' : '16px',
+                            boxShadow: '0 24px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08)',
                             display: 'flex',
                             flexDirection: 'column',
                             overflow: 'hidden'
@@ -6661,17 +6772,37 @@ export default function Dashboard() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            padding: '12px 16px',
-                            backgroundColor: '#202c33',
+                            padding: (window.innerWidth <= 768 || isMobileViewport) ? '10px 12px' : '12px 18px',
+                            backgroundColor: '#1f2c34',
                             borderBottom: '1px solid rgba(255,255,255,0.08)',
-                            gap: '12px',
+                            gap: '10px',
                             flexShrink: 0
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setDocumentViewer(null)}
+                                    title="Close"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        backgroundColor: 'rgba(255,255,255,0.08)',
+                                        color: '#ffffff',
+                                        cursor: 'pointer',
+                                        flexShrink: 0
+                                    }}
+                                >
+                                    <X size={18} />
+                                </button>
                                 <div style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    borderRadius: '10px',
+                                    width: '34px',
+                                    height: '34px',
+                                    borderRadius: '8px',
                                     backgroundColor: documentViewer.docInfo.color,
                                     display: 'flex',
                                     alignItems: 'center',
@@ -6680,12 +6811,12 @@ export default function Dashboard() {
                                     flexShrink: 0,
                                     boxShadow: `0 2px 8px ${documentViewer.docInfo.color}55`
                                 }}>
-                                    <FileText size={20} />
+                                    <FileText size={18} />
                                 </div>
                                 <div style={{ minWidth: 0, flex: 1 }}>
                                     <h3 style={{
                                         margin: 0,
-                                        fontSize: '0.95rem',
+                                        fontSize: (window.innerWidth <= 768 || isMobileViewport) ? '0.88rem' : '0.96rem',
                                         fontWeight: '600',
                                         color: '#ffffff',
                                         overflow: 'hidden',
@@ -6694,7 +6825,7 @@ export default function Dashboard() {
                                     }}>
                                         {documentViewer.filename}
                                     </h3>
-                                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.65)' }}>
+                                    <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.65)' }}>
                                         {documentViewer.docInfo.label} • {documentViewer.docInfo.appName}
                                     </span>
                                 </div>
@@ -6709,7 +6840,7 @@ export default function Dashboard() {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '6px',
-                                        padding: '7px 14px',
+                                        padding: (window.innerWidth <= 768 || isMobileViewport) ? '7px 10px' : '7px 14px',
                                         borderRadius: '8px',
                                         border: 'none',
                                         backgroundColor: '#06b6d4',
@@ -6717,37 +6848,11 @@ export default function Dashboard() {
                                         fontSize: '0.82rem',
                                         fontWeight: '600',
                                         cursor: 'pointer',
-                                        boxShadow: '0 2px 6px rgba(6,182,212,0.35)',
-                                        transition: 'transform 0.1s ease, filter 0.1s ease'
+                                        boxShadow: '0 2px 6px rgba(6,182,212,0.35)'
                                     }}
                                 >
                                     <ExternalLink size={15} />
-                                    <span>Open in App</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => window.open(
-                                        documentViewer.docInfo.ext === 'pdf'
-                                            ? documentViewer.proxyUrl
-                                            : `https://docs.google.com/viewer?url=${encodeURIComponent(documentViewer.proxyUrl)}`,
-                                        '_blank'
-                                    )}
-                                    title="Open Fullscreen in New Tab"
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: '36px',
-                                        height: '36px',
-                                        borderRadius: '8px',
-                                        border: '1px solid rgba(255,255,255,0.12)',
-                                        backgroundColor: 'rgba(255,255,255,0.06)',
-                                        color: '#ffffff',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    <Maximize2 size={16} />
+                                    <span>{(window.innerWidth <= 768 || isMobileViewport) ? 'Open' : 'Open in App'}</span>
                                 </button>
 
                                 <button
@@ -6758,8 +6863,8 @@ export default function Dashboard() {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        width: '36px',
-                                        height: '36px',
+                                        width: '34px',
+                                        height: '34px',
                                         borderRadius: '8px',
                                         border: '1px solid rgba(255,255,255,0.12)',
                                         backgroundColor: 'rgba(255,255,255,0.06)',
@@ -6768,27 +6873,6 @@ export default function Dashboard() {
                                     }}
                                 >
                                     <Download size={16} />
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setDocumentViewer(null)}
-                                    title="Close"
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: '36px',
-                                        height: '36px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        backgroundColor: 'rgba(255,255,255,0.1)',
-                                        color: '#ffffff',
-                                        cursor: 'pointer',
-                                        marginLeft: '4px'
-                                    }}
-                                >
-                                    <X size={18} />
                                 </button>
                             </div>
                         </div>
@@ -6879,62 +6963,6 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             )}
-                        </div>
-
-                        {/* Mobile Action Footer */}
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '8px',
-                            padding: '10px 14px',
-                            backgroundColor: '#1f2c34',
-                            borderTop: '1px solid rgba(255,255,255,0.08)',
-                            flexShrink: 0
-                        }}>
-                            <button
-                                type="button"
-                                onClick={() => handleOpenInApp(documentViewer.docInfo, documentViewer.proxyUrl, documentViewer.blob)}
-                                style={{
-                                    flex: 1,
-                                    padding: '10px 16px',
-                                    borderRadius: '10px',
-                                    backgroundColor: '#06b6d4',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    fontWeight: '600',
-                                    fontSize: '0.85rem',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <ExternalLink size={16} />
-                                Open with {documentViewer.docInfo.appName}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => handleDownloadDocument(documentViewer.proxyUrl, documentViewer.filename, documentViewer.docInfo.mimeType)}
-                                style={{
-                                    padding: '10px 16px',
-                                    borderRadius: '10px',
-                                    backgroundColor: 'rgba(255,255,255,0.1)',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    fontWeight: '500',
-                                    fontSize: '0.85rem',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <Download size={16} />
-                                Save
-                            </button>
                         </div>
                     </div>
                 </div>
