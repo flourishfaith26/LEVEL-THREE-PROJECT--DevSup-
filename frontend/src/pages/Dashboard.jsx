@@ -2092,23 +2092,6 @@ export default function Dashboard() {
 
     const [callLogs, setCallLogs] = useState([]);
 
-    const formatCallLog = (log, currentUserId) => {
-        const isCaller = String(log.caller?._id || log.caller) === String(currentUserId);
-        const isGroup = log.conversation?.type === 'group';
-        const contact = isGroup ? log.conversation : (isCaller ? log.receiver : log.caller);
-        
-        return {
-            id: log._id,
-            contactId: contact ? contact._id : null,
-            contactName: isGroup ? contact.name : (contact ? contact.displayName : 'Unknown'),
-            contactAvatar: contact ? (contact.avatarUrl || '/default-avatar.svg') : '/default-avatar.svg',
-            type: log.type,
-            direction: isCaller ? 'outgoing' : 'incoming',
-            status: log.status,
-            timestamp: new Date(log.createdAt).getTime()
-        };
-    };
-
     // App Settings State
     const [appSettings, setAppSettings] = useState(() => {
         const defaults = {
@@ -2220,6 +2203,112 @@ export default function Dashboard() {
         });
         return list;
     }, [conversations, allUsers, mongoUserId]);
+
+    const conversationsRef = useRef(conversations);
+    const availableContactsRef = useRef(availableContacts);
+    const allUsersRef = useRef(allUsers);
+
+    useEffect(() => {
+        conversationsRef.current = conversations;
+        availableContactsRef.current = availableContacts;
+        allUsersRef.current = allUsers;
+    }, [conversations, availableContacts, allUsers]);
+
+    const formatCallLog = useCallback((log, currentUserId) => {
+        const myId = String(currentUserId || mongoUserId || '');
+        const isCaller = String(log.caller?._id || log.caller) === myId;
+        const isGroup = log.conversation?.type === 'group';
+        let contact = isGroup ? log.conversation : (isCaller ? log.receiver : log.caller);
+
+        let contactId = contact?._id || (typeof contact === 'string' ? contact : null);
+        let contactName = isGroup
+            ? (contact?.name || log.conversation?.name)
+            : (contact?.displayName || contact?.name || contact?.username);
+        let contactAvatar = contact?.avatarUrl || (isGroup ? log.conversation?.avatarUrl : null);
+
+        // Fallback 1: Resolve from conversation if contact or name is missing
+        if (!contactName || !contactId) {
+            const allConvs = conversationsRef.current || conversations || [];
+            const convId = log.conversation?._id || (typeof log.conversation === 'string' ? log.conversation : null);
+            const conv = (log.conversation && typeof log.conversation === 'object' && log.conversation.participants)
+                ? log.conversation
+                : allConvs.find(c => String(c._id) === String(convId));
+
+            if (conv) {
+                if (conv.type === 'group') {
+                    contactName = contactName || conv.name || 'Group Call';
+                    contactAvatar = contactAvatar || conv.avatarUrl;
+                    contactId = contactId || conv._id;
+                } else if (Array.isArray(conv.participants)) {
+                    const otherPart = conv.participants.find(p => String(p?._id || p) !== myId);
+                    if (otherPart) {
+                        contactId = contactId || (typeof otherPart === 'object' ? otherPart._id : otherPart);
+                        if (typeof otherPart === 'object' && (otherPart.displayName || otherPart.username)) {
+                            contactName = contactName || otherPart.displayName || otherPart.username;
+                            contactAvatar = contactAvatar || otherPart.avatarUrl;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback 2: Look up contactId in available contacts or allUsers
+        if (!contactName && contactId) {
+            const pool = [...(availableContactsRef.current || availableContacts || []), ...(allUsersRef.current || allUsers || [])];
+            const foundUser = pool.find(u => String(u._id || u) === String(contactId));
+            if (foundUser && typeof foundUser === 'object') {
+                contactName = foundUser.displayName || foundUser.username;
+                contactAvatar = contactAvatar || foundUser.avatarUrl;
+            }
+        }
+
+        // Fallback 3: If still no name but receiver/caller is populated
+        if (!contactName) {
+            const otherSide = isCaller ? log.receiver : log.caller;
+            if (otherSide && typeof otherSide === 'object') {
+                contactName = otherSide.displayName || otherSide.name || otherSide.username;
+                contactAvatar = contactAvatar || otherSide.avatarUrl;
+                contactId = contactId || otherSide._id;
+            }
+        }
+
+        // Clean default if absolutely nothing could be resolved
+        if (!contactName) {
+            contactName = isGroup ? 'Group Call' : 'Contact';
+        }
+
+        return {
+            id: log._id,
+            contactId: contactId ? String(contactId) : null,
+            contactName,
+            contactAvatar: contactAvatar || '/default-avatar.svg',
+            type: log.type,
+            direction: isCaller ? 'outgoing' : 'incoming',
+            status: log.status,
+            timestamp: new Date(log.createdAt).getTime()
+        };
+    }, [mongoUserId, conversations, availableContacts, allUsers]);
+
+    // Keep callLogs up-to-date whenever availableContacts or conversations change
+    useEffect(() => {
+        if (callLogs.length > 0 && (availableContacts?.length > 0 || conversations?.length > 0)) {
+            setCallLogs(prev => prev.map(item => {
+                if (item.contactName && item.contactName !== 'Unknown' && item.contactName !== 'Contact' && item.contactId) {
+                    return item;
+                }
+                const pool = [...(availableContacts || []), ...(allUsers || [])];
+                const matching = pool.find(u => String(u._id || u) === String(item.contactId));
+                if (matching && (matching.displayName || matching.username)) {
+                    return {
+                        ...item,
+                        contactName: matching.displayName || matching.username,
+                        contactAvatar: matching.avatarUrl || item.contactAvatar
+                    };
+                }
+                return item;
+            }));
+        }
+    }, [availableContacts, conversations, allUsers]);
 
     // Edit/Delete State
     const [editingMessageId, setEditingMessageId] = useState(null);
@@ -2625,7 +2714,13 @@ export default function Dashboard() {
                         isReceiving: true,
                         callerData: data,
                         callType: (data.callType === 'video') ? 'video' : 'audio',
-                        conversationId: data.conversationId
+                        conversationId: data.conversationId,
+                        targetUserId: data.from,
+                        targetUser: {
+                            _id: data.from,
+                            displayName: data.callerInfo?.name,
+                            avatarUrl: data.callerInfo?.avatarUrl
+                        }
                     });
                 });
 
@@ -3481,7 +3576,13 @@ export default function Dashboard() {
     };
 
     const openConversationWith = async (contactId, thenCall = null) => {
+        if (!contactId) {
+            console.warn('openConversationWith: contactId is null or missing');
+            return;
+        }
         let conv = conversations.find(c => c.type === 'direct' && c.participants.some(p => String(p?._id || p) === String(contactId)));
+        let targetContact = (availableContacts || []).find(u => String(u._id || u) === String(contactId))
+            || (allUsers || []).find(u => String(u._id || u) === String(contactId));
         if (!conv) {
             try {
                 const token = await getAccessTokenSilently();
@@ -3503,8 +3604,17 @@ export default function Dashboard() {
             setActiveTab('chats');
             setActiveConversationId(conv._id);
             if (thenCall) {
+                const partner = conv.participants?.find(p => String(p._id || p) !== String(mongoUserId)) || targetContact;
                 setTimeout(() => {
-                    setCallConfig({ active: true, isReceiving: false, callerData: null, callType: thenCall });
+                    setCallConfig({
+                        active: true,
+                        isReceiving: false,
+                        callerData: null,
+                        callType: thenCall,
+                        targetUserId: partner ? String(partner._id || partner) : String(contactId),
+                        targetUser: partner || null,
+                        conversationId: conv._id
+                    });
                 }, 300);
             }
         }
@@ -4209,7 +4319,11 @@ export default function Dashboard() {
                                         }}
                                         onClick={() => {
                                             if (consumeSuppressedSelectionClick()) return;
-                                            if (isCallLogsSelectionMode) toggleCallLogSelection(log.id);
+                                            if (isCallLogsSelectionMode) {
+                                                toggleCallLogSelection(log.id);
+                                            } else if (log.contactId) {
+                                                openConversationWith(log.contactId);
+                                            }
                                         }}
                                         onTouchStart={(e) => handleSelectableTouchStart(e, 'callLog', log)}
                                         onTouchMove={handleTouchMove}
@@ -5030,7 +5144,15 @@ export default function Dashboard() {
                                                 showToast('Cannot call a blocked contact. Unblock them first.');
                                                 return;
                                             }
-                                            setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'video' });
+                                            setCallConfig({
+                                                active: true,
+                                                isReceiving: false,
+                                                callerData: null,
+                                                callType: 'video',
+                                                targetUserId: directChatPartner ? String(directChatPartner._id || directChatPartner) : null,
+                                                targetUser: directChatPartner || null,
+                                                conversationId: activeConversation?._id
+                                            });
                                         }} 
                                         title="Video Call"
                                     >
@@ -5042,7 +5164,15 @@ export default function Dashboard() {
                                                 showToast('Cannot call a blocked contact. Unblock them first.');
                                                 return;
                                             }
-                                            setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'audio' });
+                                            setCallConfig({
+                                                active: true,
+                                                isReceiving: false,
+                                                callerData: null,
+                                                callType: 'audio',
+                                                targetUserId: directChatPartner ? String(directChatPartner._id || directChatPartner) : null,
+                                                targetUser: directChatPartner || null,
+                                                conversationId: activeConversation?._id
+                                            });
                                         }} 
                                         title="Voice Call"
                                     >
@@ -5096,7 +5226,15 @@ export default function Dashboard() {
                                                         Whiteboard
                                                     </ContextMenuItem>}
                                                     <ContextMenuItem onClick={() => { 
-                                                        setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'video' });
+                                                        setCallConfig({
+                                                            active: true,
+                                                            isReceiving: false,
+                                                            callerData: null,
+                                                            callType: 'video',
+                                                            targetUserId: directChatPartner ? String(directChatPartner._id || directChatPartner) : null,
+                                                            targetUser: directChatPartner || null,
+                                                            conversationId: activeConversation?._id
+                                                        });
                                                         setIsHeaderMenuOpen(false); 
                                                     }}>
                                                         <Video size={18} style={{ opacity: 0.8 }} />
@@ -6492,13 +6630,29 @@ export default function Dashboard() {
                             })()}
 
                             <div style={{ display: 'flex', gap: '32px', marginTop: '8px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'audio' })}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => setCallConfig({
+                                    active: true,
+                                    isReceiving: false,
+                                    callerData: null,
+                                    callType: 'audio',
+                                    targetUserId: directChatPartner ? String(directChatPartner._id || directChatPartner) : null,
+                                    targetUser: directChatPartner || null,
+                                    conversationId: activeConversation?._id
+                                })}>
                                     <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <Phone size={20} />
                                     </div>
                                     <span style={{ fontSize: '0.85rem' }}>Audio</span>
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => setCallConfig({ active: true, isReceiving: false, callerData: null, callType: 'video' })}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--colors-accent)' }} onClick={() => setCallConfig({
+                                    active: true,
+                                    isReceiving: false,
+                                    callerData: null,
+                                    callType: 'video',
+                                    targetUserId: directChatPartner ? String(directChatPartner._id || directChatPartner) : null,
+                                    targetUser: directChatPartner || null,
+                                    conversationId: activeConversation?._id
+                                })}>
                                     <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(6,182,212,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <Video size={20} />
                                     </div>

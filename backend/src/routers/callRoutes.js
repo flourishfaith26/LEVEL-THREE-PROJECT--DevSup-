@@ -20,8 +20,30 @@ router.get('/', requireAuth, async (req, res) => {
                 { $or: [{ caller: user._id }, { receiver: user._id }, { conversation: { $in: conversationIds } }] },
                 { deletedBy: { $ne: user._id } }
             ]
-        }).populate('caller receiver conversation').sort({ createdAt: -1 }).limit(50);
+        })
+        .populate('caller receiver')
+        .populate({
+            path: 'conversation',
+            populate: { path: 'participants', select: 'displayName avatarUrl techDiscipline username' }
+        })
+        .sort({ createdAt: -1 })
+        .limit(50);
         
+        // Self-heal any legacy call logs where receiver was missing but conversation participants exist
+        for (const log of logs) {
+            if (!log.receiver && log.conversation?.participants && log.conversation.type === 'direct') {
+                const callerIdStr = String(log.caller?._id || log.caller);
+                const other = log.conversation.participants.find(p => String(p._id || p) !== callerIdStr);
+                if (other) {
+                    log.receiver = other;
+                    const otherId = other._id || other;
+                    CallLog.updateOne({ _id: log._id }, { receiver: otherId }).exec().catch(err => {
+                        console.warn('CallLog repair non-fatal error:', err);
+                    });
+                }
+            }
+        }
+
         res.status(200).json(logs);
     } catch (error) {
         console.error(error);

@@ -470,10 +470,24 @@ export const setupSocket = (io) => {
                 const normalizedStatus = ['completed', 'missed', 'rejected'].includes(status) ? status : 'completed';
 
                 let convId = conversationId;
-                if (!convId && callerId && receiverId) {
+                let targetReceiverId = receiverId;
+
+                // If receiverId is missing but we have conversationId, resolve receiver from conversation
+                if (!targetReceiverId && convId) {
+                    const convDoc = await Conversation.findById(convId);
+                    if (convDoc && convDoc.participants && convDoc.type === 'direct') {
+                        const otherP = convDoc.participants.find(p => String(p._id || p) !== String(callerId));
+                        if (otherP) {
+                            targetReceiverId = String(otherP._id || otherP);
+                        }
+                    }
+                }
+
+                // If convId is missing but we have callerId and targetReceiverId, resolve direct conversation
+                if (!convId && callerId && targetReceiverId) {
                     const directConv = await Conversation.findOne({
                         type: 'direct',
-                        participants: { $all: [callerId, receiverId] }
+                        participants: { $all: [callerId, targetReceiverId] }
                     });
                     if (directConv) {
                         convId = String(directConv._id);
@@ -482,18 +496,29 @@ export const setupSocket = (io) => {
 
                 const newLog = await CallLog.create({
                     caller: callerId,
-                    receiver: receiverId || undefined,
+                    receiver: targetReceiverId || undefined,
                     conversation: convId || undefined,
                     type: normalizedType,
                     status: normalizedStatus
                 });
-                const populatedLog = await CallLog.findById(newLog._id).populate('caller receiver conversation');
+
+                const populatedLog = await CallLog.findById(newLog._id)
+                    .populate('caller receiver')
+                    .populate({
+                        path: 'conversation',
+                        populate: { path: 'participants', select: 'displayName avatarUrl techDiscipline username' }
+                    });
                 
+                // Collect target user rooms to notify
+                const targetRooms = new Set();
+                if (callerId) targetRooms.add(getUserRoom(callerId));
+                if (targetReceiverId) targetRooms.add(getUserRoom(targetReceiverId));
+
                 if (convId) {
                     const conv = await Conversation.findById(convId);
                     if (conv && conv.participants) {
                         conv.participants.forEach(pId => {
-                            io.to(getUserRoom(pId)).emit('call_logged', populatedLog);
+                            targetRooms.add(getUserRoom(pId));
                         });
 
                         const newMessage = new Message({
@@ -518,10 +543,11 @@ export const setupSocket = (io) => {
                             io.to(getUserRoom(pId)).emit('receive_message', newMessage);
                         });
                     }
-                } else {
-                    io.to(getUserRoom(callerId)).emit('call_logged', populatedLog);
-                    if (receiverId) io.to(getUserRoom(receiverId)).emit('call_logged', populatedLog);
                 }
+
+                targetRooms.forEach(room => {
+                    io.to(room).emit('call_logged', populatedLog);
+                });
             } catch(e) {
                 console.error('Error logging call:', e);
             }

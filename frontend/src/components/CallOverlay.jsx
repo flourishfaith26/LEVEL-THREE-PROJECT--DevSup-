@@ -373,18 +373,22 @@ const CallOverlay = ({
     };
 
     const getOtherParticipant = useCallback(() => {
+        if (callConfig?.targetUser && typeof callConfig.targetUser === 'object') {
+            return callConfig.targetUser;
+        }
         if (!activeConversation?.participants) return null;
         return activeConversation.participants.find(p => {
             const id = typeof p === 'object' && p !== null ? (p._id || p.id) : p;
             return String(id) !== String(mongoUserId);
         }) || null;
-    }, [activeConversation?.participants, mongoUserId]);
+    }, [activeConversation?.participants, mongoUserId, callConfig?.targetUser]);
 
     const getOtherParticipantId = useCallback(() => {
+        if (callConfig?.targetUserId) return String(callConfig.targetUserId);
         const other = getOtherParticipant();
         if (!other) return null;
         return String(typeof other === 'object' && other !== null ? (other._id || other.id) : other);
-    }, [getOtherParticipant]);
+    }, [getOtherParticipant, callConfig?.targetUserId]);
 
     const handleEndCallRef = useRef(null);
 
@@ -393,23 +397,26 @@ const CallOverlay = ({
         if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
         if (socket && callConfig) {
             const isGroup = activeConversation?.type === 'group';
-            const otherUserId = isGroup ? null : getOtherParticipantId();
+            const otherUserId = isGroup ? null : (getOtherParticipantId() || callConfig.targetUserId);
             const convId = activeConversation?._id || callConfig.conversationId || callConfig.callerData?.conversationId;
             const callerId = callConfig.isReceiving ? (callConfig.callerData?.from || otherUserId) : mongoUserId;
             const receiverId = callConfig.isReceiving ? mongoUserId : otherUserId;
             
-            socket.emit('log_call', {
-                callerId,
-                receiverId,
-                conversationId: convId,
-                type: (callConfig.callType === 'video') ? 'video' : 'audio',
-                status: callAcceptedRef.current ? 'completed' : 'missed'
-            });
+            // Log call if receiverId is known or if it's a group call
+            if (isGroup || receiverId) {
+                socket.emit('log_call', {
+                    callerId,
+                    receiverId,
+                    conversationId: convId,
+                    type: (callConfig.callType === 'video') ? 'video' : 'audio',
+                    status: callAcceptedRef.current ? 'completed' : 'missed'
+                });
+            }
         }
         if (emitEvent && socket && callConfig) {
             const otherUserId = callConfig.isReceiving
                 ? (callConfig.callerData?.from ? String(callConfig.callerData.from) : null)
-                : getOtherParticipantId();
+                : (getOtherParticipantId() || callConfig.targetUserId);
             if (otherUserId) {
                 if (!callAcceptedRef.current && callConfig.isReceiving) {
                     socket.emit('reject_call', { to: otherUserId });
@@ -668,11 +675,11 @@ const CallOverlay = ({
     if (!callConfig?.active) return null;
 
     const otherParticipant = getOtherParticipant();
-    const otherDisplayName = otherParticipant?.displayName || 'Contact';
-    const otherAvatarUrl = otherParticipant?.avatarUrl;
+    const otherDisplayName = otherParticipant?.displayName || otherParticipant?.name || otherParticipant?.username || callConfig?.targetUser?.displayName || 'Contact';
+    const otherAvatarUrl = otherParticipant?.avatarUrl || callConfig?.targetUser?.avatarUrl;
 
     const callerName = callConfig.isReceiving
-        ? callConfig.callerData?.callerInfo?.name || 'Someone'
+        ? (callConfig.callerData?.callerInfo?.name || otherDisplayName || 'Someone')
         : otherDisplayName;
 
     const callerAvatar = callConfig.isReceiving
