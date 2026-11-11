@@ -6,6 +6,25 @@ import { askGemini } from '../routers/aiRoutes.js';
 
 // Memory store tracks every active socket for a user across their devices.
 const onlineUsers = new Map();
+// Memory store for active audio huddles: conversationId -> Map(userId -> { user, socketId, isMuted, isSpeaking })
+const activeHuddles = new Map();
+
+const getHuddleSummary = () => {
+    const summary = {};
+    activeHuddles.forEach((membersMap, convId) => {
+        if (membersMap.size > 0) {
+            summary[convId] = Array.from(membersMap.values()).map(m => ({
+                id: String(m.user?._id || m.user?.id),
+                name: m.user?.displayName || m.user?.name || 'Developer',
+                avatar: m.user?.avatarUrl || m.user?.avatar || '',
+                isMuted: m.isMuted,
+                isSpeaking: m.isSpeaking,
+                socketId: m.socketId
+            }));
+        }
+    });
+    return summary;
+};
 
 const getUserRoom = (userId) => `user:${String(userId)}`;
 
@@ -725,8 +744,138 @@ export const setupSocket = (io) => {
             });
         });
 
-        // 7. Track User Going Offline
+        // 7. Drop-in Persistent Audio Huddle & Voice Lounge
+        socket.on('huddle:get_active', (callback) => {
+            if (typeof callback === 'function') {
+                callback(getHuddleSummary());
+            }
+        });
+
+        socket.on('huddle:join', ({ conversationId, user, isMuted = false }) => {
+            if (!conversationId || !user) return;
+            const convId = String(conversationId);
+            const userId = String(user._id || user.id);
+
+            if (!activeHuddles.has(convId)) {
+                activeHuddles.set(convId, new Map());
+            }
+
+            const members = activeHuddles.get(convId);
+            members.set(userId, {
+                user,
+                socketId: socket.id,
+                isMuted: !!isMuted,
+                isSpeaking: false,
+                joinedAt: Date.now()
+            });
+
+            socket.data.huddleConvId = convId;
+            socket.data.huddleUserId = userId;
+            socket.join(`huddle:${convId}`);
+
+            const memberList = Array.from(members.values()).map(m => ({
+                id: String(m.user?._id || m.user?.id),
+                name: m.user?.displayName || m.user?.name || 'Developer',
+                avatar: m.user?.avatarUrl || m.user?.avatar || '',
+                isMuted: m.isMuted,
+                isSpeaking: m.isSpeaking,
+                socketId: m.socketId
+            }));
+
+            // Notify everyone in the huddle room
+            io.to(`huddle:${convId}`).emit('huddle:updated', {
+                conversationId: convId,
+                members: memberList,
+                joinedUser: user
+            });
+
+            // Global broadcast for channel indicators
+            io.emit('huddle:presence_updated', getHuddleSummary());
+        });
+
+        socket.on('huddle:leave', ({ conversationId, user }) => {
+            const convId = String(conversationId || socket.data.huddleConvId || '');
+            const userId = String(user?._id || user?.id || socket.data.huddleUserId || '');
+
+            if (convId && activeHuddles.has(convId)) {
+                const members = activeHuddles.get(convId);
+                members.delete(userId);
+                if (members.size === 0) {
+                    activeHuddles.delete(convId);
+                }
+                socket.leave(`huddle:${convId}`);
+                socket.data.huddleConvId = null;
+                socket.data.huddleUserId = null;
+
+                const memberList = Array.from(members.values()).map(m => ({
+                    id: String(m.user?._id || m.user?.id),
+                    name: m.user?.displayName || m.user?.name || 'Developer',
+                    avatar: m.user?.avatarUrl || m.user?.avatar || '',
+                    isMuted: m.isMuted,
+                    isSpeaking: m.isSpeaking,
+                    socketId: m.socketId
+                }));
+
+                io.to(`huddle:${convId}`).emit('huddle:updated', {
+                    conversationId: convId,
+                    members: memberList,
+                    leftUserId: userId
+                });
+
+                io.emit('huddle:presence_updated', getHuddleSummary());
+            }
+        });
+
+        socket.on('huddle:state_change', ({ conversationId, isMuted, isSpeaking }) => {
+            const convId = String(conversationId || socket.data.huddleConvId || '');
+            const userId = String(socket.data.huddleUserId || '');
+
+            if (convId && activeHuddles.has(convId)) {
+                const members = activeHuddles.get(convId);
+                const member = members.get(userId);
+                if (member) {
+                    if (typeof isMuted === 'boolean') member.isMuted = isMuted;
+                    if (typeof isSpeaking === 'boolean') member.isSpeaking = isSpeaking;
+                    io.to(`huddle:${convId}`).emit('huddle:member_state', {
+                        conversationId: convId,
+                        userId,
+                        isMuted: member.isMuted,
+                        isSpeaking: member.isSpeaking
+                    });
+                }
+            }
+        });
+
+        socket.on('huddle:signal', ({ toSocketId, signal, fromUser, conversationId }) => {
+            if (toSocketId) {
+                io.to(toSocketId).emit('huddle:signal', {
+                    signal,
+                    fromSocketId: socket.id,
+                    fromUser,
+                    conversationId
+                });
+            }
+        });
+
+        // 8. Track User Going Offline
         socket.on('disconnect', () => {
+            // Clean up huddle membership if user was in a huddle
+            const huddleConvId = socket.data.huddleConvId;
+            const huddleUserId = socket.data.huddleUserId;
+            if (huddleConvId && activeHuddles.has(huddleConvId)) {
+                const members = activeHuddles.get(huddleConvId);
+                members.delete(huddleUserId);
+                if (members.size === 0) {
+                    activeHuddles.delete(huddleConvId);
+                }
+                io.to(`huddle:${huddleConvId}`).emit('huddle:updated', {
+                    conversationId: huddleConvId,
+                    members: Array.from(members.values()),
+                    leftUserId: huddleUserId
+                });
+                io.emit('huddle:presence_updated', getHuddleSummary());
+            }
+
             const userId = socket.data.userId;
             if (userId) {
                 const userSockets = onlineUsers.get(userId);

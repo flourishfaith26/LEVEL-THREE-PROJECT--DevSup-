@@ -227,3 +227,4 @@ export default function DevOpsAlertCard({ alert, isOwnMessage, timestamp }) {
         </div>
     );
 }
+

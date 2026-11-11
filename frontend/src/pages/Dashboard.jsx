@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2, Sparkles, Webhook } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2, Sparkles, Webhook, Headphones, Radio } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -36,6 +36,7 @@ const LiveCodingWorkspace = lazy(() => import('../components/LiveCodingWorkspace
 import CodeReviewBlock from '../components/CodeReviewBlock.jsx';
 import DevOpsAlertCard from '../components/DevOpsAlertCard.jsx';
 import WebhookManagerModal from '../components/WebhookManagerModal.jsx';
+import AudioHuddleBar from '../components/AudioHuddleBar.jsx';
 import StatusSection from '../components/StatusSection.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import { useNavigate } from 'react-router-dom';
@@ -2006,6 +2007,8 @@ export default function Dashboard() {
     const [statusUploadMode, setStatusUploadMode] = useState('text');
     const [isLiveCodingOpen, setIsLiveCodingOpen] = useState(false);
     const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
+    const [activeHuddle, setActiveHuddle] = useState(null); // { conversationId, channelName }
+    const [huddleSummary, setHuddleSummary] = useState({}); // { [convId]: [members...] }
     const [isHackathonOpen, setIsHackathonOpen] = useState(false);
     const [mediaViewer, setMediaViewer] = useState(null);
     const [documentViewer, setDocumentViewer] = useState(null);
@@ -2781,6 +2784,14 @@ export default function Dashboard() {
                         }
                         return msg;
                     }));
+                });
+
+                newSocket.on('huddle:presence_updated', (summary) => {
+                    if (summary) setHuddleSummary(summary);
+                });
+
+                newSocket.emit('huddle:get_active', (summary) => {
+                    if (summary) setHuddleSummary(summary);
                 });
 
                 newSocket.on('messages_deleted_for_me', (deletedMsgIds) => {
@@ -5353,6 +5364,58 @@ export default function Dashboard() {
                                     >
                                         <Phone size={20} />
                                     </IconButton>
+
+                                    {/* Drop-in Audio Huddle Button */}
+                                    {(() => {
+                                        const convId = String(activeConversation?._id || '');
+                                        const currentHuddleMembers = huddleSummary[convId] || [];
+                                        const isInThisHuddle = activeHuddle && String(activeHuddle.conversationId) === convId;
+
+                                        return (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (isInThisHuddle) {
+                                                        setActiveHuddle(null);
+                                                    } else {
+                                                        setActiveHuddle({
+                                                            conversationId: convId,
+                                                            channelName: activeConversation?.name || directChatPartner?.displayName || 'Chat'
+                                                        });
+                                                    }
+                                                }}
+                                                title={isInThisHuddle ? "Leave Voice Huddle" : "Join Drop-in Voice Huddle"}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '16px',
+                                                    border: isInThisHuddle ? '1px solid #10b981' : '1px solid var(--colors-border)',
+                                                    backgroundColor: isInThisHuddle ? 'rgba(16, 185, 129, 0.15)' : (currentHuddleMembers.length > 0 ? 'rgba(16, 185, 129, 0.1)' : 'transparent'),
+                                                    color: isInThisHuddle || currentHuddleMembers.length > 0 ? '#10b981' : 'var(--colors-textMuted)',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: 600,
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            >
+                                                <Headphones size={15} />
+                                                <span>
+                                                    {isInThisHuddle ? 'In Huddle' : (currentHuddleMembers.length > 0 ? `Huddle (${currentHuddleMembers.length})` : 'Huddle')}
+                                                </span>
+                                                {currentHuddleMembers.length > 0 && (
+                                                    <span style={{
+                                                        width: 6,
+                                                        height: 6,
+                                                        borderRadius: '50%',
+                                                        backgroundColor: '#10b981',
+                                                        boxShadow: '0 0 6px #10b981'
+                                                    }} />
+                                                )}
+                                            </button>
+                                        );
+                                    })()}
                                     <IconButton desktopOnly onClick={() => setIsSearchOpen(!isSearchOpen)} title="Search" style={{ color: isSearchOpen ? 'var(--colors-accent)' : 'inherit' }}>
                                         <Search size={20} />
                                     </IconButton>
@@ -8275,6 +8338,15 @@ export default function Dashboard() {
                         </div>
                     </ModalContent>
                 </ModalOverlay>
+            )}
+
+            {activeHuddle && (
+                <AudioHuddleBar
+                    huddleData={activeHuddle}
+                    currentUser={{ _id: mongoUserId, displayName: user?.displayName || user?.name || user?.nickname, avatarUrl: user?.avatarUrl || user?.picture }}
+                    socket={socket}
+                    onLeaveHuddle={() => setActiveHuddle(null)}
+                />
             )}
 
             {isWebhookModalOpen && (
