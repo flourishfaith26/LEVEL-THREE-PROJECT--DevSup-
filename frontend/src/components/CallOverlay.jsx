@@ -1259,8 +1259,7 @@ const CallOverlay = ({
                                     if (!q) return true;
                                     const name = (u.displayName || '').toLowerCase();
                                     const uname = (u.username || '').toLowerCase();
-                                    const disc = (u.techDiscipline || '').toLowerCase();
-                                    return name.includes(q) || uname.includes(q) || disc.includes(q);
+                                    return name.includes(q) || uname.includes(q);
                                 });
 
                                 if (filtered.length === 0) {
