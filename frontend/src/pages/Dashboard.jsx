@@ -8514,7 +8514,7 @@ export default function Dashboard() {
                                     New Call
                                 </h2>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--colors-accent, #00e5ff)', fontWeight: '500' }}>
-                                    Select a contact to call or message
+                                    Select a contact to call
                                 </span>
                             </div>
                             <IconButton onClick={() => setIsNewCallModalOpen(false)} style={{ backgroundColor: 'var(--colors-bg)', border: '1px solid var(--colors-border)', width: '36px', height: '36px', borderRadius: '50%', color: 'var(--colors-textMuted)' }}>
@@ -8613,23 +8613,13 @@ export default function Dashboard() {
                                             </div>
                                         </div>
 
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                            <IconButton
-                                                onClick={() => {
-                                                    setIsNewCallModalOpen(false);
-                                                    openConversationWith(contact._id);
-                                                }}
-                                                style={{ color: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', width: '36px', height: '36px', borderRadius: '50%' }}
-                                                title="Send Message"
-                                            >
-                                                <MessageSquare size={17} />
-                                            </IconButton>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                             <IconButton
                                                 onClick={() => {
                                                     setIsNewCallModalOpen(false);
                                                     openConversationWith(contact._id, 'audio');
                                                 }}
-                                                style={{ color: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', width: '36px', height: '36px', borderRadius: '50%' }}
+                                                style={{ color: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', width: '38px', height: '38px', borderRadius: '50%' }}
                                                 title="Voice Call"
                                             >
                                                 <Phone size={17} />
@@ -8639,7 +8629,7 @@ export default function Dashboard() {
                                                     setIsNewCallModalOpen(false);
                                                     openConversationWith(contact._id, 'video');
                                                 }}
-                                                style={{ color: 'var(--colors-accent, #00e5ff)', backgroundColor: 'rgba(0, 229, 255, 0.1)', width: '36px', height: '36px', borderRadius: '50%' }}
+                                                style={{ color: 'var(--colors-accent, #00e5ff)', backgroundColor: 'rgba(0, 229, 255, 0.1)', width: '38px', height: '38px', borderRadius: '50%' }}
                                                 title="Video Call"
                                             >
                                                 <Video size={17} />
