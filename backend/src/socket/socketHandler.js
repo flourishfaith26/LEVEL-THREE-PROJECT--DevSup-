@@ -389,7 +389,7 @@ export const setupSocket = (io) => {
         });
 
         // 5. WebRTC Signaling
-        socket.on('call_user', async ({ userToCall, signalData, from, callerInfo, callType, conversationId }, acknowledge) => {
+        socket.on('call_user', async ({ userToCall, signalData, from, callerInfo, callType, conversationId, callSessionId }, acknowledge) => {
             try {
                 const [callerUser, calleeUser] = await Promise.all([
                     User.findById(from).select('blockedUsers'),
@@ -413,7 +413,8 @@ export const setupSocket = (io) => {
                 from: String(from),
                 callerInfo,
                 callType: (callType === 'video') ? 'video' : 'audio',
-                conversationId: conversationId || undefined
+                conversationId: conversationId || undefined,
+                callSessionId: callSessionId || undefined
             };
 
             // Retry delivering the call for up to 10 seconds to handle Render cold-start
@@ -455,15 +456,17 @@ export const setupSocket = (io) => {
             io.to(getUserRoom(to)).emit('webrtc_ice_candidate', candidate);
         });
 
-        socket.on('end_call', ({ to }) => {
-            io.to(getUserRoom(to)).emit('call_ended');
+        socket.on('end_call', ({ to, conversationId }) => {
+            if (to) io.to(getUserRoom(to)).emit('call_ended');
+            if (conversationId) socket.to(conversationId).emit('call_ended');
         });
 
-        socket.on('reject_call', ({ to }) => {
-            io.to(getUserRoom(to)).emit('call_rejected');
+        socket.on('reject_call', ({ to, conversationId }) => {
+            if (to) io.to(getUserRoom(to)).emit('call_rejected');
+            if (conversationId) socket.to(conversationId).emit('call_rejected');
         });
 
-        socket.on('log_call', async ({ callerId, receiverId, conversationId, type, status }) => {
+        socket.on('log_call', async ({ callerId, receiverId, conversationId, type, status, callSessionId, duration }) => {
             try {
                 // Normalize type: both 'audio' and 'voice' map to 'audio', ensuring both voice and video calls log reliably
                 const normalizedType = (type === 'video') ? 'video' : 'audio';
@@ -494,12 +497,40 @@ export const setupSocket = (io) => {
                     }
                 }
 
+                // Deduplicate: Check if this call was already logged (via callSessionId or within last 20 seconds)
+                let existingLog = null;
+                if (callSessionId) {
+                    existingLog = await CallLog.findOne({ callSessionId });
+                }
+                if (!existingLog && callerId && targetReceiverId) {
+                    const recentThreshold = new Date(Date.now() - 20000);
+                    existingLog = await CallLog.findOne({
+                        caller: callerId,
+                        receiver: targetReceiverId,
+                        createdAt: { $gte: recentThreshold }
+                    });
+                }
+
+                if (existingLog) {
+                    // Update existing log without creating a duplicate
+                    if (normalizedStatus === 'completed' && existingLog.status !== 'completed') {
+                        existingLog.status = 'completed';
+                    }
+                    if (duration && duration > (existingLog.duration || 0)) {
+                        existingLog.duration = duration;
+                    }
+                    await existingLog.save();
+                    return;
+                }
+
                 const newLog = await CallLog.create({
+                    callSessionId: callSessionId || undefined,
                     caller: callerId,
                     receiver: targetReceiverId || undefined,
                     conversation: convId || undefined,
                     type: normalizedType,
-                    status: normalizedStatus
+                    status: normalizedStatus,
+                    duration: duration || 0
                 });
 
                 const populatedLog = await CallLog.findById(newLog._id)

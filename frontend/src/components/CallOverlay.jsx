@@ -246,6 +246,10 @@ const CallOverlay = ({
     const [isAnswering, setIsAnswering] = useState(false);
     const [callDialog, setCallDialog] = useState(null);
 
+    const callSessionIdRef = useRef(callConfig?.callSessionId || callConfig?.callerData?.callSessionId || `${mongoUserId}-${Date.now()}`);
+    const hasLoggedCallRef = useRef(false);
+    const callDurationRef = useRef(0);
+
     const localStream = useRef(null);
     const remoteStream = useRef(null);
     const peerConnection = useRef(null);
@@ -290,7 +294,11 @@ const CallOverlay = ({
 
     useEffect(() => {
         if (!callAccepted) return;
-        timerRef.current = setInterval(() => setCallDuration(d => d + 1), 1000);
+        timerRef.current = setInterval(() => setCallDuration(d => {
+            const next = d + 1;
+            callDurationRef.current = next;
+            return next;
+        }), 1000);
         return () => clearInterval(timerRef.current);
     }, [callAccepted]);
 
@@ -325,7 +333,46 @@ const CallOverlay = ({
             }
         };
 
+        pc.onconnectionstatechange = () => {
+            if (pc.connectionState === 'connected') {
+                if (ringTimeoutRef.current) {
+                    clearTimeout(ringTimeoutRef.current);
+                    ringTimeoutRef.current = null;
+                }
+                callAcceptedRef.current = true;
+                setCallAccepted(true);
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                if (ringTimeoutRef.current) {
+                    clearTimeout(ringTimeoutRef.current);
+                    ringTimeoutRef.current = null;
+                }
+                callAcceptedRef.current = true;
+                setCallAccepted(true);
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
+            }
+        };
+
         pc.ontrack = (e) => {
+            // Once media arrives, connection is alive — stop ringtone and clear any timeout
+            if (ringTimeoutRef.current) {
+                clearTimeout(ringTimeoutRef.current);
+                ringTimeoutRef.current = null;
+            }
+            callAcceptedRef.current = true;
+            setCallAccepted(true);
+            ringtoneRef.current?.stop?.();
+            ringtoneRef.current?.pause?.();
+            ringtoneRef.current = null;
+
             const remoteStr = e.streams[0] || remoteStream.current || new MediaStream();
             if (!e.streams[0] && !remoteStr.getTracks().includes(e.track)) {
                 remoteStr.addTrack(e.track);
@@ -402,26 +449,31 @@ const CallOverlay = ({
             const callerId = callConfig.isReceiving ? (callConfig.callerData?.from || otherUserId) : mongoUserId;
             const receiverId = callConfig.isReceiving ? mongoUserId : otherUserId;
             
-            // Log call if receiverId is known or if it's a group call
-            if (isGroup || receiverId) {
+            // Log call if receiverId is known or if it's a group call — only once per session
+            if (!hasLoggedCallRef.current && (isGroup || receiverId)) {
+                hasLoggedCallRef.current = true;
                 socket.emit('log_call', {
                     callerId,
                     receiverId,
                     conversationId: convId,
                     type: (callConfig.callType === 'video') ? 'video' : 'audio',
-                    status: callAcceptedRef.current ? 'completed' : 'missed'
+                    status: callAcceptedRef.current ? 'completed' : 'missed',
+                    callSessionId: callSessionIdRef.current,
+                    duration: callDurationRef.current || callDuration || 0
                 });
             }
         }
         if (emitEvent && socket && callConfig) {
+            const isGroup = activeConversation?.type === 'group';
             const otherUserId = callConfig.isReceiving
                 ? (callConfig.callerData?.from ? String(callConfig.callerData.from) : null)
                 : (getOtherParticipantId() || callConfig.targetUserId);
+            const convId = activeConversation?._id || callConfig.conversationId || callConfig.callerData?.conversationId;
             if (otherUserId) {
                 if (!callAcceptedRef.current && callConfig.isReceiving) {
-                    socket.emit('reject_call', { to: otherUserId });
+                    socket.emit('reject_call', { to: otherUserId, conversationId: convId });
                 } else {
-                    socket.emit('end_call', { to: otherUserId });
+                    socket.emit('end_call', { to: otherUserId, conversationId: convId });
                 }
             }
         }
@@ -499,7 +551,8 @@ const CallOverlay = ({
                     avatarUrl: currentUserData?.avatarUrl || ''
                 },
                 callType: (callConfig.callType === 'video') ? 'video' : 'audio',
-                conversationId: activeConversation?._id
+                conversationId: activeConversation?._id || callConfig?.conversationId,
+                callSessionId: callSessionIdRef.current
             });
 
             if (!response?.ok) {
@@ -590,9 +643,12 @@ const CallOverlay = ({
                 await getMedia();
                 if (cancelled) { localStream.current?.getTracks().forEach(t => t.stop()); return; }
                 await initiateCall();
+                if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
                 ringTimeoutRef.current = setTimeout(() => {
-                    if (!callAcceptedRef.current) handleEndCallRef.current?.(true);
-                }, 30000);
+                    if (!callAcceptedRef.current && peerConnection.current?.connectionState !== 'connected') {
+                        handleEndCallRef.current?.(true);
+                    }
+                }, 45000);
             } catch (err) {
                 console.error('initMedia error:', err);
                 if (!cancelled) { 
@@ -606,7 +662,13 @@ const CallOverlay = ({
                 }
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            if (ringTimeoutRef.current) {
+                clearTimeout(ringTimeoutRef.current);
+                ringTimeoutRef.current = null;
+            }
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [callConfig?.active]);
 
@@ -623,7 +685,13 @@ const CallOverlay = ({
                 }
                 setCallAccepted(true);
                 callAcceptedRef.current = true;
-                if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+                if (ringTimeoutRef.current) {
+                    clearTimeout(ringTimeoutRef.current);
+                    ringTimeoutRef.current = null;
+                }
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
             } catch (error) {
                 console.error('Unable to apply call answer:', error);
                 // If the call is already accepted and running, don't kill it over a

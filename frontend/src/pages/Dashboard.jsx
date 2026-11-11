@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2 } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2 } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -2091,6 +2091,10 @@ export default function Dashboard() {
     const [searchQuery, setSearchQuery] = useState('');
 
     const [callLogs, setCallLogs] = useState([]);
+    const [selectedCallLogId, setSelectedCallLogId] = useState(null);
+    const [isNewCallModalOpen, setIsNewCallModalOpen] = useState(false);
+    const [newCallSearchQuery, setNewCallSearchQuery] = useState('');
+    const [quickCallMessage, setQuickCallMessage] = useState('');
 
     // App Settings State
     const [appSettings, setAppSettings] = useState(() => {
@@ -3621,6 +3625,39 @@ export default function Dashboard() {
         setContextMenu({ ...contextMenu, visible: false });
     };
 
+    const sendQuickMessageToContact = async (contactId, messageText) => {
+        if (!contactId || !messageText?.trim()) return;
+        const text = messageText.trim();
+        let conv = conversations.find(c => c.type === 'direct' && c.participants.some(p => String(p?._id || p) === String(contactId)));
+        if (!conv) {
+            try {
+                const token = await getAccessTokenSilently();
+                const res = await fetch(`${BACKEND_URL}/api/conversations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ type: 'direct', participantIds: [mongoUserId, contactId] })
+                });
+                if (res.ok) {
+                    conv = await res.json();
+                    setConversations(prev => [conv, ...prev]);
+                }
+            } catch (e) {
+                console.error('Error creating conversation:', e);
+            }
+        }
+        if (conv && socket) {
+            socket.emit('send_message', {
+                conversationId: conv._id,
+                senderId: mongoUserId,
+                content: text,
+                sequence: ++clientMessageSequenceRef.current
+            });
+            showToast('Message sent');
+            setActiveTab('chats');
+            setActiveConversationId(conv._id);
+        }
+    };
+
     const confirmForward = (targetConvId) => {
         if (!socket || !forwardMessageData) return;
 
@@ -4291,9 +4328,14 @@ export default function Dashboard() {
                                         </IconButton>
                                     </div>
                                 ) : (
-                                    <IconButton title="Select call logs" onClick={() => setIsCallLogsSelectionMode(true)} style={{ color: '#d1d7db', backgroundColor: '#2a3942', width: '40px', height: '40px' }}>
-                                        <CheckSquare size={20} />
-                                    </IconButton>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <IconButton title="New Call" onClick={() => { setNewCallSearchQuery(''); setIsNewCallModalOpen(true); }} style={{ color: 'var(--colors-accent, #00e5ff)', backgroundColor: 'rgba(0, 229, 255, 0.1)', width: '40px', height: '40px', borderRadius: '50%' }}>
+                                            <PhoneCall size={19} />
+                                        </IconButton>
+                                        <IconButton title="Select call logs" onClick={() => setIsCallLogsSelectionMode(true)} style={{ color: '#d1d7db', backgroundColor: '#2a3942', width: '40px', height: '40px' }}>
+                                            <CheckSquare size={20} />
+                                        </IconButton>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -4321,8 +4363,8 @@ export default function Dashboard() {
                                             if (consumeSuppressedSelectionClick()) return;
                                             if (isCallLogsSelectionMode) {
                                                 toggleCallLogSelection(log.id);
-                                            } else if (log.contactId) {
-                                                openConversationWith(log.contactId);
+                                            } else {
+                                                setSelectedCallLogId(log.id);
                                             }
                                         }}
                                         onTouchStart={(e) => handleSelectableTouchStart(e, 'callLog', log)}
@@ -4370,25 +4412,68 @@ export default function Dashboard() {
                                             </div>
                                         </div>
                                         {!isCallLogsSelectionMode && (
-                                            <IconButton
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    openConversationWith(log.contactId, log.type === 'video' ? 'video' : 'audio');
-                                                }}
-                                                style={{ 
-                                                    color: 'var(--colors-accent, #00e5ff)',
-                                                    backgroundColor: 'rgba(0, 229, 255, 0.08)',
-                                                    width: '38px',
-                                                    height: '38px',
-                                                    borderRadius: '50%',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center'
-                                                }}
-                                                title={log.type === 'video' ? 'Start video call' : 'Start voice call'}
-                                            >
-                                                {log.type === 'video' ? <Video size={18} /> : <Phone size={18} />}
-                                            </IconButton>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                                <IconButton
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openConversationWith(log.contactId);
+                                                    }}
+                                                    style={{ 
+                                                        color: '#94a3b8',
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                                                        width: '32px',
+                                                        height: '32px',
+                                                        borderRadius: '50%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    title="Message"
+                                                >
+                                                    <MessageSquare size={15} />
+                                                </IconButton>
+                                                <IconButton
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openConversationWith(log.contactId, 'audio');
+                                                    }}
+                                                    style={{ 
+                                                        color: '#94a3b8',
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                                                        width: '32px',
+                                                        height: '32px',
+                                                        borderRadius: '50%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    title="Voice Call"
+                                                >
+                                                    <Phone size={15} />
+                                                </IconButton>
+                                                <IconButton
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openConversationWith(log.contactId, 'video');
+                                                    }}
+                                                    style={{ 
+                                                        color: 'var(--colors-accent, #00e5ff)',
+                                                        backgroundColor: 'rgba(0, 229, 255, 0.08)',
+                                                        width: '32px',
+                                                        height: '32px',
+                                                        borderRadius: '50%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    title="Video Call"
+                                                >
+                                                    <Video size={15} />
+                                                </IconButton>
+                                            </div>
                                         )}
                                     </ChannelItem>
                                 ))}
@@ -6451,20 +6536,262 @@ export default function Dashboard() {
                             </div>
                         )}
                         {activeTab === 'calls' && (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative' }}>
-                                <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
-                                <div style={{ 
-                                    width: '140px', height: '140px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0.05) 100%)', 
-                                    border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px', 
-                                    boxShadow: '0 0 40px rgba(6,182,212,0.15), inset 0 0 20px rgba(6,182,212,0.1)', position: 'relative', zIndex: 1
-                                }}>
-                                    <Phone size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} />
-                                </div>
-                                <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.5rem', marginBottom: '16px', fontWeight: '500', letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>Your Calls</h2>
-                                <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.1rem', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6', position: 'relative', zIndex: 1 }}>
-                                    Start a voice or video call from any of your chats.
-                                </p>
-                            </div>
+                            (() => {
+                                const activeCallLog = callLogs.find(l => l.id === selectedCallLogId) || (callLogs.length > 0 ? callLogs[0] : null);
+                                if (!activeCallLog) {
+                                    return (
+                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative', padding: '24px' }}>
+                                            <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                                            <div style={{ 
+                                                width: '130px', height: '130px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(0,229,255,0.18) 0%, rgba(0,229,255,0.04) 100%)', 
+                                                border: '1px solid rgba(0,229,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '28px', 
+                                                boxShadow: '0 0 40px rgba(0,229,255,0.15)', position: 'relative', zIndex: 1
+                                            }}>
+                                                <Phone size={56} color="var(--colors-accent, #00e5ff)" strokeWidth={1.6} />
+                                            </div>
+                                            <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.2rem', marginBottom: '12px', fontWeight: '600', position: 'relative', zIndex: 1 }}>DevSup Calls</h2>
+                                            <p style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', maxWidth: '380px', textAlign: 'center', lineHeight: '1.6', position: 'relative', zIndex: 1, marginBottom: '24px' }}>
+                                                Make high-definition end-to-end encrypted audio and video calls, or message anyone right from here.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setNewCallSearchQuery(''); setIsNewCallModalOpen(true); }}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    padding: '12px 24px',
+                                                    borderRadius: '24px',
+                                                    backgroundColor: 'var(--colors-accent, #00e5ff)',
+                                                    color: '#080f15',
+                                                    fontWeight: '700',
+                                                    border: 'none',
+                                                    fontSize: '0.96rem',
+                                                    cursor: 'pointer',
+                                                    boxShadow: '0 4px 18px rgba(0, 229, 255, 0.35)',
+                                                    position: 'relative',
+                                                    zIndex: 1,
+                                                    transition: 'all 0.15s ease'
+                                                }}
+                                            >
+                                                <PhoneCall size={18} />
+                                                <span>Start a Call</span>
+                                            </button>
+                                        </div>
+                                    );
+                                }
+
+                                const relatedLogs = callLogs.filter(l => l.contactId && String(l.contactId) === String(activeCallLog.contactId));
+
+                                return (
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--colors-bg)', overflow: 'hidden' }}>
+                                        {/* Header Profile Area */}
+                                        <div style={{ padding: '36px 32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '1px solid var(--colors-border)', backgroundColor: 'var(--colors-surface)', flexShrink: 0 }}>
+                                            <AvatarWrapper style={{ width: '92px', height: '92px', marginBottom: '16px', border: '2px solid rgba(0, 229, 255, 0.25)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}>
+                                                <Avatar
+                                                    src={activeCallLog.contactAvatar || '/default-avatar.svg'}
+                                                    style={{ width: '100%', height: '100%', borderRadius: '50%' }}
+                                                    onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                                />
+                                            </AvatarWrapper>
+                                            <h3 style={{ fontSize: '1.4rem', fontWeight: '600', color: 'var(--colors-textMain)', margin: '0 0 6px' }}>
+                                                {activeCallLog.contactName}
+                                            </h3>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--colors-accent, #00e5ff)', marginBottom: '20px', fontWeight: '500' }}>
+                                                Contact
+                                            </span>
+
+                                            {/* Quick WhatsApp-Style Action Hub */}
+                                            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openConversationWith(activeCallLog.contactId)}
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: 'var(--colors-textMain)',
+                                                        cursor: 'pointer',
+                                                        padding: '8px 16px',
+                                                        borderRadius: '12px',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                >
+                                                    <div style={{ width: '46px', height: '46px', borderRadius: '50%', backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                                                        <MessageSquare size={20} />
+                                                    </div>
+                                                    <span style={{ fontSize: '0.82rem', fontWeight: '500' }}>Message</span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openConversationWith(activeCallLog.contactId, 'audio')}
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: 'var(--colors-textMain)',
+                                                        cursor: 'pointer',
+                                                        padding: '8px 16px',
+                                                        borderRadius: '12px',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                >
+                                                    <div style={{ width: '46px', height: '46px', borderRadius: '50%', backgroundColor: 'rgba(34, 197, 94, 0.12)', color: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(34, 197, 94, 0.25)' }}>
+                                                        <Phone size={20} />
+                                                    </div>
+                                                    <span style={{ fontSize: '0.82rem', fontWeight: '500' }}>Voice</span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openConversationWith(activeCallLog.contactId, 'video')}
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        color: 'var(--colors-textMain)',
+                                                        cursor: 'pointer',
+                                                        padding: '8px 16px',
+                                                        borderRadius: '12px',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                >
+                                                    <div style={{ width: '46px', height: '46px', borderRadius: '50%', backgroundColor: 'rgba(0, 229, 255, 0.12)', color: 'var(--colors-accent, #00e5ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0, 229, 255, 0.28)' }}>
+                                                        <Video size={20} />
+                                                    </div>
+                                                    <span style={{ fontSize: '0.82rem', fontWeight: '500' }}>Video</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Call History with this person */}
+                                        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+                                            <div style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--colors-textMuted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
+                                                Call History
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {relatedLogs.map(rLog => (
+                                                    <div
+                                                        key={rLog.id}
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            padding: '12px 16px',
+                                                            backgroundColor: 'var(--colors-surface)',
+                                                            borderRadius: '12px',
+                                                            border: '1px solid var(--colors-border)'
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                            <div style={{
+                                                                width: '36px',
+                                                                height: '36px',
+                                                                borderRadius: '50%',
+                                                                backgroundColor: rLog.type === 'video' ? 'rgba(0, 229, 255, 0.08)' : 'rgba(34, 197, 94, 0.08)',
+                                                                color: rLog.type === 'video' ? 'var(--colors-accent, #00e5ff)' : '#22c55e',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center'
+                                                            }}>
+                                                                {rLog.type === 'video' ? <Video size={17} /> : <Phone size={17} />}
+                                                            </div>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.92rem', color: 'var(--colors-textMain)', fontWeight: '500' }}>
+                                                                    {rLog.direction === 'incoming' ? (
+                                                                        <svg viewBox="0 0 24 24" width="14" height="14" fill={rLog.status === 'missed' ? '#ef4444' : '#10b981'}>
+                                                                            <path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41L20 5.41z"></path>
+                                                                        </svg>
+                                                                    ) : (
+                                                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="var(--colors-accent, #00e5ff)">
+                                                                            <path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z"></path>
+                                                                        </svg>
+                                                                    )}
+                                                                    <span>{rLog.direction === 'incoming' ? (rLog.status === 'missed' ? 'Missed Call' : 'Incoming') : 'Outgoing'}</span>
+                                                                </div>
+                                                                <span style={{ fontSize: '0.78rem', color: 'var(--colors-textMuted)' }}>
+                                                                    {formatCallTimestamp(rLog.timestamp)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            <IconButton
+                                                                onClick={() => openConversationWith(activeCallLog.contactId, rLog.type === 'video' ? 'video' : 'audio')}
+                                                                style={{ color: 'var(--colors-accent, #00e5ff)', backgroundColor: 'rgba(0, 229, 255, 0.08)', width: '34px', height: '34px', borderRadius: '50%' }}
+                                                                title={`Call back (${rLog.type})`}
+                                                            >
+                                                                {rLog.type === 'video' ? <Video size={16} /> : <Phone size={16} />}
+                                                            </IconButton>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Inline Fast Message Bar */}
+                                        <div style={{ padding: '16px 24px', backgroundColor: 'var(--colors-surface)', borderTop: '1px solid var(--colors-border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <input
+                                                type="text"
+                                                placeholder={`Message ${activeCallLog.contactName}...`}
+                                                value={quickCallMessage}
+                                                onChange={(e) => setQuickCallMessage(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        sendQuickMessageToContact(activeCallLog.contactId, quickCallMessage);
+                                                        setQuickCallMessage('');
+                                                    }
+                                                }}
+                                                style={{
+                                                    flex: 1,
+                                                    backgroundColor: 'var(--colors-bg)',
+                                                    border: '1px solid var(--colors-border)',
+                                                    borderRadius: '24px',
+                                                    padding: '12px 18px',
+                                                    color: 'var(--colors-textMain)',
+                                                    fontSize: '0.94rem',
+                                                    outline: 'none'
+                                                }}
+                                            />
+                                            <IconButton
+                                                disabled={!quickCallMessage.trim()}
+                                                onClick={() => {
+                                                    sendQuickMessageToContact(activeCallLog.contactId, quickCallMessage);
+                                                    setQuickCallMessage('');
+                                                }}
+                                                style={{
+                                                    backgroundColor: quickCallMessage.trim() ? 'var(--colors-accent, #00e5ff)' : 'rgba(255, 255, 255, 0.08)',
+                                                    color: quickCallMessage.trim() ? '#080f15' : 'var(--colors-textMuted)',
+                                                    width: '42px',
+                                                    height: '42px',
+                                                    borderRadius: '50%',
+                                                    transition: 'all 0.15s ease',
+                                                    cursor: quickCallMessage.trim() ? 'pointer' : 'default'
+                                                }}
+                                                title="Send message"
+                                            >
+                                                <Send size={18} />
+                                            </IconButton>
+                                        </div>
+                                    </div>
+                                );
+                            })()
                         )}
                         {(activeTab === 'chats' || activeTab === 'communities') && (
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative' }}>
@@ -8159,6 +8486,156 @@ export default function Dashboard() {
                             >
                                 Cancel
                             </Button>
+                        </div>
+                    </ModalContent>
+                </ModalOverlay>
+            )}
+
+            {/* New Call / Message Picker Modal */}
+            {isNewCallModalOpen && (
+                <ModalOverlay onClick={() => setIsNewCallModalOpen(false)} style={{ zIndex: 9999 }}>
+                    <ModalContent onClick={e => e.stopPropagation()} style={{
+                        gap: '20px',
+                        padding: '28px',
+                        maxWidth: '460px',
+                        borderRadius: '24px',
+                        backgroundColor: 'var(--colors-surface)',
+                        border: '1px solid var(--colors-border)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        maxHeight: '85vh',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: '800', color: 'var(--colors-textMain)' }}>
+                                    New Call
+                                </h2>
+                                <span style={{ fontSize: '0.85rem', color: 'var(--colors-accent, #00e5ff)', fontWeight: '500' }}>
+                                    Select a contact to call or message
+                                </span>
+                            </div>
+                            <IconButton onClick={() => setIsNewCallModalOpen(false)} style={{ backgroundColor: 'var(--colors-bg)', border: '1px solid var(--colors-border)', width: '36px', height: '36px', borderRadius: '50%', color: 'var(--colors-textMuted)' }}>
+                                <X size={18} />
+                            </IconButton>
+                        </div>
+
+                        {/* Search Input */}
+                        <div style={{ position: 'relative' }}>
+                            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--colors-textMuted)' }} />
+                            <input
+                                type="text"
+                                placeholder="Search name or username..."
+                                value={newCallSearchQuery}
+                                onChange={(e) => setNewCallSearchQuery(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    backgroundColor: 'var(--colors-bg)',
+                                    border: '1px solid var(--colors-border)',
+                                    borderRadius: '12px',
+                                    padding: '12px 14px 12px 42px',
+                                    color: 'var(--colors-textMain)',
+                                    fontSize: '0.92rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                        </div>
+
+                        {/* Contact List */}
+                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px' }}>
+                            {(() => {
+                                const pool = [...(availableContacts || []), ...(allUsers || [])];
+                                const uniqueContacts = [];
+                                const seen = new Set();
+                                pool.forEach(u => {
+                                    const id = String(u._id || u);
+                                    if (id && id !== String(mongoUserId) && !seen.has(id)) {
+                                        seen.add(id);
+                                        uniqueContacts.push(u);
+                                    }
+                                });
+
+                                const filtered = uniqueContacts.filter(u => {
+                                    if (!newCallSearchQuery.trim()) return true;
+                                    const q = newCallSearchQuery.toLowerCase();
+                                    return (u.displayName?.toLowerCase().includes(q) || u.username?.toLowerCase().includes(q) || u.techDiscipline?.toLowerCase().includes(q));
+                                });
+
+                                if (filtered.length === 0) {
+                                    return (
+                                        <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
+                                            No contacts found
+                                        </div>
+                                    );
+                                }
+
+                                return filtered.map(contact => (
+                                    <div
+                                        key={contact._id}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '10px 14px',
+                                            backgroundColor: 'var(--colors-bg)',
+                                            borderRadius: '12px',
+                                            border: '1px solid var(--colors-border)'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                                            <AvatarWrapper style={{ width: '42px', height: '42px', flexShrink: 0 }}>
+                                                <Avatar
+                                                    src={contact.avatarUrl || '/default-avatar.svg'}
+                                                    style={{ width: '100%', height: '100%', borderRadius: '50%' }}
+                                                    onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                                />
+                                            </AvatarWrapper>
+                                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                                <span style={{ fontSize: '0.94rem', fontWeight: '600', color: 'var(--colors-textMain)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {contact.displayName || contact.username || 'Developer'}
+                                                </span>
+                                                <span style={{ fontSize: '0.78rem', color: 'var(--colors-textMuted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {contact.techDiscipline || (contact.username ? `@${contact.username}` : 'Available')}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                            <IconButton
+                                                onClick={() => {
+                                                    setIsNewCallModalOpen(false);
+                                                    openConversationWith(contact._id);
+                                                }}
+                                                style={{ color: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.1)', width: '36px', height: '36px', borderRadius: '50%' }}
+                                                title="Send Message"
+                                            >
+                                                <MessageSquare size={17} />
+                                            </IconButton>
+                                            <IconButton
+                                                onClick={() => {
+                                                    setIsNewCallModalOpen(false);
+                                                    openConversationWith(contact._id, 'audio');
+                                                }}
+                                                style={{ color: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', width: '36px', height: '36px', borderRadius: '50%' }}
+                                                title="Voice Call"
+                                            >
+                                                <Phone size={17} />
+                                            </IconButton>
+                                            <IconButton
+                                                onClick={() => {
+                                                    setIsNewCallModalOpen(false);
+                                                    openConversationWith(contact._id, 'video');
+                                                }}
+                                                style={{ color: 'var(--colors-accent, #00e5ff)', backgroundColor: 'rgba(0, 229, 255, 0.1)', width: '36px', height: '36px', borderRadius: '50%' }}
+                                                title="Video Call"
+                                            >
+                                                <Video size={17} />
+                                            </IconButton>
+                                        </div>
+                                    </div>
+                                ));
+                            })()}
                         </div>
                     </ModalContent>
                 </ModalOverlay>
