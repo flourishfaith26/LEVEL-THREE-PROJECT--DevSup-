@@ -69,6 +69,7 @@ app.use('/api/status', statusRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/call-config', callConfigRoutes);
 app.use('/api/github', githubRoutes);
+app.use('/api/auth/github', githubRoutes);
 app.use('/api/ai', aiRoutes);
 
 const httpServer = createServer(app);
