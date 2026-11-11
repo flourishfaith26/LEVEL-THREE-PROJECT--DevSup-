@@ -35,6 +35,29 @@ const messageSchema = new mongoose.Schema({
     type: String,
     default: 'plaintext' // e.g., 'javascript', 'python', 'html'
   },
+  devopsAlert: {
+    service: {
+      type: String,
+      enum: ['github', 'vercel', 'sentry', 'custom', 'ci'],
+      default: 'custom'
+    },
+    status: {
+      type: String,
+      enum: ['success', 'failure', 'pending', 'error', 'info'],
+      default: 'info'
+    },
+    title: { type: String, default: '' },
+    description: { type: String, default: '' },
+    branch: { type: String, default: '' },
+    commit: { type: String, default: '' },
+    author: { type: String, default: '' },
+    url: { type: String, default: '' },
+    environment: { type: String, default: '' },
+    fields: [{
+      label: { type: String },
+      value: { type: String }
+    }]
+  },
   codeReviews: [{
     lineNumber: {
       type: Number,

@@ -23,6 +23,7 @@ import callConfigRoutes from './src/routers/callConfigRoutes.js';
 import githubRoutes from './src/routers/githubRoutes.js';
 import aiRoutes from './src/routers/aiRoutes.js';
 import codeRunnerRoutes from './src/routers/codeRunnerRoutes.js';
+import webhookRoutes from './src/routers/webhookRoutes.js';
 
 connectDB();
 
@@ -73,6 +74,7 @@ app.use('/api/github', githubRoutes);
 app.use('/api/auth/github', githubRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/code', codeRunnerRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 const httpServer = createServer(app);
 

@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2, Sparkles } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2, Sparkles, Webhook } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -34,6 +34,8 @@ const StatusUploadModal = lazy(() => import('../components/StatusUploadModal'));
 const EventsView = lazy(() => import('../components/EventsView'));
 const LiveCodingWorkspace = lazy(() => import('../components/LiveCodingWorkspace'));
 import CodeReviewBlock from '../components/CodeReviewBlock.jsx';
+import DevOpsAlertCard from '../components/DevOpsAlertCard.jsx';
+import WebhookManagerModal from '../components/WebhookManagerModal.jsx';
 import StatusSection from '../components/StatusSection.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import { useNavigate } from 'react-router-dom';
@@ -2003,6 +2005,7 @@ export default function Dashboard() {
     const [communityTab, setCommunityTab] = useState('chat');
     const [statusUploadMode, setStatusUploadMode] = useState('text');
     const [isLiveCodingOpen, setIsLiveCodingOpen] = useState(false);
+    const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
     const [isHackathonOpen, setIsHackathonOpen] = useState(false);
     const [mediaViewer, setMediaViewer] = useState(null);
     const [documentViewer, setDocumentViewer] = useState(null);
@@ -5438,6 +5441,13 @@ export default function Dashboard() {
                                                                 <Rocket size={18} style={{ opacity: 0.8 }} />
                                                                 Hackathon
                                                             </ContextMenuItem>
+                                                            <ContextMenuItem onClick={() => { 
+                                                                setIsWebhookModalOpen(true);
+                                                                setIsHeaderMenuOpen(false); 
+                                                            }}>
+                                                                <Webhook size={18} style={{ opacity: 0.8 }} />
+                                                                DevOps CI/CD Webhooks
+                                                            </ContextMenuItem>
                                                         </>
                                                     )}
                                                     <ContextMenuItem onClick={() => { 
@@ -5860,6 +5870,16 @@ export default function Dashboard() {
                                                                         </div>
                                                                     )}
                                                                     {(() => {
+                                                                        if (msg.devopsAlert && msg.devopsAlert.title) {
+                                                                            return (
+                                                                                <DevOpsAlertCard
+                                                                                    alert={msg.devopsAlert}
+                                                                                    isOwnMessage={isOwnMessage}
+                                                                                    timestamp={renderInlineTimestamp('0px')}
+                                                                                />
+                                                                            );
+                                                                        }
+
                                                                         const embedData = detectEcosystemLink(msg.content);
 
                                                                         // If it's a code snippet or pasted code, render the code block with right-aligned timestamp
@@ -8255,6 +8275,16 @@ export default function Dashboard() {
                         </div>
                     </ModalContent>
                 </ModalOverlay>
+            )}
+
+            {isWebhookModalOpen && (
+                <WebhookManagerModal
+                    isOpen={isWebhookModalOpen}
+                    onClose={() => setIsWebhookModalOpen(false)}
+                    conversationId={activeConversationId}
+                    conversationName={activeConversation?.name || 'Channel'}
+                    getAccessTokenSilently={getAccessTokenSilently}
+                />
             )}
 
             {isStatusModalOpen && (

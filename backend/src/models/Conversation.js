@@ -43,6 +43,32 @@ const conversationSchema = new mongoose.Schema({
   deletedFor: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  }],
+  webhooks: [{
+    token: {
+      type: String,
+      required: true
+    },
+    name: {
+      type: String,
+      default: 'DevOps Webhook'
+    },
+    service: {
+      type: String,
+      enum: ['github', 'vercel', 'sentry', 'custom'],
+      default: 'custom'
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    lastTriggeredAt: {
+      type: Date
+    }
   }]
 }, { timestamps: true });
 
