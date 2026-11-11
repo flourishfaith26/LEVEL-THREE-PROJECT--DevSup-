@@ -12,7 +12,7 @@ export const getMessages = async (req, res) => {
     if (!currentUser) return res.status(404).json({ message: 'User not found' });
 
     // 1. Automatically mark unread messages from other users in this conversation as READ & DELIVERED by currentUser
-    const unreadMessages = await Message.find({ 
+    const unreadMessages = await Message.find({
       conversationId,
       sender: { $ne: currentUser._id },
       readBy: { $ne: currentUser._id }
@@ -42,9 +42,9 @@ export const getMessages = async (req, res) => {
     }
 
     // 2. Return updated messages
-    const messages = await Message.find({ 
+    const messages = await Message.find({
       conversationId,
-      deletedFor: { $ne: currentUser._id } 
+      deletedFor: { $ne: currentUser._id }
     })
       .populate('sender', 'displayName avatarUrl username')
       .populate({

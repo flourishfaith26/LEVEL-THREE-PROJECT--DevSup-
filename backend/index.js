@@ -20,6 +20,8 @@ import uploadRoutes from './src/routers/uploadRoutes.js';
 import statusRoutes from './src/routers/statusRoutes.js';
 import callRoutes from './src/routers/callRoutes.js';
 import callConfigRoutes from './src/routers/callConfigRoutes.js';
+import githubRoutes from './src/routers/githubRoutes.js';
+import aiRoutes from './src/routers/aiRoutes.js';
 
 connectDB();
 
@@ -66,6 +68,8 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/call-config', callConfigRoutes);
+app.use('/api/github', githubRoutes);
+app.use('/api/ai', aiRoutes);
 
 const httpServer = createServer(app);
 
