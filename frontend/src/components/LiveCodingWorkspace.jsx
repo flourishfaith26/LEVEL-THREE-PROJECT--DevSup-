@@ -167,10 +167,12 @@ export default function LiveCodingWorkspace({
     activeConversationName = 'Channel',
     conversationId = null,
     socket = null,
-    currentUser = null
+    currentUser = null,
+    initialCode = null,
+    initialLanguage = null
 }) {
-    const [language, setLanguage] = useState('javascript');
-    const [code, setCode] = useState(CODE_TEMPLATES.javascript.code);
+    const [language, setLanguage] = useState(initialLanguage || 'javascript');
+    const [code, setCode] = useState(initialCode || (initialLanguage && CODE_TEMPLATES[initialLanguage]?.code) || CODE_TEMPLATES.javascript.code);
     const [stdin, setStdin] = useState('');
     const [output, setOutput] = useState([]);
     const [isRunning, setIsRunning] = useState(false);
@@ -178,6 +180,15 @@ export default function LiveCodingWorkspace({
     const [executionMeta, setExecutionMeta] = useState(null); // { time, exitCode, mem }
     const [copied, setCopied] = useState(false);
     const [shared, setShared] = useState(false);
+
+    useEffect(() => {
+        if (initialCode) {
+            setCode(initialCode);
+        }
+        if (initialLanguage) {
+            setLanguage(initialLanguage);
+        }
+    }, [initialCode, initialLanguage]);
 
     // Collaboration states
     const [peers, setPeers] = useState([]);

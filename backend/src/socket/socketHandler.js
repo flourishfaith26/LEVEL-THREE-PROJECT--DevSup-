@@ -2,7 +2,7 @@ import Message from '../models/Message.js';
 import Conversation from '../models/Conversation.js';
 import CallLog from '../models/CallLog.js';
 import User from '../models/User.js';
-import { askGemini } from '../routers/aiRoutes.js';
+import { askGemini, generateSmartDevSupAiAnswer } from '../routers/aiRoutes.js';
 import { sendPushNotificationToUser } from '../routers/pushRoutes.js';
 
 // Memory store tracks every active socket for a user across their devices.
@@ -251,7 +251,13 @@ export const setupSocket = (io) => {
                                 .map(m => `${m.sender?.displayName || 'User'}: ${m.content}`)
                                 .join('\n');
 
-                            const aiReplyText = await askGemini(cleanPrompt, contextHistory);
+                            let aiReplyText;
+                            try {
+                                aiReplyText = await askGemini(cleanPrompt, contextHistory);
+                            } catch (geminiErr) {
+                                console.warn('[DevSup AI] Gemini unavailable, utilizing built-in staff engine:', geminiErr.message);
+                                aiReplyText = generateSmartDevSupAiAnswer(cleanPrompt, contextHistory);
+                            }
 
                             const aiSeq = await getNextMessageSequence(messageData.conversationId);
                             const aiMessage = new Message({

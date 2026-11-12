@@ -2010,6 +2010,8 @@ export default function Dashboard() {
     const [communityTab, setCommunityTab] = useState('chat');
     const [statusUploadMode, setStatusUploadMode] = useState('text');
     const [isLiveCodingOpen, setIsLiveCodingOpen] = useState(false);
+    const [pairIdeInitialCode, setPairIdeInitialCode] = useState('');
+    const [pairIdeInitialLang, setPairIdeInitialLang] = useState('javascript');
     const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
     const [activeHuddle, setActiveHuddle] = useState(null); // { conversationId, channelName }
     const [huddleSummary, setHuddleSummary] = useState({}); // { [convId]: [members...] }
@@ -4135,7 +4137,7 @@ export default function Dashboard() {
         currentUserData?.blockedUsers?.some(u => String(u._id || u) === String(directChatPartner._id || directChatPartner))
     );
     const isSelectingCurrentMessages = isSelectingMessages && messageSelectionConversationId === activeConversationId;
-    const showChatArea = !!activeConversationId || (activeTab === 'settings' && !!activeSettingTab);
+    const showChatArea = !!activeConversationId || (activeTab === 'settings' && !!activeSettingTab) || isLiveCodingOpen;
 
     const isAudioUrl = (url, mimeType) => {
         if (typeof url !== 'string' || url.startsWith('$STATUS_REPLY$') || url.startsWith('$CALL_LOG$')) return false;
@@ -5854,10 +5856,12 @@ export default function Dashboard() {
                                                 });
                                                 setIsLiveCodingOpen(false);
                                             }}
-                                            activeConversationName={activeConversation.name || (otherParticipant?.displayName) || 'Chat'}
+                                            activeConversationName={activeConversation?.name || directChatPartner?.displayName || 'Chat'}
                                             conversationId={activeConversationId}
                                             socket={socket}
                                             currentUser={{ _id: mongoUserId, displayName: user?.displayName || user?.name || user?.nickname }}
+                                            initialCode={pairIdeInitialCode}
+                                            initialLanguage={pairIdeInitialLang}
                                         />
                                     </Suspense>
                                 </div>
@@ -6194,6 +6198,8 @@ export default function Dashboard() {
                                                                                         message={msg}
                                                                                         isOwnMessage={isOwnMessage}
                                                                                         onOpenInPairIDE={(snippet, lang) => {
+                                                                                            setPairIdeInitialCode(snippet || '');
+                                                                                            if (lang) setPairIdeInitialLang(lang);
                                                                                             setIsLiveCodingOpen(true);
                                                                                         }}
                                                                                         onAddLineReview={async (messageId, lineNumber, comment) => {
@@ -7283,25 +7289,53 @@ export default function Dashboard() {
                             })()
                         )}
                         {(activeTab === 'chats' || activeTab === 'communities') && (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative' }}>
-                                <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
-                                <div style={{ 
-                                    width: '140px', height: '140px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0.05) 100%)', 
-                                    border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px', 
-                                    boxShadow: '0 0 40px rgba(6,182,212,0.15), inset 0 0 20px rgba(6,182,212,0.1)', position: 'relative', zIndex: 1
-                                }}>
-                                    {activeTab === 'communities' ? 
-                                        <Users size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} /> : 
-                                        <DevSupLogo size={70} />
-                                    }
+                            isLiveCodingOpen ? (
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', minHeight: 0, width: '100%', height: '100%' }}>
+                                    <Suspense fallback={null}>
+                                        <LiveCodingWorkspace
+                                            onClose={() => setIsLiveCodingOpen(false)}
+                                            onSendToChat={(codeSnippet) => {
+                                                if (activeConversationId) {
+                                                    sendMessage({
+                                                        conversationId: activeConversationId,
+                                                        senderId: mongoUserId,
+                                                        content: codeSnippet,
+                                                        isCodeSnippet: true,
+                                                        language: pairIdeInitialLang || 'javascript'
+                                                    });
+                                                }
+                                                setIsLiveCodingOpen(false);
+                                            }}
+                                            activeConversationName="Pair IDE"
+                                            conversationId={activeConversationId}
+                                            socket={socket}
+                                            currentUser={{ _id: mongoUserId, displayName: user?.displayName || user?.name || user?.nickname }}
+                                            initialCode={pairIdeInitialCode}
+                                            initialLanguage={pairIdeInitialLang}
+                                        />
+                                    </Suspense>
                                 </div>
-                                <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.5rem', marginBottom: '16px', fontWeight: '500', letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
-                                    {activeTab === 'communities' ? "Communities" : "Welcome to DevSup!"}
-                                </h2>
-                                <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.1rem', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6', position: 'relative', zIndex: 1 }}>
-                                    {activeTab === 'communities' ? "Select a community or create a new one to get started." : "Click the + button in the sidebar to start a new conversation."}
-                                </p>
-                            </div>
+                            ) : (
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--colors-bg)', overflow: 'hidden', position: 'relative' }}>
+                                    <div style={{ position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'var(--colors-accent)', filter: 'blur(200px)', opacity: 0.15, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+                                    <div style={{ 
+                                        width: '140px', height: '140px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0.05) 100%)', 
+                                        border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '32px', 
+                                        boxShadow: '0 0 40px rgba(6,182,212,0.15), inset 0 0 20px rgba(6,182,212,0.1)', position: 'relative', zIndex: 1
+                                    }}>
+                                        {activeTab === 'communities' ? 
+                                            <Users size={64} color="var(--colors-accent)" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 8px rgba(6,182,212,0.5))' }} /> : 
+                                            <DevSupLogo size={70} />
+                                        }
+                                    </div>
+                                    <h2 style={{ color: 'var(--colors-textMain)', fontSize: '2.5rem', marginBottom: '16px', fontWeight: '500', letterSpacing: '-0.5px', position: 'relative', zIndex: 1, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                                        {activeTab === 'communities' ? "Communities" : "Welcome to DevSup!"}
+                                    </h2>
+                                    <p style={{ color: 'var(--colors-textMuted)', fontSize: '1.1rem', maxWidth: '400px', textAlign: 'center', lineHeight: '1.6', position: 'relative', zIndex: 1 }}>
+                                        {activeTab === 'communities' ? "Select a community or create a new one to get started." : "Click the + button in the sidebar to start a new conversation."}
+                                    </p>
+                                </div>
+                            )
                         )}
                     </>
                 )}
@@ -8686,7 +8720,8 @@ export default function Dashboard() {
                         showToast('Live coding workspace is optimized for desktop.');
                         return;
                     }
-                    setCommunityTab('code');
+                    setPairIdeInitialCode('');
+                    setPairIdeInitialLang('javascript');
                     setIsLiveCodingOpen(true);
                 }}
                 onOpenWhiteboard={() => {
