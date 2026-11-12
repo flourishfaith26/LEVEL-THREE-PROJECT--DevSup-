@@ -6886,7 +6886,53 @@ export default function Dashboard() {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <InputArea onSubmit={handleSendMessage} style={{ borderTop: 'none', backgroundColor: 'transparent' }}>
+                                                <>
+                                                    {messageInput.includes('@devsup-ai') && (
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            padding: '6px 16px',
+                                                            backgroundColor: 'rgba(0, 229, 255, 0.05)',
+                                                            borderBottom: '1px solid rgba(0, 229, 255, 0.15)',
+                                                            overflowX: 'auto',
+                                                            fontSize: '0.78rem'
+                                                        }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#00e5ff', fontWeight: 600, flexShrink: 0 }}>
+                                                                <Sparkles size={13} />
+                                                                <span>DevSup AI:</span>
+                                                            </div>
+                                                            {[
+                                                                { label: '⚡ Explain code', query: '@devsup-ai explain how this code works and its time complexity' },
+                                                                { label: '🐛 Find bugs', query: '@devsup-ai inspect this snippet for bugs, edge cases, and runtime issues' },
+                                                                { label: '🚀 Optimize', query: '@devsup-ai how can I optimize this for performance and memory?' },
+                                                                { label: '💡 Best practices', query: '@devsup-ai what are the production best practices for this pattern?' }
+                                                            ].map((s, idx) => (
+                                                                <button
+                                                                    key={idx}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setMessageInput(s.query + ' ');
+                                                                        inputRef.current?.focus();
+                                                                    }}
+                                                                    style={{
+                                                                        backgroundColor: 'rgba(0, 229, 255, 0.1)',
+                                                                        border: '1px solid rgba(0, 229, 255, 0.25)',
+                                                                        color: '#e6edf3',
+                                                                        padding: '3px 10px',
+                                                                        borderRadius: '12px',
+                                                                        cursor: 'pointer',
+                                                                        whiteSpace: 'nowrap',
+                                                                        fontSize: '0.76rem',
+                                                                        transition: 'all 0.15s ease'
+                                                                    }}
+                                                                >
+                                                                    {s.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <InputArea onSubmit={handleSendMessage} style={{ borderTop: 'none', backgroundColor: 'transparent' }}>
                                                     <input
                                                         type="file"
                                                         ref={fileInputRef}
@@ -6910,13 +6956,15 @@ export default function Dashboard() {
                                                         onClick={() => {
                                                             if (!messageInput.includes('@devsup-ai')) {
                                                                 setMessageInput(prev => prev ? `@devsup-ai ${prev}` : '@devsup-ai ');
-                                                                inputRef.current?.focus();
+                                                            } else {
+                                                                setMessageInput(prev => prev.replace(/@devsup-ai\s*/g, ''));
                                                             }
+                                                            inputRef.current?.focus();
                                                         }}
                                                         style={{
                                                             color: '#00e5ff',
-                                                            backgroundColor: 'rgba(0, 229, 255, 0.08)',
-                                                            border: '1px solid rgba(0, 229, 255, 0.25)',
+                                                            backgroundColor: messageInput.includes('@devsup-ai') ? 'rgba(0, 229, 255, 0.22)' : 'rgba(0, 229, 255, 0.08)',
+                                                            border: messageInput.includes('@devsup-ai') ? '1px solid rgba(0, 229, 255, 0.6)' : '1px solid rgba(0, 229, 255, 0.25)',
                                                             width: '36px',
                                                             height: '36px',
                                                             borderRadius: '50%',
@@ -6925,6 +6973,7 @@ export default function Dashboard() {
                                                             justifyContent: 'center',
                                                             flexShrink: 0,
                                                             cursor: 'pointer',
+                                                            boxShadow: messageInput.includes('@devsup-ai') ? '0 0 12px rgba(0, 229, 255, 0.4)' : 'none',
                                                             transition: 'all 0.15s ease'
                                                         }}
                                                     >
@@ -6960,6 +7009,7 @@ export default function Dashboard() {
                                                         </SendButton>
                                                     )}
                                                 </InputArea>
+                                                </>
                                             )}
                                         </div>
                                     )}

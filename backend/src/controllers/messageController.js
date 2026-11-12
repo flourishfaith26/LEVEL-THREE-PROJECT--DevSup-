@@ -2,6 +2,7 @@ import Message from '../models/Message.js';
 import User from '../models/User.js';
 import Conversation from '../models/Conversation.js';
 import { sendPushNotificationToUser } from '../routers/pushRoutes.js';
+import { handleInChatAiTrigger } from '../routers/aiRoutes.js';
 
 // Fetch all messages for a specific conversation
 export const getMessages = async (req, res) => {
@@ -209,6 +210,10 @@ export const sendMessageHttp = async (req, res) => {
           }
         });
       }
+      // In-Chat AI Assistant trigger
+      handleInChatAiTrigger({ message: newMessage, conversationId, io }).catch(err => {
+        console.error('AI in-chat HTTP trigger error:', err);
+      });
     }
 
     res.status(201).json(messageToEmit);

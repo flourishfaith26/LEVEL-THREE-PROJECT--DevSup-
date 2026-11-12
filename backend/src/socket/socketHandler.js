@@ -2,7 +2,7 @@ import Message from '../models/Message.js';
 import Conversation from '../models/Conversation.js';
 import CallLog from '../models/CallLog.js';
 import User from '../models/User.js';
-import { askGemini, generateSmartDevSupAiAnswer } from '../routers/aiRoutes.js';
+import { handleInChatAiTrigger } from '../routers/aiRoutes.js';
 import { sendPushNotificationToUser } from '../routers/pushRoutes.js';
 
 // Memory store tracks every active socket for a user across their devices.
@@ -208,102 +208,9 @@ export const setupSocket = (io) => {
                 }
 
                 // In-Chat AI Assistant (@devsup-ai or @ai trigger)
-                const contentStr = typeof messageData.content === 'string' ? messageData.content : '';
-                const isAiTrigger = (contentStr.includes('@devsup-ai') || contentStr.includes('@ai') || contentStr.startsWith('/ai ')) && !contentStr.startsWith('$CALL_LOG$') && !contentStr.startsWith('$STATUS_REPLY$');
-                if (isAiTrigger) {
-                    (async () => {
-                        try {
-                            const cleanPrompt = contentStr.replace(/@devsup-ai|@ai|^\/ai\s+/gi, '').trim();
-                            if (!cleanPrompt) return;
-
-                            // Emit typing indicator for AI
-                            io.to(messageData.conversationId).emit('typing_status', {
-                                conversationId: messageData.conversationId,
-                                userId: 'devsup-ai-system',
-                                displayName: 'DevSup AI',
-                                isTyping: true
-                            });
-
-                            let aiBot = await User.findOne({ username: 'devsup-ai' });
-                            if (!aiBot) {
-                                aiBot = await User.create({
-                                    auth0Id: 'system|devsup-ai',
-                                    displayName: 'DevSup AI',
-                                    username: 'devsup-ai',
-                                    email: 'ai@devsupchat.com',
-                                    avatarUrl: '/logo.png',
-                                    about: 'Official DevSup Engineering Assistant',
-                                    techDiscipline: 'Fullstack'
-                                });
-                            }
-
-                            // Fetch recent conversation context (last 5 messages)
-                            const recentMessages = await Message.find({ 
-                                conversationId: messageData.conversationId,
-                                isDeletedForEveryone: { $ne: true }
-                            })
-                                .sort({ createdAt: -1 })
-                                .limit(5)
-                                .populate('sender', 'displayName username');
-
-                            const contextHistory = recentMessages
-                                .reverse()
-                                .map(m => `${m.sender?.displayName || 'User'}: ${m.content}`)
-                                .join('\n');
-
-                            let aiReplyText;
-                            try {
-                                aiReplyText = await askGemini(cleanPrompt, contextHistory);
-                            } catch (geminiErr) {
-                                console.warn('[DevSup AI] Gemini unavailable, utilizing built-in staff engine:', geminiErr.message);
-                                aiReplyText = generateSmartDevSupAiAnswer(cleanPrompt, contextHistory);
-                            }
-
-                            const aiSeq = await getNextMessageSequence(messageData.conversationId);
-                            const aiMessage = new Message({
-                                conversationId: messageData.conversationId,
-                                sender: aiBot._id,
-                                content: aiReplyText,
-                                replyTo: newMessage._id,
-                                sequence: aiSeq
-                            });
-
-                            await aiMessage.save();
-                            await aiMessage.populate([
-                                { path: 'sender', select: 'displayName avatarUrl username' },
-                                { path: 'replyTo', select: 'content sender isCodeSnippet caption isDeletedForEveryone', populate: { path: 'sender', select: 'displayName username' } }
-                            ]);
-
-                            await Conversation.findByIdAndUpdate(messageData.conversationId, {
-                                lastMessage: aiMessage._id,
-                                updatedAt: new Date()
-                            });
-
-                            io.to(messageData.conversationId).emit('typing_status', {
-                                conversationId: messageData.conversationId,
-                                userId: 'devsup-ai-system',
-                                displayName: 'DevSup AI',
-                                isTyping: false
-                            });
-
-                            let aiBroadcast = io.to(messageData.conversationId);
-                            if (updatedConv?.participants) {
-                                updatedConv.participants.forEach(pId => {
-                                    aiBroadcast = aiBroadcast.to(getUserRoom(pId));
-                                });
-                            }
-                            aiBroadcast.emit('receive_message', aiMessage.toObject());
-                        } catch (aiErr) {
-                            console.error('DevSup AI in-chat response failed:', aiErr);
-                            io.to(messageData.conversationId).emit('typing_status', {
-                                conversationId: messageData.conversationId,
-                                userId: 'devsup-ai-system',
-                                displayName: 'DevSup AI',
-                                isTyping: false
-                            });
-                        }
-                    })();
-                }
+                handleInChatAiTrigger({ message: newMessage, conversationId: messageData.conversationId, io }).catch(aiErr => {
+                    console.error('DevSup AI in-chat response failed:', aiErr);
+                });
             } catch (error) {
                 console.error('Error handling socket message:', error);
                 if (typeof acknowledge === 'function') acknowledge({ ok: false, error: 'Message could not be sent' });

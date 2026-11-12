@@ -1,4 +1,7 @@
 import express from 'express';
+import User from '../models/User.js';
+import Message from '../models/Message.js';
+import Conversation from '../models/Conversation.js';
 
 const router = express.Router();
 
@@ -254,6 +257,119 @@ ${notes ? `- Interviewer Note: "${notes}"` : '- Maintained readable, self-docume
 
 ### 6. Candidate Shareable Feedback
 Great performance on **${problemTitle}**! Your structural thinking and algorithmic efficiency were strong. Continue practicing system design and edge-case testing!`;
+}
+
+export async function handleInChatAiTrigger({ message, conversationId, io }) {
+    if (!message || !message.content || typeof message.content !== 'string') return;
+    const contentStr = message.content;
+    const isAiTrigger = (contentStr.includes('@devsup-ai') || contentStr.includes('@ai') || contentStr.startsWith('/ai ')) && !contentStr.startsWith('$CALL_LOG$') && !contentStr.startsWith('$STATUS_REPLY$');
+    if (!isAiTrigger) return;
+
+    try {
+        const cleanPrompt = contentStr.replace(/@devsup-ai|@ai|^\/ai\s+/gi, '').trim();
+        if (!cleanPrompt) return;
+
+        let aiBot = await User.findOne({ auth0Id: 'system|devsup-ai' });
+        if (!aiBot) {
+            aiBot = await User.findOne({ username: { $in: ['devsup-ai', 'devsup_ai'] } });
+        }
+        if (!aiBot) {
+            aiBot = await User.create({
+                auth0Id: 'system|devsup-ai',
+                displayName: 'DevSup AI',
+                username: 'devsup-ai',
+                email: 'ai@devsupchat.com',
+                avatarUrl: '/logo.png',
+                about: 'Official DevSup Engineering Assistant',
+                techDiscipline: 'Fullstack'
+            });
+        }
+
+        if (io) {
+            io.to(String(conversationId)).emit('typing_status', {
+                conversationId: String(conversationId),
+                userId: String(aiBot._id),
+                displayName: 'DevSup AI',
+                isTyping: true
+            });
+        }
+
+        const recentMessages = await Message.find({
+            conversationId,
+            isDeletedForEveryone: { $ne: true }
+        })
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .populate('sender', 'displayName username');
+
+        const contextHistory = recentMessages
+            .reverse()
+            .map(m => `${m.sender?.displayName || 'User'}: ${m.content}`)
+            .join('\n');
+
+        let aiReplyText;
+        try {
+            aiReplyText = await askGemini(cleanPrompt, contextHistory);
+        } catch (geminiErr) {
+            console.warn('[DevSup AI] Gemini service error, serving intelligent staff engine:', geminiErr.message);
+            aiReplyText = generateSmartDevSupAiAnswer(cleanPrompt, contextHistory);
+        }
+
+        const convSequence = await Conversation.findByIdAndUpdate(
+            conversationId,
+            { $inc: { messageSequence: 1 } },
+            { new: true }
+        );
+        const sequence = convSequence ? convSequence.messageSequence : 1;
+
+        const aiMessage = new Message({
+            conversationId,
+            sender: aiBot._id,
+            content: aiReplyText,
+            replyTo: message._id,
+            sequence
+        });
+
+        await aiMessage.save();
+        await aiMessage.populate([
+            { path: 'sender', select: 'displayName avatarUrl username' },
+            { path: 'replyTo', select: 'content sender isCodeSnippet caption isDeletedForEveryone', populate: { path: 'sender', select: 'displayName username' } }
+        ]);
+
+        const updatedConv = await Conversation.findByIdAndUpdate(conversationId, {
+            lastMessage: aiMessage._id,
+            updatedAt: new Date(),
+            $pull: { deletedFor: aiBot._id }
+        }, { new: true });
+
+        if (io) {
+            io.to(String(conversationId)).emit('typing_status', {
+                conversationId: String(conversationId),
+                userId: String(aiBot._id),
+                displayName: 'DevSup AI',
+                isTyping: false
+            });
+
+            const aiObj = aiMessage.toObject();
+            let broadcast = io.to(String(conversationId));
+            if (updatedConv?.participants) {
+                updatedConv.participants.forEach(pId => {
+                    broadcast = broadcast.to(`user:${String(pId)}`);
+                });
+            }
+            broadcast.emit('receive_message', aiObj);
+        }
+    } catch (err) {
+        console.error('[DevSup AI] handleInChatAiTrigger error:', err);
+        if (io) {
+            io.to(String(conversationId)).emit('typing_status', {
+                conversationId: String(conversationId),
+                userId: 'devsup-ai-system',
+                displayName: 'DevSup AI',
+                isTyping: false
+            });
+        }
+    }
 }
 
 export default router;

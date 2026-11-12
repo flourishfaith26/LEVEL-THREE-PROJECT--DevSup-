@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
     sparse: true,
     lowercase: true,
     trim: true,
-    match: [/^[a-z0-9._]{3,30}$/, 'Username must be 3-30 characters and can only contain lowercase letters, numbers, underscores (_), and periods (.)']
+    match: [/^[a-z0-9._-]{3,30}$/, 'Username must be 3-30 characters and can only contain lowercase letters, numbers, underscores (_), hyphens (-), and periods (.)']
   },
   email: { 
     type: String, 
