@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2, Sparkles, Webhook, Headphones, Radio, Award } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2, Sparkles, Webhook, Headphones, Radio, Award, Compass } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -45,6 +45,7 @@ import DevSupLogo from '../components/DevSupLogo.jsx';
 import { getAvatarUrl } from '../utils/defaultAvatar.js';
 import CommandPalette from '../components/CommandPalette.jsx';
 import TechnicalInterviewWorkspace from '../components/TechnicalInterviewWorkspace.jsx';
+import CommunityDirectoryModal from '../components/CommunityDirectoryModal.jsx';
 import { applyTheme } from '../utils/theme.js';
 
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -2017,6 +2018,7 @@ export default function Dashboard() {
     const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
     const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
     const [isInterviewOpen, setIsInterviewOpen] = useState(false);
+    const [isCommunityDirectoryOpen, setIsCommunityDirectoryOpen] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -4707,6 +4709,9 @@ export default function Dashboard() {
                                         </IconButton>
                                     </div>
                                 ) : <div style={{ display: 'flex', gap: '8px' }}>
+                                    <IconButton title="Explore Public Communities" onClick={() => setIsCommunityDirectoryOpen(true)} style={{ backgroundColor: 'var(--colors-surface)', color: '#06B6D4' }}>
+                                        <Compass size={19} />
+                                    </IconButton>
                                     <IconButton title="New Chat" onClick={openCreateModal} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
                                         <Plus size={20} />
                                     </IconButton>
@@ -4721,6 +4726,10 @@ export default function Dashboard() {
                                                     onClick={() => setIsChatsMenuOpen(false)}
                                                 />
                                                 <ContextMenuContainer style={{ top: '100%', right: 0, marginTop: '12px', zIndex: 2000 }}>
+                                                    <ContextMenuItem onClick={() => { setIsCommunityDirectoryOpen(true); setIsChatsMenuOpen(false); }}>
+                                                        <Compass size={18} color="#06B6D4" style={{ opacity: 0.9 }} />
+                                                        Explore communities
+                                                    </ContextMenuItem>
                                                     <ContextMenuItem onClick={() => { setConvType('group'); setIsModalOpen(true); setIsChatsMenuOpen(false); }}>
                                                         <Users size={18} style={{ opacity: 0.8 }} />
                                                         New group
@@ -5577,6 +5586,53 @@ export default function Dashboard() {
                                         <Award size={15} />
                                         <span>Interview</span>
                                     </button>
+
+                                    {/* Share Channel Invite Link */}
+                                    {activeConversation?.type === 'group' && (
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    const token = await getAccessTokenSilently();
+                                                    const res = await fetch(`${BACKEND_URL}/api/conversations/${activeConversation._id}/invite-link`, {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            Authorization: `Bearer ${token}`
+                                                        }
+                                                    });
+                                                    if (res.ok) {
+                                                        const data = await res.json();
+                                                        const inviteUrl = data.inviteUrl || `${window.location.origin}/join/${data.inviteCode}`;
+                                                        navigator.clipboard.writeText(inviteUrl);
+                                                        showToast('Shareable invite link copied to clipboard!');
+                                                    } else {
+                                                        showToast('Failed to generate invite link.');
+                                                    }
+                                                } catch (err) {
+                                                    showToast('Error generating invite link.');
+                                                }
+                                            }}
+                                            title="Copy Shareable Channel Invite Link"
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '4px 10px',
+                                                borderRadius: '16px',
+                                                border: '1px solid var(--colors-border)',
+                                                backgroundColor: 'transparent',
+                                                color: 'var(--colors-textMuted)',
+                                                cursor: 'pointer',
+                                                fontSize: '0.78rem',
+                                                fontWeight: 600,
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        >
+                                            <Share2 size={14} />
+                                            <span>Invite</span>
+                                        </button>
+                                    )}
                                     <IconButton desktopOnly onClick={() => setIsSearchOpen(!isSearchOpen)} title="Search" style={{ color: isSearchOpen ? 'var(--colors-accent)' : 'inherit' }}>
                                         <Search size={20} />
                                     </IconButton>
@@ -7300,6 +7356,53 @@ export default function Dashboard() {
                                         <Award size={15} />
                                         <span>Interview</span>
                                     </button>
+
+                                    {/* Share Channel Invite Link */}
+                                    {activeConversation?.type === 'group' && (
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                try {
+                                                    const token = await getAccessTokenSilently();
+                                                    const res = await fetch(`${BACKEND_URL}/api/conversations/${activeConversation._id}/invite-link`, {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            Authorization: `Bearer ${token}`
+                                                        }
+                                                    });
+                                                    if (res.ok) {
+                                                        const data = await res.json();
+                                                        const inviteUrl = data.inviteUrl || `${window.location.origin}/join/${data.inviteCode}`;
+                                                        navigator.clipboard.writeText(inviteUrl);
+                                                        showToast('Shareable invite link copied to clipboard!');
+                                                    } else {
+                                                        showToast('Failed to generate invite link.');
+                                                    }
+                                                } catch (err) {
+                                                    showToast('Error generating invite link.');
+                                                }
+                                            }}
+                                            title="Copy Shareable Channel Invite Link"
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '4px 10px',
+                                                borderRadius: '16px',
+                                                border: '1px solid var(--colors-border)',
+                                                backgroundColor: 'transparent',
+                                                color: 'var(--colors-textMuted)',
+                                                cursor: 'pointer',
+                                                fontSize: '0.78rem',
+                                                fontWeight: 600,
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        >
+                                            <Share2 size={14} />
+                                            <span>Invite</span>
+                                        </button>
+                                    )}
                                     {activeContactPane === 'starred' && (
                                         <div style={{ textAlign: 'center', color: 'var(--colors-textMuted)', padding: '40px 0' }}>
                                             <Star size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
@@ -8601,6 +8704,9 @@ export default function Dashboard() {
                 onOpenInterview={() => {
                     setIsInterviewOpen(true);
                 }}
+                onOpenCommunityDirectory={() => {
+                    setIsCommunityDirectoryOpen(true);
+                }}
                 onTriggerAi={() => {
                     setMessageInput('@devsup-ai ');
                     if (inputRef.current) inputRef.current.focus();
@@ -8639,6 +8745,19 @@ export default function Dashboard() {
                     }}
                 />
             )}
+
+            <CommunityDirectoryModal
+                isOpen={isCommunityDirectoryOpen}
+                onClose={() => setIsCommunityDirectoryOpen(false)}
+                BACKEND_URL={BACKEND_URL}
+                getAccessTokenSilently={getAccessTokenSilently}
+                currentUserConversations={conversations}
+                onOpenConversation={(convId) => {
+                    setActiveTab('chats');
+                    setActiveConversationId(convId);
+                }}
+                showToast={showToast}
+            />
 
             {isStatusModalOpen && (
                 <Suspense fallback={null}><StatusUploadModal

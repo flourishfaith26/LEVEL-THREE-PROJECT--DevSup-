@@ -44,6 +44,20 @@ const conversationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  inviteCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
+  isPublic: {
+    type: Boolean,
+    default: false
+  },
+  tags: [{
+    type: String,
+    trim: true
+  }],
   webhooks: [{
     token: {
       type: String,

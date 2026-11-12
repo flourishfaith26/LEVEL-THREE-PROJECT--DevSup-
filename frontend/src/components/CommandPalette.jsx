@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Search, Terminal, Hash, User, Code2, Headphones, Brush, 
     Sparkles, Webhook, Settings, Sun, Moon, Keyboard, Bell, 
-    Shield, X, ChevronRight, CornerDownLeft, ArrowUpDown, Award
+    Shield, X, ChevronRight, CornerDownLeft, ArrowUpDown, Award, Compass
 } from 'lucide-react';
 
 export default function CommandPalette({
@@ -16,6 +16,7 @@ export default function CommandPalette({
     onToggleHuddle,
     onOpenWebhooks,
     onOpenInterview,
+    onOpenCommunityDirectory,
     onTriggerAi,
     onOpenSetting,
     onToggleTheme,
@@ -59,6 +60,16 @@ export default function CommandPalette({
             category: 'Developer Tools',
             shortcut: 'INTERVIEW',
             handler: () => onOpenInterview?.()
+        },
+        {
+            id: 'action-communities',
+            type: 'action',
+            title: 'Explore Public Developer Communities',
+            subtitle: 'Browse and join open engineering channels (#algorithms, #system-design, #rust)',
+            icon: Compass,
+            category: 'Communities',
+            shortcut: 'DISCOVER',
+            handler: () => onOpenCommunityDirectory?.()
         },
         {
             id: 'action-huddle',
@@ -140,7 +151,7 @@ export default function CommandPalette({
             shortcut: 'KEYS',
             handler: () => onOpenSetting?.('Keyboard shortcuts')
         }
-    ], [currentTheme, onOpenPairCoding, onOpenInterview, onToggleHuddle, onOpenWhiteboard, onTriggerAi, onOpenWebhooks, onToggleTheme, onOpenSetting]);
+    ], [currentTheme, onOpenPairCoding, onOpenInterview, onOpenCommunityDirectory, onToggleHuddle, onOpenWhiteboard, onTriggerAi, onOpenWebhooks, onToggleTheme, onOpenSetting]);
 
     // Build items from channels and direct chats
     const conversationItems = useMemo(() => {

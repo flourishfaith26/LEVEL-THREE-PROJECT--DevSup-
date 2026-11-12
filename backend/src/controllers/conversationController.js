@@ -1,5 +1,6 @@
 import Conversation from '../models/Conversation.js';
 import User from '../models/User.js';
+import crypto from 'crypto';
 
 // Get all conversations for the logged-in user
 export const getUserConversations = async (req, res) => {
@@ -150,5 +151,151 @@ export const addMembersToConversation = async (req, res) => {
     res.status(200).json(populatedConversation);
   } catch (error) {
     res.status(500).json({ message: 'Error adding members', error: error.message });
+  }
+};
+
+// Get public community channels for discovery
+export const getPublicCommunities = async (req, res) => {
+  try {
+    let communities = await Conversation.find({ type: 'group', isPublic: true })
+      .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
+      .populate('admins', 'displayName avatarUrl username')
+      .sort({ updatedAt: -1 });
+
+    // Seed default developer communities if none exist
+    if (communities.length === 0) {
+      const defaults = [
+        {
+          name: 'General Engineering',
+          description: 'Architecture debates, engineering best practices, stack decisions, and dev discussions.',
+          tags: ['general', 'architecture', 'best-practices'],
+          isPublic: true,
+          type: 'group',
+          inviteCode: 'devsup-general'
+        },
+        {
+          name: 'Algorithms & LeetCode',
+          description: 'DSA practice, algorithmic complexity optimization, dynamic programming, and interview challenges.',
+          tags: ['algorithms', 'leetcode', 'dsa', 'interviews'],
+          isPublic: true,
+          type: 'group',
+          inviteCode: 'devsup-algorithms'
+        },
+        {
+          name: 'System Design Hub',
+          description: 'High-scale distributed systems, microservices, database sharding, caching, and event streaming.',
+          tags: ['system-design', 'distributed-systems', 'backend'],
+          isPublic: true,
+          type: 'group',
+          inviteCode: 'devsup-sysdesign'
+        },
+        {
+          name: 'Frontend Wizards',
+          description: 'React, TypeScript, CSS art, Vite, Next.js, and modern browser rendering techniques.',
+          tags: ['frontend', 'react', 'typescript', 'ui-ux'],
+          isPublic: true,
+          type: 'group',
+          inviteCode: 'devsup-frontend'
+        }
+      ];
+
+      for (const d of defaults) {
+        await Conversation.create(d);
+      }
+
+      communities = await Conversation.find({ type: 'group', isPublic: true })
+        .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
+        .populate('admins', 'displayName avatarUrl username');
+    }
+
+    res.status(200).json(communities);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching public communities', error: error.message });
+  }
+};
+
+// Generate or retrieve invite code for a conversation
+export const getOrCreateInviteCode = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const conversation = await Conversation.findById(id);
+    if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
+
+    if (!conversation.inviteCode) {
+      conversation.inviteCode = `dev-${crypto.randomBytes(4).toString('hex')}`;
+      await conversation.save();
+    }
+
+    const frontendOrigin = process.env.FRONTEND_URL || 'https://frontend-tjte.vercel.app';
+    const inviteUrl = `${frontendOrigin}/join/${conversation.inviteCode}`;
+
+    res.status(200).json({
+      inviteCode: conversation.inviteCode,
+      inviteUrl,
+      isPublic: conversation.isPublic
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error generating invite link', error: error.message });
+  }
+};
+
+// Get public metadata for an invite code (accessible by guests)
+export const getInviteMetadata = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const conversation = await Conversation.findOne({ inviteCode: code })
+      .populate('admins', 'displayName avatarUrl username');
+
+    if (!conversation) {
+      return res.status(404).json({ message: 'Invalid or expired invite link.' });
+    }
+
+    res.status(200).json({
+      name: conversation.name || 'Developer Conversation',
+      description: conversation.description || '',
+      type: conversation.type,
+      memberCount: conversation.participants?.length || 0,
+      avatarUrl: conversation.avatarUrl || '',
+      tags: conversation.tags || [],
+      isPublic: conversation.isPublic,
+      admins: conversation.admins
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving invite details', error: error.message });
+  }
+};
+
+// Join conversation via invite code (authenticated)
+export const joinConversationByInvite = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const auth0Id = req.auth?.payload?.sub;
+    const currentUser = await User.findOne({ auth0Id });
+
+    if (!currentUser) {
+      return res.status(401).json({ message: 'User must be authenticated to join.' });
+    }
+
+    const conversation = await Conversation.findOne({ inviteCode: code });
+    if (!conversation) {
+      return res.status(404).json({ message: 'Invalid or expired invite link.' });
+    }
+
+    const currentParticipantIds = conversation.participants.map(p => p.toString());
+    if (!currentParticipantIds.includes(currentUser._id.toString())) {
+      conversation.participants.push(currentUser._id);
+      await conversation.save();
+    }
+
+    const populated = await Conversation.findById(conversation._id)
+      .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
+      .populate('lastMessage');
+
+    res.status(200).json({
+      message: 'Joined successfully',
+      conversation: populated
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error joining conversation', error: error.message });
   }
 };

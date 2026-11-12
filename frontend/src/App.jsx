@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProfileSetup = lazy(() => import('./pages/ProfileSetup'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const JoinInvitePage = lazy(() => import('./pages/JoinInvitePage'));
 
 const slideDown = keyframes({
   '0%': { transform: 'translateY(-100%)', opacity: 0 },
@@ -220,6 +221,10 @@ function AppRoutes() {
         <Route 
           path="/setup" 
           element={isAuthenticated ? <ProfileSetup /> : <Navigate to="/" replace />} 
+        />
+        <Route 
+          path="/join/:inviteCode" 
+          element={<JoinInvitePage />} 
         />
         {/* Catch-all route for any unmatched paths */}
         <Route 
