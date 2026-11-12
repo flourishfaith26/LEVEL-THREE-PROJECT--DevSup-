@@ -1,12 +1,13 @@
 {
-  "name": "DevSup",
+  "name": "DevSup - Developer Communication Platform",
   "short_name": "DevSup",
-  "description": "The Developer Support Network",
-  "start_url": "/",
+  "description": "World-class real-time developer communication, live pair programming, code reviews, and audio huddles.",
+  "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#0B0F19",
-  "theme_color": "#0B0F19",
-  "orientation": "portrait",
+  "background_color": "#070B14",
+  "theme_color": "#06B6D4",
+  "orientation": "any",
+  "categories": ["developer", "productivity", "utilities", "social"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -37,6 +38,29 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Pair Programming",
+      "short_name": "Pair Code",
+      "description": "Launch multi-language code runner and pair programming workspace",
+      "url": "/dashboard?action=pair-code",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Explore Communities",
+      "short_name": "Explore",
+      "description": "Discover open engineering channels and developer hubs",
+      "url": "/dashboard?action=communities",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Technical Interview",
+      "short_name": "Interview",
+      "description": "Start technical interview & mentorship workspace",
+      "url": "/dashboard?action=interview",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

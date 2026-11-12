@@ -46,6 +46,7 @@ import { getAvatarUrl } from '../utils/defaultAvatar.js';
 import CommandPalette from '../components/CommandPalette.jsx';
 import TechnicalInterviewWorkspace from '../components/TechnicalInterviewWorkspace.jsx';
 import CommunityDirectoryModal from '../components/CommunityDirectoryModal.jsx';
+import PwaInstallPrompt from '../components/PwaInstallPrompt.jsx';
 import { applyTheme } from '../utils/theme.js';
 
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -2019,6 +2020,20 @@ export default function Dashboard() {
     const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
     const [isInterviewOpen, setIsInterviewOpen] = useState(false);
     const [isCommunityDirectoryOpen, setIsCommunityDirectoryOpen] = useState(false);
+
+    // Handle PWA App Shortcuts (e.g. ?action=pair-code, ?action=communities, ?action=interview)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const action = params.get('action');
+        if (action === 'pair-code') {
+            setCommunityTab('code');
+            setIsLiveCodingOpen(true);
+        } else if (action === 'communities') {
+            setIsCommunityDirectoryOpen(true);
+        } else if (action === 'interview') {
+            setIsInterviewOpen(true);
+        }
+    }, []);
 
     useEffect(() => {
         const handleResize = () => {
@@ -8758,6 +8773,8 @@ export default function Dashboard() {
                 }}
                 showToast={showToast}
             />
+
+            <PwaInstallPrompt />
 
             {isStatusModalOpen && (
                 <Suspense fallback={null}><StatusUploadModal
