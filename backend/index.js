@@ -62,7 +62,8 @@ const corsOptions = {
 
 // middleware
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/conversations', conversationRoutes);
@@ -77,6 +78,14 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/code', codeRunnerRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/push', pushRoutes);
+
+// Global JSON error handler so Express never returns HTML error pages on API calls
+app.use((err, req, res, next) => {
+  console.error('Unhandled API error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error'
+  });
+});
 
 const httpServer = createServer(app);
 

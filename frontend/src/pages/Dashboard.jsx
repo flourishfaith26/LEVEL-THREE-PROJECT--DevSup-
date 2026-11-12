@@ -6251,6 +6251,7 @@ export default function Dashboard() {
                                                                                         }}
                                                                                         currentUser={{ _id: mongoUserId, displayName: user?.displayName || user?.name || user?.nickname }}
                                                                                         renderTimestamp={() => renderInlineTimestamp('0px')}
+                                                                                        backendUrl={BACKEND_URL}
                                                                                     />
                                                                                 </div>
                                                                             );

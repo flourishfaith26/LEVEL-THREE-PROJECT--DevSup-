@@ -141,10 +141,7 @@ Please provide:
 2. The complete corrected/optimized code block in \`\`\`${language} ... \`\`\`.
 3. Keep your tone encouraging, precise, and developer-centric.`;
 
-        const aiResponse = await askGemini({
-            prompt,
-            systemInstruction: 'You are @devsup-ai, a concise expert coding assistant embedded in DevSup IDE.'
-        });
+        const aiResponse = await askGemini(prompt);
 
         res.json({
             success: true,

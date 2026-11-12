@@ -15,8 +15,10 @@ export default function CodeReviewBlock({
     onAddLineReview,
     onToggleResolveReview,
     currentUser,
-    renderTimestamp
+    renderTimestamp,
+    backendUrl: propBackendUrl
 }) {
+    const activeBackendUrl = propBackendUrl || BACKEND_URL;
     const rawContent = message?.content || '';
     const cleanContent = rawContent.trim().startsWith('```') && rawContent.trim().endsWith('```')
         ? rawContent.trim().replace(/^```[a-zA-Z0-9_-]*\n?/, '').replace(/```$/, '')
@@ -74,7 +76,7 @@ export default function CodeReviewBlock({
 
         setAiReviewLoading(true);
         try {
-            const res = await fetch(`${BACKEND_URL}/api/code/ai-fix`, {
+            const res = await fetch(`${activeBackendUrl}/api/code/ai-fix`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -83,14 +85,24 @@ export default function CodeReviewBlock({
                     error: 'Perform a comprehensive senior staff engineer code review: analyze Big-O complexity, correctness, edge cases, potential security issues, and style.'
                 })
             });
-            const data = await res.json();
-            if (res.ok && data.analysis) {
-                setAiReviewContent(data.analysis);
+
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                const data = await res.json();
+                if (res.ok && data.analysis) {
+                    setAiReviewContent(data.analysis);
+                } else {
+                    setAiReviewContent(data.error || data.details || 'AI reviewer unavailable at this moment.');
+                }
             } else {
-                setAiReviewContent('AI reviewer unavailable at this moment.');
+                const text = await res.text();
+                if (!res.ok) {
+                    throw new Error(`Service returned HTTP ${res.status}. Backend may be updating, please try again.`);
+                }
+                setAiReviewContent(text);
             }
         } catch (err) {
-            setAiReviewContent(`Review failed: ${err.message}`);
+            setAiReviewContent(`Review unavailable: ${err.message}`);
         } finally {
             setAiReviewLoading(false);
         }
