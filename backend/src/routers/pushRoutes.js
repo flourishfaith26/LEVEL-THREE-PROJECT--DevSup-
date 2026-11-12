@@ -1,5 +1,5 @@
 import express from 'express';
-import webpush from 'web-push';
+import * as webpush from 'web-push';
 import User from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
 

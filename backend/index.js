@@ -79,6 +79,13 @@ app.use('/api/code', codeRunnerRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/push', pushRoutes);
 
+// 404 JSON handler for unmatched /api routes
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: `Cannot ${req.method} ${req.originalUrl}`
+  });
+});
+
 // Global JSON error handler so Express never returns HTML error pages on API calls
 app.use((err, req, res, next) => {
   console.error('Unhandled API error:', err);
