@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Search, Terminal, Hash, User, Code2, Headphones, Brush, 
     Sparkles, Webhook, Settings, Sun, Moon, Keyboard, Bell, 
-    Shield, X, ChevronRight, CornerDownLeft, ArrowUpDown
+    Shield, X, ChevronRight, CornerDownLeft, ArrowUpDown, Award
 } from 'lucide-react';
 
 export default function CommandPalette({
@@ -15,6 +15,7 @@ export default function CommandPalette({
     onOpenWhiteboard,
     onToggleHuddle,
     onOpenWebhooks,
+    onOpenInterview,
     onTriggerAi,
     onOpenSetting,
     onToggleTheme,
@@ -48,6 +49,16 @@ export default function CommandPalette({
             category: 'Developer Tools',
             shortcut: 'RUN',
             handler: () => onOpenPairCoding?.()
+        },
+        {
+            id: 'action-interview',
+            type: 'action',
+            title: 'Technical Interview & Mentorship Mode',
+            subtitle: 'Split-screen coding challenge, live timer, rubric & AI scorecard',
+            icon: Award,
+            category: 'Developer Tools',
+            shortcut: 'INTERVIEW',
+            handler: () => onOpenInterview?.()
         },
         {
             id: 'action-huddle',
@@ -129,7 +140,7 @@ export default function CommandPalette({
             shortcut: 'KEYS',
             handler: () => onOpenSetting?.('Keyboard shortcuts')
         }
-    ], [currentTheme, onOpenPairCoding, onToggleHuddle, onOpenWhiteboard, onTriggerAi, onOpenWebhooks, onToggleTheme, onOpenSetting]);
+    ], [currentTheme, onOpenPairCoding, onOpenInterview, onToggleHuddle, onOpenWhiteboard, onTriggerAi, onOpenWebhooks, onToggleTheme, onOpenSetting]);
 
     // Build items from channels and direct chats
     const conversationItems = useMemo(() => {
@@ -582,3 +593,4 @@ export default function CommandPalette({
         </div>
     );
 }
+

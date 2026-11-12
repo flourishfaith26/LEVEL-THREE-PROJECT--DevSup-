@@ -98,4 +98,61 @@ router.post('/explain-code', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/ai/interview-eval
+ * Body: { problemTitle, problemDescription, candidateCode, language, notes, rubric }
+ */
+router.post('/interview-eval', async (req, res) => {
+    try {
+        const { problemTitle, problemDescription, candidateCode, language, notes, rubric } = req.body;
+
+        const prompt = `You are an elite Principal Software Engineer and Technical Interview evaluation chair.
+Problem Title: ${problemTitle || 'Technical Interview Problem'}
+Problem Description: ${problemDescription || 'Algorithmic challenge'}
+Language Used: ${language || 'javascript'}
+
+Candidate Code Solution:
+\`\`\`${language || ''}
+${candidateCode || '// No code provided'}
+\`\`\`
+
+Interviewer Private Notes:
+${notes || 'No specific private notes provided.'}
+
+Rubric Scores (out of 5):
+- Problem Solving & Logic: ${rubric?.problemSolving || 3}/5
+- Data Structures & Algorithms: ${rubric?.dsa || 3}/5
+- Code Quality & Cleanliness: ${rubric?.codeQuality || 3}/5
+- Communication & System Design: ${rubric?.communication || 3}/5
+
+Please generate a high-standard, structured technical interview evaluation report with the following markdown sections:
+### 1. Executive Summary & Recommendation
+Recommendation: **[Strong Hire | Hire | Leaning Hire | Leaning No Hire | No Hire]**
+Brief justification summarizing candidate performance.
+
+### 2. Algorithmic Complexity Analysis
+- **Time Complexity:** O(...)
+- **Space Complexity:** O(...)
+- Explanation of algorithmic efficiency.
+
+### 3. Solution Correctness & Edge Cases
+Detailed check of logic, edge case handling (empty input, large bounds, duplicates), and potential bugs or runtime failures.
+
+### 4. Key Strengths
+- Bulleted observations on positive patterns, modularity, or speed of implementation.
+
+### 5. Constructive Growth Areas
+- Bulleted actionable feedback on optimizations, naming conventions, or missed edge cases.
+
+### 6. Candidate Shareable Feedback
+A concise, encouraging summary suitable to share directly with the mentee or candidate for their professional development.`;
+
+        const evaluation = await askGemini(prompt);
+        res.json({ evaluation, model: MODEL_NAME });
+    } catch (err) {
+        console.error('Interview evaluation error:', err);
+        res.status(500).json({ error: err.message || 'Failed to generate interview evaluation' });
+    }
+});
+
 export default router;

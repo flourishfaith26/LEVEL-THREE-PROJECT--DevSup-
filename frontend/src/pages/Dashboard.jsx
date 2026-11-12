@@ -25,7 +25,7 @@ import { detectEcosystemLink } from '../utils/urlParser.js';
 import { getDailyUserColor } from '../utils/colorUtils.js';
 const Whiteboard = lazy(() => import('../components/Whiteboard'));
 const CallOverlay = lazy(() => import('../components/CallOverlay'));
-import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2, Sparkles, Webhook, Headphones, Radio } from 'lucide-react';
+import { Brush, MessageSquare, LogOut, Code2, Users, Settings, Video, Phone, PhoneOff, PhoneCall, Send, Search, MoreVertical, CircleDot, CircleDashed, Bell, BellOff, Lock, Key, HelpCircle, Monitor, Mic, Square, Play, Pause, Plus, X, ArrowLeft, Image, Star, Clock, ShieldAlert, ShieldCheck, ThumbsDown, Trash2, Briefcase, Link as LinkIcon, UserPlus, Timer, Info, Rocket, CheckSquare, XCircle, Eraser, ChevronRight, Check, CheckCheck, FileText, Maximize2, Camera, Edit3, ExternalLink, RefreshCw, Download, Eye, Share2, Sparkles, Webhook, Headphones, Radio, Award } from 'lucide-react';
 import { AccountPane, PrivacyPane, ChatsPane, NotificationsPane, KeyboardShortcutsPane, HelpPane, ProfilePane } from '../components/SettingsPanes';
 import { playNotificationSound } from '../utils/audio.js';
 const StoryViewer = lazy(() => import('../components/StoryViewer'));
@@ -44,6 +44,7 @@ import { normalizeUsername } from '../utils/username.js';
 import DevSupLogo from '../components/DevSupLogo.jsx';
 import { getAvatarUrl } from '../utils/defaultAvatar.js';
 import CommandPalette from '../components/CommandPalette.jsx';
+import TechnicalInterviewWorkspace from '../components/TechnicalInterviewWorkspace.jsx';
 import { applyTheme } from '../utils/theme.js';
 
 const STATUS_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -2015,6 +2016,7 @@ export default function Dashboard() {
     const [documentViewer, setDocumentViewer] = useState(null);
     const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
     const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+    const [isInterviewOpen, setIsInterviewOpen] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -5551,6 +5553,30 @@ export default function Dashboard() {
                                             </button>
                                         );
                                     })()}
+
+                                    {/* Technical Interview & Mentorship Mode Button */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsInterviewOpen(true)}
+                                        title="Technical Interview & Mentorship Mode"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '4px 10px',
+                                            borderRadius: '16px',
+                                            border: isInterviewOpen ? '1px solid #06B6D4' : '1px solid var(--colors-border)',
+                                            backgroundColor: isInterviewOpen ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+                                            color: isInterviewOpen ? '#06B6D4' : 'var(--colors-textMuted)',
+                                            cursor: 'pointer',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 600,
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <Award size={15} />
+                                        <span>Interview</span>
+                                    </button>
                                     <IconButton desktopOnly onClick={() => setIsSearchOpen(!isSearchOpen)} title="Search" style={{ color: isSearchOpen ? 'var(--colors-accent)' : 'inherit' }}>
                                         <Search size={20} />
                                     </IconButton>
@@ -7250,6 +7276,30 @@ export default function Dashboard() {
                                             </div>
                                         );
                                     })()}
+
+                                    {/* Technical Interview & Mentorship Mode Button */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsInterviewOpen(true)}
+                                        title="Technical Interview & Mentorship Mode"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '4px 10px',
+                                            borderRadius: '16px',
+                                            border: isInterviewOpen ? '1px solid #06B6D4' : '1px solid var(--colors-border)',
+                                            backgroundColor: isInterviewOpen ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+                                            color: isInterviewOpen ? '#06B6D4' : 'var(--colors-textMuted)',
+                                            cursor: 'pointer',
+                                            fontSize: '0.78rem',
+                                            fontWeight: 600,
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <Award size={15} />
+                                        <span>Interview</span>
+                                    </button>
                                     {activeContactPane === 'starred' && (
                                         <div style={{ textAlign: 'center', color: 'var(--colors-textMuted)', padding: '40px 0' }}>
                                             <Star size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
@@ -8548,6 +8598,9 @@ export default function Dashboard() {
                     }
                     setIsWebhookModalOpen(true);
                 }}
+                onOpenInterview={() => {
+                    setIsInterviewOpen(true);
+                }}
                 onTriggerAi={() => {
                     setMessageInput('@devsup-ai ');
                     if (inputRef.current) inputRef.current.focus();
@@ -8565,6 +8618,27 @@ export default function Dashboard() {
                 currentTheme={appSettings.theme || 'dark'}
                 mongoUserId={mongoUserId}
             />
+
+            {isInterviewOpen && (
+                <TechnicalInterviewWorkspace
+                    isOpen={isInterviewOpen}
+                    onClose={() => setIsInterviewOpen(false)}
+                    conversationId={activeConversationId}
+                    conversationName={activeConversation?.name || directChatPartner?.displayName || 'Interview Lounge'}
+                    currentUser={currentUserData || { _id: mongoUserId, displayName: user?.name, avatarUrl: user?.picture }}
+                    socket={socket}
+                    BACKEND_URL={BACKEND_URL}
+                    onSendToChat={(msgData) => {
+                        if (!activeConversationId) return;
+                        sendMessage({
+                            conversationId: activeConversationId,
+                            senderId: mongoUserId,
+                            ...msgData
+                        });
+                        showToast('Evaluation report shared to conversation.');
+                    }}
+                />
+            )}
 
             {isStatusModalOpen && (
                 <Suspense fallback={null}><StatusUploadModal

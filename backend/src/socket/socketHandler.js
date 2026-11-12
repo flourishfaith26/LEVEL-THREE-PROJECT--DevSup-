@@ -11,6 +11,8 @@ const onlineUsers = new Map();
 const activeHuddles = new Map();
 // Memory store for collaborative whiteboard: conversationId -> { elements: [], bgColor: '#080C16' }
 const whiteboardRooms = new Map();
+// Memory store for technical interviews: conversationId -> roomState
+const interviewRooms = new Map();
 
 const getHuddleSummary = () => {
     const summary = {};
@@ -797,6 +799,87 @@ export const setupSocket = (io) => {
                 success,
                 timestamp: Date.now()
             });
+        });
+
+        // 6b. Technical Interview & Mentorship Mode Sync
+        socket.on('interview:join', ({ conversationId, user, role }, callback) => {
+            if (!conversationId) return;
+            const roomName = `interview:${conversationId}`;
+            socket.join(roomName);
+
+            const convIdStr = String(conversationId);
+            let roomState = interviewRooms.get(convIdStr);
+            if (!roomState) {
+                roomState = {
+                    problemId: 'two-sum',
+                    durationMinutes: 45,
+                    remainingSeconds: 45 * 60,
+                    isRunning: false,
+                    language: 'javascript',
+                    code: '',
+                    participants: []
+                };
+                interviewRooms.set(convIdStr, roomState);
+            }
+
+            // Record participant
+            if (user) {
+                const existingIndex = roomState.participants.findIndex(p => String(p.id || p._id) === String(user._id || user.id));
+                const participantData = {
+                    id: String(user._id || user.id),
+                    name: user.displayName || user.name || 'Developer',
+                    avatar: user.avatarUrl || user.avatar || '',
+                    role: role || 'candidate',
+                    socketId: socket.id
+                };
+                if (existingIndex !== -1) {
+                    roomState.participants[existingIndex] = participantData;
+                } else {
+                    roomState.participants.push(participantData);
+                }
+            }
+
+            socket.to(roomName).emit('interview:peer_joined', { user, role, socketId: socket.id });
+            socket.to(roomName).emit('interview:participants_updated', roomState.participants);
+
+            if (typeof callback === 'function') {
+                callback(roomState);
+            }
+        });
+
+        socket.on('interview:leave', ({ conversationId, user }) => {
+            if (!conversationId) return;
+            const roomName = `interview:${conversationId}`;
+            socket.leave(roomName);
+
+            const convIdStr = String(conversationId);
+            const roomState = interviewRooms.get(convIdStr);
+            if (roomState && user) {
+                roomState.participants = roomState.participants.filter(p => String(p.id) !== String(user._id || user.id));
+                socket.to(roomName).emit('interview:participants_updated', roomState.participants);
+            }
+            socket.to(roomName).emit('interview:peer_left', { user, socketId: socket.id });
+        });
+
+        socket.on('interview:state_update', ({ conversationId, update }) => {
+            if (!conversationId || !update) return;
+            const convIdStr = String(conversationId);
+            let roomState = interviewRooms.get(convIdStr) || {};
+            roomState = { ...roomState, ...update, lastUpdated: Date.now() };
+            interviewRooms.set(convIdStr, roomState);
+
+            socket.to(`interview:${conversationId}`).emit('interview:state_updated', update);
+        });
+
+        socket.on('interview:timer_sync', ({ conversationId, remainingSeconds, isRunning }) => {
+            if (!conversationId) return;
+            const convIdStr = String(conversationId);
+            const roomState = interviewRooms.get(convIdStr);
+            if (roomState) {
+                roomState.remainingSeconds = remainingSeconds;
+                roomState.isRunning = isRunning;
+            }
+            socket.to(`interview:${conversationId}`).emit('interview:timer_updated', { remainingSeconds, isRunning });
         });
 
         // 7. Drop-in Persistent Audio Huddle & Voice Lounge
