@@ -79,6 +79,10 @@ app.use('/api/code', codeRunnerRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/push', pushRoutes);
 
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ message: 'DevSup backend is running' });
+});
+
 // 404 JSON handler for unmatched /api routes
 app.use('/api', (req, res) => {
   res.status(404).json({
@@ -103,10 +107,6 @@ const io = new Server(httpServer, {
 app.set('io', io);
 
 setupSocket(io);
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ message: 'DevSup backend is running' })
-})
 
 httpServer.listen(process.env.PORT, () => {
   console.log(`Server is running on port ${process.env.PORT}`)
