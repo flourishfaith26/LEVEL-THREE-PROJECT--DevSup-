@@ -4,6 +4,7 @@ import { Auth0Provider } from '@auth0/auth0-react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { styled, keyframes } from './stitches.config.js';
 import DevSupPumpLoader from './components/DevSupPumpLoader.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { WifiOff } from 'lucide-react';
 const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -216,7 +217,11 @@ function AppRoutes() {
         />
         <Route 
           path="/dashboard" 
-          element={isAuthenticated ? <Dashboard /> : <Navigate to="/" replace />} 
+          element={isAuthenticated ? (
+            <ErrorBoundary>
+              <Dashboard />
+            </ErrorBoundary>
+          ) : <Navigate to="/" replace />} 
         />
         <Route 
           path="/setup" 

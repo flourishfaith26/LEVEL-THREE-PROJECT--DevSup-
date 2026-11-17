@@ -1620,6 +1620,9 @@ export default function Dashboard() {
     const [conversations, setConversations] = useState([]);
     const [chatSearchQuery, setChatSearchQuery] = useState('');
     const [activeConversationId, setActiveConversationId] = useState(null);
+    const activeConversation = useMemo(() => {
+        return conversations.find(c => c._id === activeConversationId) || null;
+    }, [conversations, activeConversationId]);
     const [messages, setMessages] = useState([]);
     const [showMessageDateLabel, setShowMessageDateLabel] = useState(false);
 
@@ -2265,6 +2268,7 @@ export default function Dashboard() {
 
     // Input & Upload State
     const [messageInput, setMessageInput] = useState('');
+    const inputRef = useRef(null);
     const [isUploading, setIsUploading] = useState(false);
     const [chatUploadFile, setChatUploadFile] = useState(null);
     const [chatUploadPreview, setChatUploadPreview] = useState(null);
@@ -2549,7 +2553,6 @@ export default function Dashboard() {
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, message: null, callLog: null });
     const [connectionError, setConnectionError] = useState(null);
 
-    const inputRef = useRef(null);
     const clientMessageSequenceRef = useRef(0);
     const isSendingMessageRef = useRef(false);
     const fileInputRef = useRef(null);
@@ -4407,7 +4410,6 @@ export default function Dashboard() {
         }
     };
 
-    const activeConversation = conversations.find(c => c._id === activeConversationId);
     const directChatPartner = (activeConversation && activeConversation.type !== 'group')
         ? activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId))
         : null;
