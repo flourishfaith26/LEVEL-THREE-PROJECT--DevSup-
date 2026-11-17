@@ -2897,6 +2897,21 @@ export default function Dashboard() {
                             return nextMessages;
                         }
 
+                        // Deduplicate $CALL_LOG$ messages received within 45 seconds of an existing call log
+                        if (typeof incomingMessage.content === 'string' && incomingMessage.content.startsWith('$CALL_LOG$')) {
+                            const incomingTime = new Date(incomingMessage.createdAt || Date.now()).getTime();
+                            const duplicateCallIndex = prev.findIndex(msg => {
+                                if (typeof msg.content !== 'string' || !msg.content.startsWith('$CALL_LOG$')) return false;
+                                const msgTime = new Date(msg.createdAt || Date.now()).getTime();
+                                return Math.abs(msgTime - incomingTime) < 45000;
+                            });
+                            if (duplicateCallIndex !== -1) {
+                                const nextMessages = [...prev];
+                                nextMessages[duplicateCallIndex] = { ...nextMessages[duplicateCallIndex], ...incomingMessage };
+                                return nextMessages;
+                            }
+                        }
+
                         return [...prev, incomingMessage];
                     });
 
@@ -6441,6 +6456,19 @@ export default function Dashboard() {
                                                     }
                                                     
                                                     return !searchQuery || (msg.content && (typeof msg.content === 'string') && msg.content.toLowerCase().includes(searchQuery.toLowerCase()));
+                                                }).filter((msg, idx, arr) => {
+                                                    // Deduplicate $CALL_LOG$ messages for the same call within 60 seconds
+                                                    if (typeof msg.content === 'string' && msg.content.startsWith('$CALL_LOG$')) {
+                                                        const msgTime = new Date(msg.createdAt || 0).getTime();
+                                                        const prevCallIndex = arr.findIndex((other, oIdx) => {
+                                                            if (oIdx >= idx) return false;
+                                                            if (typeof other.content !== 'string' || !other.content.startsWith('$CALL_LOG$')) return false;
+                                                            const otherTime = new Date(other.createdAt || 0).getTime();
+                                                            return Math.abs(msgTime - otherTime) < 60000;
+                                                        });
+                                                        if (prevCallIndex !== -1) return false;
+                                                    }
+                                                    return true;
                                                 }).map((msg, index, array) => {
 
                                                     const senderId = String(msg.sender?._id || msg.sender || '');

@@ -255,6 +255,18 @@ const CallOverlay = ({
     const hasLoggedCallRef = useRef(false);
     const callDurationRef = useRef(0);
 
+    useEffect(() => {
+        if (callConfig?.active) {
+            const incomingSessionId = callConfig?.callSessionId || callConfig?.callerData?.callSessionId;
+            if (incomingSessionId) {
+                callSessionIdRef.current = incomingSessionId;
+            } else if (!callConfig.isReceiving) {
+                callSessionIdRef.current = `${mongoUserId}-${Date.now()}`;
+            }
+            hasLoggedCallRef.current = false;
+        }
+    }, [callConfig?.active, callConfig?.callSessionId, callConfig?.callerData?.callSessionId, callConfig?.isReceiving, mongoUserId]);
+
     const localStream = useRef(null);
     const remoteStream = useRef(null);
     const peerConnection = useRef(null);
@@ -529,8 +541,9 @@ const CallOverlay = ({
             const callerId = callConfig.isReceiving ? (callConfig.callerData?.from || otherUserId) : mongoUserId;
             const receiverId = callConfig.isReceiving ? mongoUserId : otherUserId;
             
-            // Log call if receiverId is known or if it's a group call — only once per session
-            if (!hasLoggedCallRef.current && (isGroup || receiverId)) {
+            // Log direct call only once per session and only if initiating the end/reject action (not when receiving call_ended)
+            // Group calls are automatically logged by backend's leave_group_call when participants leave
+            if (emitEvent && !isGroup && receiverId && !hasLoggedCallRef.current) {
                 hasLoggedCallRef.current = true;
                 socket.emit('log_call', {
                     callerId,

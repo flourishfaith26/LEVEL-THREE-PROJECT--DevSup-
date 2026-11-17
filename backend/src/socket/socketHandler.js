@@ -608,16 +608,24 @@ export const setupSocket = (io) => {
                     }
                 }
 
-                // Deduplicate: Check if this call was already logged (via callSessionId or within last 20 seconds)
+                // Deduplicate: Check if this call was already logged (via callSessionId or within last 30 seconds)
                 let existingLog = null;
                 if (callSessionId) {
                     existingLog = await CallLog.findOne({ callSessionId });
                 }
-                if (!existingLog && callerId && targetReceiverId) {
-                    const recentThreshold = new Date(Date.now() - 20000);
+                const recentThreshold = new Date(Date.now() - 30000);
+                if (!existingLog && convId) {
                     existingLog = await CallLog.findOne({
-                        caller: callerId,
-                        receiver: targetReceiverId,
+                        conversation: convId,
+                        createdAt: { $gte: recentThreshold }
+                    });
+                }
+                if (!existingLog && callerId && targetReceiverId) {
+                    existingLog = await CallLog.findOne({
+                        $or: [
+                            { caller: callerId, receiver: targetReceiverId },
+                            { caller: targetReceiverId, receiver: callerId }
+                        ],
                         createdAt: { $gte: recentThreshold }
                     });
                 }
@@ -632,6 +640,18 @@ export const setupSocket = (io) => {
                     }
                     await existingLog.save();
                     return;
+                }
+
+                // Check if a $CALL_LOG$ message was already created for this conversation in the last 30 seconds
+                if (convId) {
+                    const existingMsg = await Message.findOne({
+                        conversationId: convId,
+                        content: { $regex: '^\\$CALL_LOG\\$' },
+                        createdAt: { $gte: recentThreshold }
+                    });
+                    if (existingMsg) {
+                        return;
+                    }
                 }
 
                 const newLog = await CallLog.create({
@@ -1128,16 +1148,29 @@ export const setupSocket = (io) => {
                         console.error('Error notifying group call ended:', e);
                     }
 
-                    // Auto-log group call
+                    // Auto-log group call if not already logged
                     try {
-                        const callMessage = new Message({
+                        const recentThreshold = new Date(Date.now() - 30000);
+                        const existingMsg = await Message.findOne({
                             conversationId: convIdStr,
-                            sender: call.callerId,
-                            content: `$CALL_LOG$|${call.callType}|${wasAnswered ? 'completed' : 'missed'}|${duration}`
+                            content: { $regex: '^\\$CALL_LOG\\$' },
+                            createdAt: { $gte: recentThreshold }
                         });
-                        await callMessage.save();
-                        await callMessage.populate('sender', 'displayName avatarUrl username');
-                        io.to(convIdStr).emit('receive_message', callMessage);
+                        if (!existingMsg) {
+                            const callMessage = new Message({
+                                conversationId: convIdStr,
+                                sender: call.callerId,
+                                content: `$CALL_LOG$|${call.callType}|${wasAnswered ? 'completed' : 'missed'}|${duration}`,
+                                sequence: await getNextMessageSequence(convIdStr)
+                            });
+                            await callMessage.save();
+                            await callMessage.populate('sender', 'displayName avatarUrl username');
+                            await Conversation.findByIdAndUpdate(convIdStr, {
+                                lastMessage: callMessage._id,
+                                updatedAt: new Date()
+                            });
+                            io.to(convIdStr).emit('receive_message', callMessage);
+                        }
                     } catch (logErr) {
                         console.error('Failed to log group call end:', logErr);
                     }
@@ -1188,15 +1221,31 @@ export const setupSocket = (io) => {
                     } catch (e) {}
 
                     try {
-                        const callMessage = new Message({
+                        const recentThreshold = new Date(Date.now() - 30000);
+                        Message.findOne({
                             conversationId: groupCallConvId,
-                            sender: call.callerId,
-                            content: `$CALL_LOG$|${call.callType}|${wasAnswered ? 'completed' : 'missed'}|${duration}`
-                        });
-                        callMessage.save().then(saved => {
-                            saved.populate('sender', 'displayName avatarUrl username').then(pop => {
-                                io.to(groupCallConvId).emit('receive_message', pop);
-                            }).catch(() => {});
+                            content: { $regex: '^\\$CALL_LOG\\$' },
+                            createdAt: { $gte: recentThreshold }
+                        }).then(existingMsg => {
+                            if (!existingMsg) {
+                                getNextMessageSequence(groupCallConvId).then(seq => {
+                                    const callMessage = new Message({
+                                        conversationId: groupCallConvId,
+                                        sender: call.callerId,
+                                        content: `$CALL_LOG$|${call.callType}|${wasAnswered ? 'completed' : 'missed'}|${duration}`,
+                                        sequence: seq
+                                    });
+                                    callMessage.save().then(saved => {
+                                        saved.populate('sender', 'displayName avatarUrl username').then(pop => {
+                                            Conversation.findByIdAndUpdate(groupCallConvId, {
+                                                lastMessage: saved._id,
+                                                updatedAt: new Date()
+                                            }).catch(() => {});
+                                            io.to(groupCallConvId).emit('receive_message', pop);
+                                        }).catch(() => {});
+                                    }).catch(() => {});
+                                }).catch(() => {});
+                            }
                         }).catch(() => {});
                     } catch (logErr) {}
                 }
