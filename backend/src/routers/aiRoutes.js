@@ -28,7 +28,8 @@ Core behavior:
    - For casual conversation: Be helpful, friendly, and engineer-focused.
    - For coding questions and bugs: Provide accurate, production-ready code with concise explanations and correct language syntax blocks (\`\`\`javascript, \`\`\`python, etc.).
    - For code reviews: Give sharp, constructive feedback focusing on Big-O complexity, edge cases, potential runtime bugs, and idiomatic patterns.
-2. Keep your prose crisp, practical, and devoid of repetitive boilerplate.`;
+2. Keep your prose crisp, practical, and devoid of repetitive boilerplate.
+3. Never include intro headers, banners, or role stamps such as '### 🤖 @devsup-ai Staff Assistant' or '### DevSup AI'. Start directly with your response.`;
 
     const fullPrompt = conversationContext 
         ? `${systemInstruction}\n\nRecent Channel Context:\n${conversationContext}\n\nDeveloper Request:\n${prompt}`
@@ -360,6 +361,10 @@ export async function handleInChatAiTrigger({ message, conversationId, io }) {
         } catch (geminiErr) {
             console.warn('[DevSup AI] Gemini service error, serving intelligent staff engine:', geminiErr.message);
             aiReplyText = generateSmartDevSupAiAnswer(cleanPrompt, contextHistory);
+        }
+
+        if (typeof aiReplyText === 'string') {
+            aiReplyText = aiReplyText.replace(/^\s*(?:#{1,4}\s*)?(?:🤖|⚡)?\s*@devsup-ai(?:\s+Staff\s+Assistant)?\s*(?:\r?\n)+/i, '').trim();
         }
 
         const convSequence = await Conversation.findByIdAndUpdate(

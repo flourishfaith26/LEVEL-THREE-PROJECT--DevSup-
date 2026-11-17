@@ -239,13 +239,24 @@ export default function MarkdownRenderer({ content, isOwn = false, options = {} 
         return <span>{content || ''}</span>;
     }
 
-    const lines = content.split('\n');
+    // Strip repetitive AI banners like "### 🤖 @devsup-ai Staff Assistant"
+    const cleanedContent = content
+        .replace(/^\s*(?:#{1,4}\s*)?(?:🤖|⚡)?\s*@devsup-ai(?:\s+Staff\s+Assistant)?\s*(?:\r?\n)+/i, '')
+        .trimStart();
+
+    const lines = cleanedContent.split('\n');
     const elements = [];
     let inCodeBlock = false;
     let codeBlockLang = '';
     let codeBlockLines = [];
 
     lines.forEach((line, lineIdx) => {
+        const trimmed = line.trim();
+
+        // Skip standalone AI bot banner lines if repeated
+        if (/^(?:#{1,4}\s*)?(?:🤖\s*)?@devsup-ai(?:\s+Staff\s+Assistant)?$/i.test(trimmed)) {
+            return;
+        }
         // Fenced code blocks ```
         if (line.trim().startsWith('```')) {
             if (inCodeBlock) {
@@ -271,8 +282,6 @@ export default function MarkdownRenderer({ content, isOwn = false, options = {} 
             codeBlockLines.push(line);
             return;
         }
-
-        const trimmed = line.trim();
 
         // Empty line
         if (!trimmed) {
