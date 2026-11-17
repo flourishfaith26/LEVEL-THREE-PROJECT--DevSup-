@@ -2228,6 +2228,13 @@ export default function Dashboard() {
         activeConversationIdRef.current = activeConversationId;
         appSettingsRef.current = appSettings;
         mutedConversationsRef.current = mutedConversations;
+        if (activeConversationId) {
+            setConversations(prev => prev.map(c => 
+                String(c._id) === String(activeConversationId) 
+                    ? { ...c, unreadCount: 0 } 
+                    : c
+            ));
+        }
     }, [activeConversationId, appSettings, mutedConversations]);
 
     const handleUpdateProfile = async (updates) => {
@@ -2743,7 +2750,9 @@ export default function Dashboard() {
                                                 const cType = parts[1] === 'video' ? 'video call' : 'voice call';
                                                 return parts[2] === 'missed' ? `Missed ${cType}` : (parts[1] === 'video' ? 'Video call' : 'Voice call');
                                             })()
-                                            : incomingMessage.content || 'You sent an attachment',
+                                            : (isVoiceNote(incomingMessage) || isAudioUrl(incomingMessage.content, incomingMessage.attachmentType))
+                                                ? '🎤 Voice note'
+                                                : incomingMessage.content || 'You sent an attachment',
                                     icon: '/favicon.svg',
                                     tag: `message-${messageId}`,
                                     data: { conversationId },
@@ -2803,9 +2812,16 @@ export default function Dashboard() {
                         if (convIndex === -1) return prev;
                         
                         const newConvs = [...prev];
+                        const existing = newConvs[convIndex];
+                        const isForActiveChat = String(activeConversationIdRef.current) === incomingConvId;
+                        const isFromOtherUser = incomingSenderId && currentUid && incomingSenderId !== currentUid;
+                        const prevUnread = Number(existing.unreadCount) || 0;
+                        const nextUnread = (!isForActiveChat && isFromOtherUser) ? prevUnread + 1 : (isForActiveChat ? 0 : prevUnread);
+
                         const updatedConv = { 
-                            ...newConvs[convIndex], 
+                            ...existing, 
                             lastMessage: incomingMessage, 
+                            unreadCount: nextUnread,
                             updatedAt: new Date().toISOString() 
                         };
                         newConvs.splice(convIndex, 1);
@@ -3428,8 +3444,25 @@ export default function Dashboard() {
             pending: true,
             offline: isOffline
         };
-        // Optimistically display the message immediately
-        setMessages(previous => [...previous, optimisticMessage]);
+        // Optimistically display the message immediately ONLY if viewing this conversation
+        if (String(payload.conversationId) === String(activeConversationIdRef.current)) {
+            setMessages(previous => [...previous, optimisticMessage]);
+        }
+
+        // Update target conversation in sidebar immediately and move to top
+        setConversations(prev => {
+            const convIndex = prev.findIndex(c => String(c._id) === String(payload.conversationId));
+            if (convIndex === -1) return prev;
+            const newConvs = [...prev];
+            const updated = {
+                ...newConvs[convIndex],
+                lastMessage: optimisticMessage,
+                updatedAt: new Date().toISOString()
+            };
+            newConvs.splice(convIndex, 1);
+            newConvs.unshift(updated);
+            return newConvs;
+        });
 
         if (isOffline) {
             const currentOutbox = getOfflineOutbox();
@@ -3440,19 +3473,21 @@ export default function Dashboard() {
 
         const handleConfirm = (confirmedMsg) => {
             if (!confirmedMsg) return;
-            setMessages(previous => {
-                const index = previous.findIndex(m =>
-                    m.clientMessageId === clientMessageId ||
-                    String(m._id) === clientMessageId ||
-                    String(m._id) === String(confirmedMsg._id)
-                );
-                if (index !== -1) {
-                    const next = [...previous];
-                    next[index] = { ...confirmedMsg, pending: false, offline: false };
-                    return next;
-                }
-                return previous;
-            });
+            if (String(payload.conversationId) === String(activeConversationIdRef.current)) {
+                setMessages(previous => {
+                    const index = previous.findIndex(m =>
+                        m.clientMessageId === clientMessageId ||
+                        String(m._id) === clientMessageId ||
+                        String(m._id) === String(confirmedMsg._id)
+                    );
+                    if (index !== -1) {
+                        const next = [...previous];
+                        next[index] = { ...confirmedMsg, pending: false, offline: false };
+                        return next;
+                    }
+                    return previous;
+                });
+            }
             // Update sidebar conversation item immediately
             setConversations(prev => prev.map(c => {
                 if (String(c._id) === String(payload.conversationId)) {
@@ -4256,13 +4291,27 @@ export default function Dashboard() {
 
     const isAudioUrl = (url, mimeType) => {
         if (typeof url !== 'string' || url.startsWith('$STATUS_REPLY$') || url.startsWith('$CALL_LOG$')) return false;
+        const cleanUrl = url.split('#')[0].split('?')[0].toLowerCase();
+        if (url.includes('voice_note') || cleanUrl.endsWith('voice_note.webm') || url.includes('/audio/upload/') || url.includes('/audio/')) return true;
         if (mimeType) {
             if (mimeType.startsWith('audio/') || mimeType === 'audio') return true;
-            if (mimeType.startsWith('video/') || mimeType.startsWith('image/')) return false;
         }
-        if (url.match(/\.(webm|mp3|wav|ogg|m4a|aac|flac|opus)(\?.*)?$/i) != null) return true;
-        if (url.includes('res.cloudinary') && (url.includes('voice_note') || url.includes('/audio/'))) return true;
+        if (/\.(webm|mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(cleanUrl)) {
+            if (cleanUrl.endsWith('.webm') && url.includes('devsup_attachments')) return true;
+            if (!mimeType || mimeType.startsWith('audio/')) return true;
+        }
+        if (mimeType && (mimeType.startsWith('video/') || mimeType.startsWith('image/'))) return false;
         return false;
+    };
+
+    const isVoiceNote = (urlOrMsg) => {
+        if (!urlOrMsg) return false;
+        const str = typeof urlOrMsg === 'string' ? urlOrMsg : (urlOrMsg.content || '');
+        const name = typeof urlOrMsg === 'object' ? (urlOrMsg.attachmentName || '') : '';
+        const mime = typeof urlOrMsg === 'object' ? (urlOrMsg.attachmentType || '') : '';
+        if (typeof str !== 'string') return false;
+        if (str.includes('voice_note') || (name && name.includes('voice_note')) || (mime && mime.includes('audio') && name.endsWith('.webm'))) return true;
+        return isAudioUrl(str, mime);
     };
 
     const isVideoUrl = (url, mimeType) => {
@@ -4520,8 +4569,8 @@ export default function Dashboard() {
             return `${prefix}${icon} ${typeLabel}`;
         }
 
-        if (isAudioUrl(content, mime) || /\.(mp3|wav|ogg|m4a|aac|flac|opus|webm)$/i.test(name)) {
-            return prefix + '🎤 Audio';
+        if (isVoiceNote(lastMsg) || isAudioUrl(content, mime) || /\.(mp3|wav|ogg|m4a|aac|flac|opus|webm)$/i.test(name)) {
+            return prefix + '🎤 Voice note';
         }
 
         if (isVideoUrl(content, mime) || /\.(mp4|mov|avi|mkv|3gp|flv|wmv)$/i.test(name)) {
@@ -5006,7 +5055,9 @@ export default function Dashboard() {
                                             minHeight: '62px',
                                             boxSizing: 'border-box',
                                             borderBottom: 'none',
-                                            backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : (activeConversationId === conv._id ? 'rgba(255, 255, 255, 0.08)' : undefined)
+                                            borderLeft: (conv.unreadCount > 0 && activeConversationId !== conv._id) ? '4px solid var(--colors-accent)' : '4px solid transparent',
+                                            backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : (activeConversationId === conv._id ? 'rgba(255, 255, 255, 0.08)' : (conv.unreadCount > 0 ? 'rgba(6, 182, 212, 0.08)' : undefined)),
+                                            transition: 'all 0.2s ease'
                                         }}
                                         onMouseEnter={(e) => {
                                             const btn = e.currentTarget.querySelector('.conv-delete-btn');
@@ -5057,11 +5108,11 @@ export default function Dashboard() {
 
                                         <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', alignSelf: 'center', gap: '4px', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
-                                                <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                                                <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '700' : '500', color: conv.unreadCount > 0 ? '#ffffff' : 'var(--colors-textMain, #e2e8f0)', textShadow: conv.unreadCount > 0 ? '0 0 10px rgba(255, 255, 255, 0.35)' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                     {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
                                                 </span>
                                                 {conv.lastMessage && (
-                                                    <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.2 }}>
+                                                    <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '700' : 'normal', lineHeight: 1.2 }}>
                                                         {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                     </span>
                                                 )}
@@ -5071,7 +5122,7 @@ export default function Dashboard() {
                                                     fontSize: '0.82rem', 
                                                     color: (conv.lastMessage?.content?.startsWith('$CALL_LOG$') && conv.lastMessage?.content?.includes('|missed') && String(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) !== String(mongoUserId))
                                                         ? '#ef4444' 
-                                                        : (conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)'), 
+                                                        : (conv.unreadCount > 0 ? '#f8fafc' : 'var(--colors-textMuted)'), 
                                                     fontWeight: (conv.unreadCount > 0 || (conv.lastMessage?.content?.startsWith('$CALL_LOG$') && conv.lastMessage?.content?.includes('|missed') && String(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) !== String(mongoUserId))) ? '600' : 'normal', 
                                                     whiteSpace: 'nowrap', 
                                                     overflow: 'hidden', 
@@ -5082,7 +5133,7 @@ export default function Dashboard() {
                                                 </span>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                     {conv.unreadCount > 0 && (
-                                                        <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center', lineHeight: 1.2 }}>
+                                                        <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.72rem', fontWeight: '800', padding: '2px 7px', borderRadius: '12px', minWidth: '20px', boxShadow: '0 2px 8px rgba(6, 182, 212, 0.45)', textAlign: 'center', lineHeight: 1.2 }}>
                                                             {conv.unreadCount}
                                                         </div>
                                                     )}
@@ -5325,7 +5376,9 @@ export default function Dashboard() {
                                         minHeight: '62px',
                                         boxSizing: 'border-box',
                                         borderBottom: 'none',
-                                        backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : (activeConversationId === conv._id ? 'rgba(255, 255, 255, 0.08)' : undefined)
+                                        borderLeft: (conv.unreadCount > 0 && activeConversationId !== conv._id) ? '4px solid var(--colors-accent)' : '4px solid transparent',
+                                            backgroundColor: selectedChats.includes(conv._id) ? 'rgba(0, 168, 132, 0.16)' : (activeConversationId === conv._id ? 'rgba(255, 255, 255, 0.08)' : (conv.unreadCount > 0 ? 'rgba(6, 182, 212, 0.08)' : undefined)),
+                                            transition: 'all 0.2s ease'
                                     }}
                                     onMouseEnter={(e) => {
                                         const btn = e.currentTarget.querySelector('.conv-delete-btn');
@@ -5361,7 +5414,7 @@ export default function Dashboard() {
                                     <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', alignSelf: 'center', gap: '4px', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                                                <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                                                <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '700' : '500', color: conv.unreadCount > 0 ? '#ffffff' : 'var(--colors-textMain, #e2e8f0)', textShadow: conv.unreadCount > 0 ? '0 0 10px rgba(255, 255, 255, 0.35)' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
                                                     {conv.name}
                                                 </span>
                                                 <span style={{
@@ -5397,7 +5450,7 @@ export default function Dashboard() {
                                                 )}
                                             </div>
                                             {conv.lastMessage && (
-                                                <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.2 }}>
+                                                <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '700' : 'normal', lineHeight: 1.2 }}>
                                                     {formatMessageTime(conv.lastMessage.createdAt, false)}
                                                 </span>
                                             )}
@@ -5407,7 +5460,7 @@ export default function Dashboard() {
                                                 fontSize: '0.82rem', 
                                                 color: (conv.lastMessage?.content?.startsWith('$CALL_LOG$') && conv.lastMessage?.content?.includes('|missed') && String(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) !== String(mongoUserId))
                                                     ? '#ef4444' 
-                                                    : (conv.unreadCount > 0 ? 'var(--colors-textMain)' : 'var(--colors-textMuted)'), 
+                                                    : (conv.unreadCount > 0 ? '#f8fafc' : 'var(--colors-textMuted)'), 
                                                 fontWeight: (conv.unreadCount > 0 || (conv.lastMessage?.content?.startsWith('$CALL_LOG$') && conv.lastMessage?.content?.includes('|missed') && String(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) !== String(mongoUserId))) ? '600' : 'normal', 
                                                 whiteSpace: 'nowrap', 
                                                 overflow: 'hidden', 
@@ -5418,7 +5471,7 @@ export default function Dashboard() {
                                             </span>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {conv.unreadCount > 0 && (
-                                                    <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', minWidth: '18px', textAlign: 'center', lineHeight: 1.2 }}>
+                                                    <div style={{ backgroundColor: 'var(--colors-accent)', color: '#fff', fontSize: '0.72rem', fontWeight: '800', padding: '2px 7px', borderRadius: '12px', minWidth: '20px', boxShadow: '0 2px 8px rgba(6, 182, 212, 0.45)', textAlign: 'center', lineHeight: 1.2 }}>
                                                         {conv.unreadCount}
                                                     </div>
                                                 )}
@@ -6509,7 +6562,13 @@ export default function Dashboard() {
                                                                                                 const icon = parsed?.type === 'video' ? '🎥' : parsed?.type === 'text' ? '📝' : '📷';
                                                                                                 return `${icon} Status: ${parsed?.replyText || 'Status reply'}`;
                                                                                             })()
-                                                                                            : (msg.replyTo.content || (msg.replyTo.isCodeSnippet ? 'Code Snippet' : 'Media'))}
+                                                                                            : (isVoiceNote(msg.replyTo) || isAudioUrl(msg.replyTo.content, msg.replyTo.attachmentType))
+                                                                                        ? '🎤 Voice note'
+                                                                                        : isVideoUrl(msg.replyTo.content, msg.replyTo.attachmentType)
+                                                                                            ? '🎥 Video'
+                                                                                            : isImageUrl(msg.replyTo.content, msg.replyTo.attachmentType)
+                                                                                                ? '📷 Photo'
+                                                                                                : (msg.replyTo.content || (msg.replyTo.isCodeSnippet ? 'Code Snippet' : 'Media'))}
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -7174,7 +7233,13 @@ export default function Dashboard() {
                                                                         const icon = parsed?.type === 'video' ? '🎥' : parsed?.type === 'text' ? '📝' : '📷';
                                                                         return `${icon} Status: ${parsed?.replyText || 'Status reply'}`;
                                                                     })()
-                                                                    : (replyingToMessage.content || (replyingToMessage.isCodeSnippet ? 'Code Snippet' : 'Media'))}
+                                                                    : (isVoiceNote(replyingToMessage) || isAudioUrl(replyingToMessage.content, replyingToMessage.attachmentType))
+                                                                        ? '🎤 Voice note'
+                                                                        : isVideoUrl(replyingToMessage.content, replyingToMessage.attachmentType)
+                                                                            ? '🎥 Video'
+                                                                            : isImageUrl(replyingToMessage.content, replyingToMessage.attachmentType)
+                                                                                ? '📷 Photo'
+                                                                                : (replyingToMessage.content || (replyingToMessage.isCodeSnippet ? 'Code Snippet' : 'Media'))}
                                                         </span>
                                                     </div>
                                                     <IconButton type="button" onClick={() => setReplyingToMessage(null)} style={{ padding: '4px' }}>

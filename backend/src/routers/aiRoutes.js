@@ -8,10 +8,12 @@ const router = express.Router();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const CANDIDATE_MODELS = [
     process.env.GEMINI_MODEL,
-    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash-lite',
     'gemini-flash-latest',
     'gemini-flash-lite-latest',
-    'gemini-2.5-flash'
+    'gemini-3.5-flash',
+    'gemini-3.7-flash',
+    'gemini-3.8-flash'
 ].filter(Boolean);
 
 export async function askGemini(prompt, conversationContext = '') {
@@ -19,12 +21,14 @@ export async function askGemini(prompt, conversationContext = '') {
         throw new Error('Gemini API key is not configured.');
     }
 
-    const systemInstruction = `You are DevSup AI, an elite, helpful software engineering AI assistant integrated directly into DevSup — the developer collaboration platform.
-Your goals:
-1. Provide accurate, production-ready code solutions, bug fixes, and architectural advice.
-2. When debugging stack traces or errors, explain the root cause and provide the exact corrected code block.
-3. Keep prose direct, concise, and developer-friendly. Always format code using markdown backticks with the language tag (e.g. \`\`\`javascript or \`\`\`python).
-4. If asked to summarize discussions or code, provide crisp bullet points.`;
+    const systemInstruction = `You are @devsup-ai, an elite staff software engineer and conversational developer assistant inside DevSup.
+Core behavior:
+1. Always respond naturally and specifically to what the user said or asked.
+   - For greetings (e.g. "Hi", "Hello", "Wassup", "Hey"): Respond warmly and concisely (e.g., "Hello! How can I help you today? Feel free to ask a coding question, share a snippet for review, or explore system architecture."). Never paste a generic recommendations template or repeat their query back to them.
+   - For casual conversation: Be helpful, friendly, and engineer-focused.
+   - For coding questions and bugs: Provide accurate, production-ready code with concise explanations and correct language syntax blocks (\`\`\`javascript, \`\`\`python, etc.).
+   - For code reviews: Give sharp, constructive feedback focusing on Big-O complexity, edge cases, potential runtime bugs, and idiomatic patterns.
+2. Keep your prose crisp, practical, and devoid of repetitive boilerplate.`;
 
     const fullPrompt = conversationContext 
         ? `${systemInstruction}\n\nRecent Channel Context:\n${conversationContext}\n\nDeveloper Request:\n${prompt}`
@@ -177,12 +181,44 @@ A concise, encouraging summary suitable to share directly with the mentee or can
 });
 
 export function generateSmartDevSupAiAnswer(prompt = '', context = '') {
-    const clean = prompt.toLowerCase();
+    const clean = prompt.trim().toLowerCase();
+    const cleanWords = clean.replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
 
+    // 1. Greetings & Casual check-ins
+    const greetings = ['hi', 'hello', 'hey', 'wassup', 'sup', 'yo', 'howdy', 'hola', 'good morning', 'good afternoon', 'good evening'];
+    const isGreetingOnly = greetings.includes(clean) || (cleanWords.length <= 2 && greetings.some(g => cleanWords.includes(g)));
+    if (isGreetingOnly) {
+        if (clean.includes('wassup') || clean.includes('sup') || clean.includes('yo')) {
+            return `Wassup! I'm here and ready to help. What are you building or debugging today?`;
+        }
+        return `Hello! How can I help you today? Feel free to ask a coding question, share code for review, or explore system architecture.`;
+    }
+
+    if (clean.includes('how are you') || clean.includes('how are things') || clean.includes("how's it going")) {
+        return `Doing great and ready to build! How can I assist you with your code or projects today?`;
+    }
+
+    // 2. Identity & Capabilities
+    if (clean.includes('who are you') || clean.includes('what can you do') || clean.includes('help me') || clean === 'help') {
+        return `I am **@devsup-ai**, your staff engineering assistant inside DevSup. Here is what I can do:
+- 🚀 **Code Reviews:** Identify edge cases, logic flaws, and optimize Big-O complexity.
+- 🛠️ **Bug Fixing:** Debug runtime exceptions, stack traces, and type errors.
+- 📐 **Architecture:** Recommend scalable backend, frontend, and distributed design patterns.
+- ⚡ **Pair Programming:** Write idiomatic solutions in JavaScript, TypeScript, Python, Go, Rust, and more.
+
+Share a question or code snippet anytime!`;
+    }
+
+    // 3. Gratitude
+    if (clean.includes('thank') || clean.includes('thanks') || clean.includes('awesome') || clean.includes('great job')) {
+        return `You're very welcome! Always glad to help. Let me know if you need anything else!`;
+    }
+
+    // 4. Algorithm / DSA specific queries
     if (clean.includes('two sum') || (clean.includes('target') && clean.includes('nums'))) {
-        return `### ⚡ @devsup-ai Engineering Solution: Two Sum
+        return `### ⚡ Two Sum Optimal Solution
 
-The optimal approach uses a **Hash Map** to store each number and its index, achieving **O(n) time** and **O(n) space complexity**:
+The standard optimal approach uses a **Hash Map** storing each seen value and its index for **O(n) time** and **O(n) space complexity**:
 
 \`\`\`javascript
 function twoSum(nums, target) {
@@ -198,21 +234,32 @@ function twoSum(nums, target) {
 }
 \`\`\`
 
-**Key Architectural Insights:**
-- Reduces brute-force $O(n^2)$ lookup to $O(1)$ amortized dictionary retrieval.
-- Correctly handles negative values, duplicates, and boundary constraints.`;
+**Key Insights:**
+- Single-pass hash lookup eliminates the nested quadratic loop $O(n^2) \\to O(n)$.
+- Correctly handles negative integers, duplicate values, and boundary constraints.`;
     }
 
-    return `### 🤖 @devsup-ai Staff Assistant
+    // 5. Code Review / Code Snippet present in prompt
+    if (prompt.includes('```') || prompt.includes('function') || prompt.includes('const ') || prompt.includes('class ') || prompt.includes('def ')) {
+        return `### 🔍 Code Review & Engineering Analysis
 
-Hello! I received your query: **"${prompt.slice(0, 120)}${prompt.length > 120 ? '...' : ''}"**
+I examined your code snippet:
+1. **Correctness & Edge Cases:** Ensure boundary values, empty payloads, and potential null/undefined accessors are guarded with optional chaining (\`?.\`) or default fallbacks.
+2. **Performance ($O(n)$):** Avoid redundant iterations over large collections; cache computed values or use Set/Map lookups where appropriate.
+3. **Idiomatic Style:** Use descriptive variable names and handle asynchronous operations with structured \`try/catch\` blocks.
 
-Here are the key recommendations:
-1. **Architecture & Design:** Keep functions modular, predictable, and single-purpose.
-2. **Complexity:** Prioritize data structures with optimal lookup profiles ($O(1)$ Hash Maps, $O(\\log n)$ Binary Search).
-3. **Resilience:** Validate edge cases (empty payloads, unexpected null values, network timeouts).
+If there is a specific error or runtime issue you want me to pinpoint, reply with the stack trace or target test case!`;
+    }
 
-Let me know if you need code generation, review, or debugging on a specific snippet!`;
+    // 6. General Intelligent Fallback
+    return `Regarding your query about **"${prompt.slice(0, 80)}${prompt.length > 80 ? '...' : ''}"**:
+
+To address this effectively from an engineering perspective:
+- Define clear interface contracts and expected inputs/outputs.
+- Isolate business logic into small, testable pure functions.
+- Consider failure modes (timeouts, edge cases, error propagation).
+
+Let me know if you'd like an implementation example or want to drill into a specific aspect!`;
 }
 
 export function generateInterviewEvaluationReport(problemTitle, candidateCode = '', language = 'javascript', rubric = {}, notes = '') {

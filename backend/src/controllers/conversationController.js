@@ -1,5 +1,6 @@
 import Conversation from '../models/Conversation.js';
 import User from '../models/User.js';
+import Message from '../models/Message.js';
 import crypto from 'crypto';
 
 // Get all conversations for the logged-in user
@@ -19,7 +20,34 @@ export const getUserConversations = async (req, res) => {
       .populate('lastMessage')
       .sort({ updatedAt: -1 });
 
-    res.status(200).json(conversations);
+    const conversationIds = conversations.map(c => c._id);
+    const unreadAgg = await Message.aggregate([
+      {
+        $match: {
+          conversationId: { $in: conversationIds },
+          sender: { $ne: currentUser._id },
+          readBy: { $ne: currentUser._id },
+          isDeletedForEveryone: { $ne: true }
+        }
+      },
+      {
+        $group: {
+          _id: '$conversationId',
+          unreadCount: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const unreadMap = new Map();
+    unreadAgg.forEach(u => unreadMap.set(String(u._id), u.unreadCount));
+
+    const enriched = conversations.map(c => {
+      const cObj = c.toObject();
+      cObj.unreadCount = unreadMap.get(String(c._id)) || 0;
+      return cObj;
+    });
+
+    res.status(200).json(enriched);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching conversations', error: error.message });
   }

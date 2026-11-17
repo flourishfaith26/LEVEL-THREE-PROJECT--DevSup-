@@ -86,23 +86,26 @@ export default function CodeReviewBlock({
                 })
             });
 
-            const contentType = res.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-                const data = await res.json();
-                if (res.ok && data.analysis) {
-                    setAiReviewContent(data.analysis);
-                } else {
-                    setAiReviewContent(data.error || data.details || 'AI reviewer unavailable at this moment.');
-                }
-            } else {
+            let analysis = null;
+            try {
                 const text = await res.text();
-                if (!res.ok) {
-                    throw new Error(`Service returned HTTP ${res.status}. Backend may be updating, please try again.`);
+                if (text && text.trim().startsWith('{')) {
+                    const data = JSON.parse(text);
+                    analysis = data.analysis || data.reply || data.error;
+                } else if (text && !text.includes('<!DOCTYPE') && !text.includes('<html') && res.ok) {
+                    analysis = text;
                 }
-                setAiReviewContent(text);
+            } catch (e) {}
+
+            if (analysis) {
+                setAiReviewContent(analysis);
+            } else if (!res.ok) {
+                setAiReviewContent(`DevSup AI reviewer is warming up (HTTP ${res.status}). Please try clicking again in a few moments.`);
+            } else {
+                setAiReviewContent('AI reviewer is temporarily unavailable. Please try again shortly.');
             }
         } catch (err) {
-            setAiReviewContent(`Review unavailable: ${err.message}`);
+            setAiReviewContent(`Review unavailable: ${err.message || 'Network connection issue'}`);
         } finally {
             setAiReviewLoading(false);
         }

@@ -269,36 +269,63 @@ Please provide:
 
 function generateFallbackAnalysis(code, language, error) {
     const findings = [];
+    const suggestions = [];
 
     // 1. Check numeric string concatenation ('7' + '7')
     if (/['"]\d+['"]\s*\+\s*['"]\d+['"]/.test(code)) {
-        findings.push('String concatenation detected with numeric string literals (e.g. `\'7\' + \'7\'` produces `\'77\'` instead of numeric `14`). Convert to numeric literals or use `Number(...)`.');
+        findings.push('**Type Coercion Issue:** Detected string concatenation using numeric strings (e.g. `\'7\' + \'7\'` yields `\'77\'` instead of numeric `14`). Parse to integer/number or use numeric literals.');
+        suggestions.push('Replace string addition with numeric values or `Number(...)`.');
     }
 
     // 2. Check typed arrow function with body block but missing return
     if (/:\s*(?:number|string|boolean|object|any)\s*=>\s*\{/.test(code) && !/\breturn\b/.test(code)) {
-        findings.push('Function specifies an explicit return type, but the block `{ ... }` does not include an explicit `return` statement (evaluates to `undefined`).');
+        findings.push('**Missing Return Statement:** Function signature specifies an explicit return type, but the block `{ ... }` does not return a value. In JavaScript/TypeScript, this implicitly returns `undefined`.');
+        suggestions.push('Add an explicit `return` statement (e.g. `return multiply;` or `return sum;`).');
     }
 
-    // 3. Check for legacy var usage
+    // 3. Check loose equality (== vs ===)
+    if (/[^!=]==[^=]/.test(code)) {
+        findings.push('**Loose Equality:** Detected `==` comparison which allows unexpected type coercion. Use strict equality `===` for predictable evaluation.');
+    }
+
+    // 4. Check for legacy var usage
     if (/\bvar\s+/.test(code)) {
-        findings.push('Prefer modern `const` or `let` over `var` to avoid unintended variable hoisting and global scope pollution.');
+        findings.push('**Legacy Scope:** Prefer `const` or `let` over `var` to avoid variable hoisting and accidental scope pollution.');
     }
 
-    // 4. Missing semicolons or unclosed blocks
+    // 5. Missing semicolons or unclosed blocks
     const openBraces = (code.match(/\{/g) || []).length;
     const closeBraces = (code.match(/\}/g) || []).length;
     if (openBraces !== closeBraces) {
-        findings.push(`Mismatched braces detected (${openBraces} opening vs ${closeBraces} closing). Check for unclosed function or object blocks.`);
+        findings.push(`**Syntax Mismatch:** Detected mismatched curly braces (${openBraces} opening vs ${closeBraces} closing). Ensure all blocks are closed.`);
     }
+
+    // 6. Async without await or unhandled promise
+    if (/\basync\s+/.test(code) && !/\bawait\b/.test(code)) {
+        findings.push('**Unnecessary Async:** Function is declared `async` but contains no `await` statements. Consider removing `async` or ensuring async operations are awaited.');
+    }
+
+    // 7. Complexity Analysis
+    const hasNestedLoops = /for\b[\s\S]*for\b|while\b[\s\S]*while\b/.test(code);
+    const hasMapOrSet = /\b(?:Map|Set|dict)\b/.test(code);
+    const timeComp = hasNestedLoops ? 'O(n²)' : (hasMapOrSet ? 'O(n) amortized' : 'O(n) / O(1)');
 
     if (findings.length === 0) {
-        findings.push('Code structure is syntactically consistent. Review runtime edge cases (null/undefined inputs, boundary values, async error handling).');
+        findings.push('**Code Structure:** Syntactically clean and modular.');
+        findings.push('**Edge Cases:** Verify behavior with empty arrays, `null`/`undefined` arguments, and boundary inputs.');
     }
 
-    return `### ⚡ Staff Code Analysis (${language.toUpperCase()})
+    return `### ⚡ Staff Code Analysis (${(language || 'code').toUpperCase()})
 
+#### 1. Identified Observations & Potential Bugs
 ${findings.map((f, i) => `${i + 1}. ${f}`).join('\n\n')}
+
+#### 2. Complexity Profile
+- **Estimated Time Complexity:** ${timeComp}
+- **Space Complexity:** ${hasMapOrSet ? 'O(n) auxiliary' : 'O(1) in-place'}
+
+#### 3. Recommended Senior Refactoring
+${suggestions.length > 0 ? suggestions.map(s => `- ${s}`).join('\n') : '- Code adheres to standard patterns. Add unit test assertions to verify runtime contracts.'}
 
 *Analyzed by @devsup-ai staff review engine.*`;
 }
