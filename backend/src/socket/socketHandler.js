@@ -966,6 +966,8 @@ export const setupSocket = (io) => {
                         groupName: conv.name || 'Group Call',
                         groupAvatarUrl: conv.avatarUrl || '',
                         startedAt: Date.now(),
+                        answeredAt: null,
+                        hasBeenAnswered: false,
                         participants: new Map()
                     };
                     activeGroupCalls.set(convIdStr, call);
@@ -1003,6 +1005,8 @@ export const setupSocket = (io) => {
                     });
                 } else {
                     // Notify ongoing call members
+                    call.hasBeenAnswered = true;
+                    if (!call.answeredAt) call.answeredAt = Date.now();
                     socket.to(`group_call:${convIdStr}`).emit('group_call:peer_joined', {
                         conversationId: convIdStr,
                         userId: String(socket.data.userId),
@@ -1045,9 +1049,14 @@ export const setupSocket = (io) => {
                         groupName: conv?.name || 'Group Call',
                         groupAvatarUrl: conv?.avatarUrl || '',
                         startedAt: Date.now(),
+                        answeredAt: Date.now(),
+                        hasBeenAnswered: true,
                         participants: new Map()
                     };
                     activeGroupCalls.set(convIdStr, call);
+                } else {
+                    call.hasBeenAnswered = true;
+                    if (!call.answeredAt) call.answeredAt = Date.now();
                 }
 
                 call.participants.set(userId, {
@@ -1102,15 +1111,29 @@ export const setupSocket = (io) => {
                 });
 
                 if (call.participants.size === 0) {
-                    const duration = Math.max(1, Math.round((Date.now() - call.startedAt) / 1000));
+                    const wasAnswered = Boolean(call.answeredAt || call.hasBeenAnswered);
+                    const duration = wasAnswered ? Math.max(1, Math.round((Date.now() - (call.answeredAt || call.startedAt)) / 1000)) : 0;
                     activeGroupCalls.delete(convIdStr);
+
+                    // Notify all group participants that call ended / was cancelled so any ringing phones stop
+                    try {
+                        const conv = await Conversation.findById(convIdStr);
+                        if (conv && Array.isArray(conv.participants)) {
+                            conv.participants.forEach(p => {
+                                const pId = String(p._id || p);
+                                io.to(getUserRoom(pId)).emit('call_ended', { conversationId: convIdStr });
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Error notifying group call ended:', e);
+                    }
 
                     // Auto-log group call
                     try {
                         const callMessage = new Message({
                             conversationId: convIdStr,
                             sender: call.callerId,
-                            content: `$CALL_LOG$|${call.callType}|completed|${duration}`
+                            content: `$CALL_LOG$|${call.callType}|${wasAnswered ? 'completed' : 'missed'}|${duration}`
                         });
                         await callMessage.save();
                         await callMessage.populate('sender', 'displayName avatarUrl username');
@@ -1149,7 +1172,33 @@ export const setupSocket = (io) => {
                     socketId: socket.id
                 });
                 if (call.participants.size === 0) {
+                    const wasAnswered = Boolean(call.answeredAt || call.hasBeenAnswered);
+                    const duration = wasAnswered ? Math.max(1, Math.round((Date.now() - (call.answeredAt || call.startedAt)) / 1000)) : 0;
                     activeGroupCalls.delete(groupCallConvId);
+
+                    try {
+                        Conversation.findById(groupCallConvId).then(conv => {
+                            if (conv && Array.isArray(conv.participants)) {
+                                conv.participants.forEach(p => {
+                                    const pId = String(p._id || p);
+                                    io.to(getUserRoom(pId)).emit('call_ended', { conversationId: groupCallConvId });
+                                });
+                            }
+                        }).catch(() => {});
+                    } catch (e) {}
+
+                    try {
+                        const callMessage = new Message({
+                            conversationId: groupCallConvId,
+                            sender: call.callerId,
+                            content: `$CALL_LOG$|${call.callType}|${wasAnswered ? 'completed' : 'missed'}|${duration}`
+                        });
+                        callMessage.save().then(saved => {
+                            saved.populate('sender', 'displayName avatarUrl username').then(pop => {
+                                io.to(groupCallConvId).emit('receive_message', pop);
+                            }).catch(() => {});
+                        }).catch(() => {});
+                    } catch (logErr) {}
                 }
                 io.emit('group_calls:presence_updated', getGroupCallSummary());
             }

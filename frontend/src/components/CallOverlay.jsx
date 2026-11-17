@@ -452,6 +452,17 @@ const CallOverlay = ({
 
         pc.ontrack = (e) => {
             const stream = e.streams[0] || new MediaStream([e.track]);
+            if (!callAcceptedRef.current) {
+                callAcceptedRef.current = true;
+                setCallAccepted(true);
+                if (ringTimeoutRef.current) {
+                    clearTimeout(ringTimeoutRef.current);
+                    ringTimeoutRef.current = null;
+                }
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
+            }
             setGroupParticipants(prev => {
                 const existing = prev.find(p => p.socketId === targetSocketId);
                 const isVideo = stream.getVideoTracks().some(t => t.enabled && t.readyState === 'live');
@@ -532,8 +543,7 @@ const CallOverlay = ({
                 });
             }
         }
-        if (emitEvent && socket && callConfig) {
-            const isGroup = activeConversation?.type === 'group';
+        if (emitEvent && socket && callConfig && !isGroup) {
             const otherUserId = callConfig.isReceiving
                 ? (callConfig.callerData?.from ? String(callConfig.callerData.from) : null)
                 : (getOtherParticipantId() || callConfig.targetUserId);
@@ -607,12 +617,6 @@ const CallOverlay = ({
                 displayName: currentUserData?.displayName || 'Someone',
                 avatarUrl: currentUserData?.avatarUrl || ''
             };
-            setCallAccepted(true);
-            callAcceptedRef.current = true;
-            ringtoneRef.current?.stop?.();
-            ringtoneRef.current?.pause?.();
-            ringtoneRef.current = null;
-
             socket.emit('start_group_call', {
                 conversationId: convId,
                 callType: (callConfig.callType === 'video') ? 'video' : 'audio',
@@ -624,6 +628,19 @@ const CallOverlay = ({
                     return;
                 }
                 if (Array.isArray(res.participants)) {
+                    const otherParticipants = res.participants.filter(p => p.socketId && p.socketId !== socket.id);
+                    if (otherParticipants.length > 0) {
+                        // Other participants already present in the group call
+                        setCallAccepted(true);
+                        callAcceptedRef.current = true;
+                        if (ringTimeoutRef.current) {
+                            clearTimeout(ringTimeoutRef.current);
+                            ringTimeoutRef.current = null;
+                        }
+                        ringtoneRef.current?.stop?.();
+                        ringtoneRef.current?.pause?.();
+                        ringtoneRef.current = null;
+                    }
                     const iceServers = await getIceServers();
                     res.participants.forEach(async (p) => {
                         if (!p.socketId || p.socketId === socket.id) return;
@@ -879,11 +896,30 @@ const CallOverlay = ({
                 pendingCandidates.current.push(candidate);
             }
         };
-        const onCallEnded = () => handleEndCall(false);
+        const onCallEnded = (data) => {
+            if (data?.conversationId) {
+                const currentConvId = activeConversation?._id || callConfig?.conversationId || callConfig?.callerData?.conversationId;
+                if (currentConvId && String(data.conversationId) !== String(currentConvId)) {
+                    return;
+                }
+            }
+            handleEndCall(false);
+        };
         const onCallRejected = () => { if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current); handleEndCall(false); };
 
         const onGroupPeerJoined = async ({ socketId, user, conversationId }) => {
             if (!socketId || socketId === socket.id) return;
+            if (!callAcceptedRef.current) {
+                callAcceptedRef.current = true;
+                setCallAccepted(true);
+                if (ringTimeoutRef.current) {
+                    clearTimeout(ringTimeoutRef.current);
+                    ringTimeoutRef.current = null;
+                }
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
+            }
             if (socket.id < socketId) {
                 try {
                     const iceServers = await getIceServers();
@@ -913,6 +949,17 @@ const CallOverlay = ({
 
         const onGroupCallSignal = async ({ signal, fromSocketId, fromUser, conversationId }) => {
             if (!fromSocketId || fromSocketId === socket.id) return;
+            if (!callAcceptedRef.current) {
+                callAcceptedRef.current = true;
+                setCallAccepted(true);
+                if (ringTimeoutRef.current) {
+                    clearTimeout(ringTimeoutRef.current);
+                    ringTimeoutRef.current = null;
+                }
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
+            }
             const iceServers = await getIceServers();
             const pc = buildGroupPeerConnection(fromSocketId, fromUser, iceServers);
             const entry = groupPeersRef.current.get(fromSocketId);
@@ -1519,7 +1566,7 @@ const CallOverlay = ({
                         userSelect: 'none'
                     }}>
                         <Phone size={16} color="#00e5ff" />
-                        <span>DevSup Voice Call</span>
+                        <span>{isGroupCall ? 'DevSup Group Voice Call' : 'DevSup Voice Call'}</span>
                     </div>
 
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1538,6 +1585,23 @@ const CallOverlay = ({
                         />
                     </div>
                     <CallerNameText>{callerName}</CallerNameText>
+                    {isGroupCall && groupParticipants.length > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '320px' }}>
+                            {groupParticipants.map(peer => (
+                                <div key={peer.socketId} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                                    <img
+                                        src={peer.avatarUrl || '/default-avatar.svg'}
+                                        alt={peer.name}
+                                        onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                        style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00e5ff' }}
+                                    />
+                                    <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.75)', maxWidth: '60px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {peer.name}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
                         <span style={{ color: '#00e5ff', fontSize: '1.2rem', fontWeight: '600', letterSpacing: '1px' }}>
@@ -1553,6 +1617,19 @@ const CallOverlay = ({
             )}
 
             <audio ref={remoteAudioCallbackRef} autoPlay playsInline />
+            {isGroupCall && groupParticipants.map(peer => (
+                <audio
+                    key={`group-audio-stream-${peer.socketId}`}
+                    autoPlay
+                    playsInline
+                    ref={el => {
+                        if (el && peer.stream && el.srcObject !== peer.stream) {
+                            el.srcObject = peer.stream;
+                            el.play().catch(() => {});
+                        }
+                    }}
+                />
+            ))}
 
             {/* Controls */}
             {callAccepted && (
