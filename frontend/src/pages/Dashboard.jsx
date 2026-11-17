@@ -2289,6 +2289,96 @@ export default function Dashboard() {
     const [forwardMessageData, setForwardMessageData] = useState(null);
     const [allUsers, setAllUsers] = useState([]);
 
+    // Group Tagging / Mentions State (@member)
+    const [mentionMenuOpen, setMentionMenuOpen] = useState(false);
+    const [mentionQuery, setMentionQuery] = useState('');
+    const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+
+    // Groups in common with direct contact (WhatsApp style)
+    const directContact = useMemo(() => {
+        if (!activeConversation || activeConversation.type === 'group') return null;
+        return activeConversation.participants?.find(p => String(p._id || p) !== String(mongoUserId)) || null;
+    }, [activeConversation, mongoUserId]);
+
+    const groupsInCommon = useMemo(() => {
+        if (!directContact || !mongoUserId || !conversations) return [];
+        const contactId = String(directContact._id || directContact);
+        return conversations.filter(c => {
+            if (c.type !== 'group') return false;
+            const participantIds = (c.participants || []).map(p => String(p._id || p));
+            return participantIds.includes(String(mongoUserId)) && participantIds.includes(contactId);
+        });
+    }, [conversations, directContact, mongoUserId]);
+
+    // Group mention candidates (@tagging)
+    const mentionCandidates = useMemo(() => {
+        if (!mentionMenuOpen || activeConversation?.type !== 'group') return [];
+        const pool = [];
+
+        // Special mention: @devsup-ai
+        pool.push({
+            _id: 'devsup-ai-mention',
+            displayName: 'DevSup AI',
+            username: 'devsup-ai',
+            avatarUrl: '/logo.png',
+            techDiscipline: 'Official AI Engineering Assistant',
+            isBot: true
+        });
+
+        // Special mention: @everyone
+        pool.push({
+            _id: 'everyone-mention',
+            displayName: 'Everyone',
+            username: 'everyone',
+            isSpecial: true,
+            techDiscipline: 'Notify all group members'
+        });
+
+        // Group participants
+        (activeConversation.participants || []).forEach(p => {
+            if (!p) return;
+            const pId = String(p._id || p);
+            const isMe = pId === String(mongoUserId);
+            pool.push({
+                _id: pId,
+                displayName: isMe ? `${currentUserData?.displayName || user?.name || 'You'} (You)` : (p.displayName || 'Member'),
+                username: p.username || '',
+                avatarUrl: isMe ? (currentUserData?.avatarUrl || user?.picture || p.avatarUrl) : p.avatarUrl,
+                techDiscipline: p.techDiscipline || 'Member'
+            });
+        });
+
+        if (!mentionQuery) return pool;
+
+        return pool.filter(c => {
+            const u = (c.username || '').toLowerCase();
+            const d = (c.displayName || '').toLowerCase();
+            return u.includes(mentionQuery) || d.includes(mentionQuery);
+        });
+    }, [mentionMenuOpen, activeConversation, mentionQuery, mongoUserId, currentUserData, user]);
+
+    const insertMention = (candidate) => {
+        if (!candidate || !inputRef.current) return;
+        const tag = candidate.username ? `@${candidate.username} ` : `@${candidate.displayName.replace(/\s*\(You\)$/, '').trim()} `;
+        const val = messageInput;
+        const cursor = inputRef.current.selectionStart ?? val.length;
+        const textBeforeCursor = val.slice(0, cursor);
+        const textAfterCursor = val.slice(cursor);
+
+        const newBefore = textBeforeCursor.replace(/@([a-zA-Z0-9_.-]*)$/, tag);
+        const nextVal = newBefore + textAfterCursor;
+        setMessageInput(nextVal);
+        setMentionMenuOpen(false);
+
+        setTimeout(() => {
+            if (inputRef.current) {
+                inputRef.current.focus();
+                const newPos = newBefore.length;
+                inputRef.current.setSelectionRange(newPos, newPos);
+            }
+        }, 10);
+    };
+
     // Reset and preload users whenever Add Members modal opens
     useEffect(() => {
         if (isAddMembersModalOpen) {
@@ -3347,9 +3437,25 @@ export default function Dashboard() {
 
     // 4. Handle Text Input and Sending
     const handleInputChange = (e) => {
-        setMessageInput(e.target.value);
+        const val = e.target.value;
+        setMessageInput(val);
         e.target.style.height = '48px';
         e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
+
+        if (activeConversation?.type === 'group') {
+            const cursor = e.target.selectionStart ?? val.length;
+            const textBeforeCursor = val.slice(0, cursor);
+            const match = textBeforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
+            if (match) {
+                setMentionQuery(match[1].toLowerCase());
+                setMentionMenuOpen(true);
+                setMentionSelectedIndex(0);
+            } else {
+                setMentionMenuOpen(false);
+            }
+        } else {
+            setMentionMenuOpen(false);
+        }
     };
 
     const drainOfflineOutboxRef = useRef(null);
@@ -3697,6 +3803,29 @@ export default function Dashboard() {
     };
 
     const handleKeyDown = (e) => {
+        if (mentionMenuOpen && mentionCandidates.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setMentionSelectedIndex(prev => (prev + 1) % mentionCandidates.length);
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setMentionSelectedIndex(prev => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                insertMention(mentionCandidates[mentionSelectedIndex] || mentionCandidates[0]);
+                return;
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setMentionMenuOpen(false);
+                return;
+            }
+        }
+
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSendMessage(e);
@@ -4302,6 +4431,39 @@ export default function Dashboard() {
         }
         if (mimeType && (mimeType.startsWith('video/') || mimeType.startsWith('image/'))) return false;
         return false;
+    };
+
+    const renderFormattedMessageText = (text, isOwn = false) => {
+        if (typeof text !== 'string') return text;
+        const myUsername = (currentUserData?.username || '').toLowerCase();
+        const myName = (currentUserData?.displayName || user?.name || '').toLowerCase().replace(/\s+/g, '');
+
+        const parts = text.split(/(@[a-zA-Z0-9_.-]+)/g);
+        if (parts.length === 1) return text;
+
+        return parts.map((part, i) => {
+            if (part.startsWith('@')) {
+                const handle = part.slice(1).toLowerCase();
+                const isMe = (myUsername && handle === myUsername) || (myName && handle === myName) || handle === 'everyone' || handle === 'all';
+                return (
+                    <span
+                        key={i}
+                        style={{
+                            color: isMe ? '#ffffff' : 'var(--colors-accent, #06b6d4)',
+                            backgroundColor: isMe ? 'rgba(6, 182, 212, 0.35)' : 'rgba(6, 182, 212, 0.12)',
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            fontWeight: '600',
+                            display: 'inline-block',
+                            margin: '0 1px'
+                        }}
+                    >
+                        {part}
+                    </span>
+                );
+            }
+            return part;
+        });
     };
 
     const isVoiceNote = (urlOrMsg) => {
@@ -6837,7 +6999,7 @@ export default function Dashboard() {
                                                                                     ) : (
                                                                                         <>
                                                                                             <span style={{ whiteSpace: 'pre-wrap', display: 'inline' }}>
-                                                                                                {msg.content}
+                                                                                                {renderFormattedMessageText(msg.content, isOwnMessage)}
                                                                                             </span>
                                                                                             {renderInlineTimestamp('12px')}
                                                                                         </>
@@ -7217,7 +7379,66 @@ export default function Dashboard() {
                                             </SelectionToolbarActions>
                                         </SelectionToolbar>
                                     ) : (
-                                        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, backgroundColor: 'var(--colors-surface)', borderTop: '1px solid var(--colors-border)' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, backgroundColor: 'var(--colors-surface)', borderTop: '1px solid var(--colors-border)', position: 'relative' }}>
+                                            {mentionMenuOpen && mentionCandidates.length > 0 && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    bottom: '100%',
+                                                    left: '16px',
+                                                    right: '16px',
+                                                    maxHeight: '260px',
+                                                    backgroundColor: 'var(--colors-surface, #1e293b)',
+                                                    border: '1px solid var(--colors-border, rgba(255, 255, 255, 0.12))',
+                                                    borderRadius: '16px',
+                                                    boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.45)',
+                                                    zIndex: 100,
+                                                    overflowY: 'auto',
+                                                    padding: '6px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '2px',
+                                                    backdropFilter: 'blur(16px)'
+                                                }}>
+                                                    <div style={{ padding: '6px 12px 4px 12px', fontSize: '0.72rem', fontWeight: '700', color: 'var(--colors-accent, #06b6d4)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                        Tag a member (@)
+                                                    </div>
+                                                    {mentionCandidates.map((c, idx) => {
+                                                        const isSelected = idx === mentionSelectedIndex;
+                                                        return (
+                                                            <div
+                                                                key={c._id || idx}
+                                                                onClick={() => insertMention(c)}
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '10px',
+                                                                    padding: '8px 12px',
+                                                                    borderRadius: '10px',
+                                                                    cursor: 'pointer',
+                                                                    backgroundColor: isSelected ? 'rgba(6, 182, 212, 0.16)' : 'transparent',
+                                                                    borderLeft: isSelected ? '3px solid var(--colors-accent)' : '3px solid transparent',
+                                                                    transition: 'all 0.15s ease'
+                                                                }}
+                                                                onMouseEnter={() => setMentionSelectedIndex(idx)}
+                                                            >
+                                                                <Avatar
+                                                                    src={getAvatarUrl(c.avatarUrl)}
+                                                                    onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                                                    style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }}
+                                                                />
+                                                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                                                                    <span style={{ color: 'var(--colors-textMain, #ffffff)', fontSize: '0.9rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                        {c.displayName}
+                                                                    </span>
+                                                                    <span style={{ color: 'var(--colors-accent, #06b6d4)', fontSize: '0.75rem' }}>
+                                                                        {c.username ? `@${c.username}` : (c.techDiscipline || 'Member')}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                             {replyingToMessage && (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', backgroundColor: 'var(--colors-bg)', borderLeft: '4px solid var(--colors-accent)', margin: '8px 16px 0 16px', borderRadius: '4px' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -8125,6 +8346,72 @@ export default function Dashboard() {
                         </div>
 
                         <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
+
+                        {(!activeConversation.type || activeConversation.type === 'direct') && directContact && (
+                            <>
+                                <div style={{ padding: '16px', backgroundColor: 'var(--colors-surface)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--colors-textMuted)', fontSize: '0.9rem', fontWeight: '600' }}>
+                                            <Users size={16} color="var(--colors-accent)" />
+                                            <span>Groups in common</span>
+                                        </div>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--colors-accent)', fontWeight: '700', backgroundColor: 'rgba(6, 182, 212, 0.12)', padding: '2px 8px', borderRadius: '10px' }}>
+                                            {groupsInCommon.length}
+                                        </span>
+                                    </div>
+
+                                    {groupsInCommon.length === 0 ? (
+                                        <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', padding: '6px 0', fontStyle: 'italic' }}>
+                                            No groups in common
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {groupsInCommon.map(group => {
+                                                const memberCount = group.participants?.length || 0;
+                                                return (
+                                                    <div
+                                                        key={group._id}
+                                                        onClick={() => {
+                                                            setActiveConversationId(group._id);
+                                                            setIsDrawerOpen(false);
+                                                            setActiveContactPane(null);
+                                                        }}
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '12px',
+                                                            padding: '8px 10px',
+                                                            borderRadius: '10px',
+                                                            cursor: 'pointer',
+                                                            transition: 'background-color 0.2s',
+                                                            backgroundColor: 'transparent'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--colors-surfaceHover, rgba(255,255,255,0.06))'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                    >
+                                                        <Avatar
+                                                            src={getAvatarUrl(group.avatarUrl)}
+                                                            onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                                            style={{ width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0 }}
+                                                        />
+                                                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                                                            <span style={{ color: 'var(--colors-textMain)', fontSize: '0.92rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {group.name || 'Group Chat'}
+                                                            </span>
+                                                            <span style={{ color: 'var(--colors-textMuted)', fontSize: '0.78rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {group.groupType === 'community' ? 'Community' : 'Group'} • {memberCount} {memberCount === 1 ? 'member' : 'members'}
+                                                            </span>
+                                                        </div>
+                                                        <ChevronRight size={16} color="var(--colors-textMuted)" />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{ height: '8px', backgroundColor: 'var(--colors-bg)' }}></div>
+                            </>
+                        )}
 
                         {activeConversation.type === 'group' && (
                             activeConversation.admins?.some(a => (a._id || a).toString() === mongoUserId) ||
