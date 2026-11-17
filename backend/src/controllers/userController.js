@@ -165,14 +165,15 @@ export const searchByUsername = async (req, res) => {
         const escaped = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const compactEscaped = cleanQuery.replace(/\s+/g, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-        // Find users whose username or displayName matches query
+        // Find users whose username, displayName, or email matches query
         const results = await User.find({
             $or: [
                 { username: { $regex: compactEscaped, $options: 'i' } },
                 { displayName: { $regex: escaped, $options: 'i' } },
-                { displayName: { $regex: compactEscaped, $options: 'i' } }
+                { displayName: { $regex: compactEscaped, $options: 'i' } },
+                { email: { $regex: escaped, $options: 'i' } }
             ]
-        }).select('_id displayName username avatarUrl techDiscipline onlineStatus').limit(25);
+        }).select('_id displayName username email avatarUrl techDiscipline onlineStatus').limit(25);
 
         // Map isSelf if the result matches the current user
         const mapped = results.map(u => ({

@@ -179,16 +179,25 @@ export const addMembersToConversation = async (req, res) => {
 
     const auth0Id = req.auth?.payload?.sub;
     if (auth0Id) {
-      const currentUser = await User.findOne({ auth0Id });
+      const currentUser = await User.findOne({
+        $or: [
+          { auth0Id },
+          { _id: mongoose.isValidObjectId(auth0Id) ? auth0Id : null },
+          { email: req.auth?.payload?.email }
+        ].filter(Boolean)
+      });
       const userObjIdStr = currentUser?._id ? currentUser._id.toString() : '';
       const adminIds = (conversation.admins || []).map(a => (a?._id || a).toString());
-      const firstParticipantId = conversation.participants?.[0] ? (conversation.participants[0]._id || conversation.participants[0]).toString() : null;
-      const isAdmin = currentUser && (
-        adminIds.includes(userObjIdStr) || 
-        (adminIds.length === 0 && firstParticipantId === userObjIdStr)
-      );
-      if (!isAdmin && !conversation.allowAnyMemberToAdd) {
-        return res.status(403).json({ message: 'Only admins can add members to this group' });
+      const participantIds = (conversation.participants || []).map(p => (p?._id || p).toString());
+      const firstParticipantId = participantIds[0] || null;
+
+      const isParticipant = participantIds.includes(userObjIdStr);
+      const isExplicitAdmin = adminIds.includes(userObjIdStr);
+      const isCreator = firstParticipantId === userObjIdStr;
+
+      const canAdd = isExplicitAdmin || isCreator || conversation.allowAnyMemberToAdd || (adminIds.length === 0 && isParticipant);
+      if (!canAdd) {
+        return res.status(403).json({ message: 'Only admins can add members to this group. You can enable "Allow Members to Add Others" in Group Settings.' });
       }
     }
 

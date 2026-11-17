@@ -2281,6 +2281,30 @@ export default function Dashboard() {
     const userSearchTimerRef = useRef(null);
     const [forwardMessageData, setForwardMessageData] = useState(null);
     const [allUsers, setAllUsers] = useState([]);
+
+    // Reset and preload users whenever Add Members modal opens
+    useEffect(() => {
+        if (isAddMembersModalOpen) {
+            setSelectedMembersToAdd([]);
+            setAddMembersSearchQuery('');
+            setAddMembersSearchResults([]);
+
+            (async () => {
+                try {
+                    let token = null;
+                    try { token = await getAccessTokenSilently(); } catch (e) {}
+                    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                    const res = await fetch(`${BACKEND_URL}/api/users`, { headers });
+                    if (res.ok) {
+                        const users = await res.json();
+                        setAllUsers(users.filter(u => u._id !== mongoUserId));
+                    }
+                } catch (err) {
+                    console.error('Failed to pre-fetch users for Add Members:', err);
+                }
+            })();
+        }
+    }, [isAddMembersModalOpen]);
     const [convType, setConvType] = useState('direct');
     const [convName, setConvName] = useState('');
     const [convDescription, setConvDescription] = useState('');
@@ -3231,23 +3255,44 @@ export default function Dashboard() {
         setIsSearchingMembers(true);
         addMembersSearchTimerRef.current = setTimeout(async () => {
             try {
-                const token = await getAccessTokenSilently();
-                const res = await fetch(`${BACKEND_URL}/api/users/search?q=${encodeURIComponent(q)}`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                let token = null;
+                try { token = await getAccessTokenSilently(); } catch (e) {}
+                const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                
+                let foundUsers = [];
+                const res = await fetch(`${BACKEND_URL}/api/users/search?q=${encodeURIComponent(q)}&username=${encodeURIComponent(q)}`, {
+                    headers
                 });
                 if (res.ok) {
                     const found = await res.json();
-                    setAddMembersSearchResults(Array.isArray(found) ? found : (found ? [found] : []));
-                } else {
-                    setAddMembersSearchResults([]);
+                    if (Array.isArray(found)) {
+                        foundUsers = found;
+                    } else if (found && found._id) {
+                        foundUsers = [found];
+                    }
                 }
+
+                // If no results and search looks like a handle or email, try direct lookup as fallback
+                if (foundUsers.length === 0 && !q.includes(' ')) {
+                    const cleanQ = q.replace(/^@+/, '');
+                    try {
+                        const lookupRes = await fetch(`${BACKEND_URL}/api/users/lookup?identifier=${encodeURIComponent(cleanQ)}`, { headers });
+                        if (lookupRes.ok) {
+                            const u = await lookupRes.json();
+                            if (u && u._id) {
+                                foundUsers = [u];
+                            }
+                        }
+                    } catch (e) {}
+                }
+
+                setAddMembersSearchResults(foundUsers);
             } catch (err) {
                 console.error('Error searching users to add:', err);
-                setAddMembersSearchResults([]);
             } finally {
                 setIsSearchingMembers(false);
             }
-        }, 300);
+        }, 200);
     };
 
     const handleAddMembersToGroup = async () => {
@@ -3266,22 +3311,21 @@ export default function Dashboard() {
                 })
             });
 
+            const data = await res.json();
             if (res.ok) {
-                const updatedConv = await res.json();
-                setConversations(prev => prev.map(c => c._id === updatedConv._id ? updatedConv : c));
-                setActiveConversation(updatedConv);
+                setConversations(prev => prev.map(c => c._id === data._id ? data : c));
+                setActiveConversation(data);
                 showToast(`Added ${selectedMembersToAdd.length} member${selectedMembersToAdd.length > 1 ? 's' : ''} to group!`);
                 setIsAddMembersModalOpen(false);
                 setSelectedMembersToAdd([]);
                 setAddMembersSearchQuery('');
                 setAddMembersSearchResults([]);
             } else {
-                const errData = await res.json().catch(() => ({}));
-                showToast(errData.error || 'Failed to add members');
+                showToast(data.message || data.error || 'Failed to add members');
             }
         } catch (error) {
             console.error('Failed to add members:', error);
-            showToast('Failed to add members');
+            showToast('Failed to add members: ' + (error.message || String(error)));
         }
     };
 
@@ -5665,9 +5709,9 @@ export default function Dashboard() {
                                         />
                                     )}
                                     {activeConversation.type === 'group' && (
-                                        activeConversation.admins?.includes(mongoUserId) || 
+                                        activeConversation.admins?.some(a => (a._id || a).toString() === mongoUserId) || 
                                         activeConversation.allowAnyMemberToAdd || 
-                                        (!activeConversation.admins?.length && activeConversation.participants?.[0]?._id === mongoUserId)
+                                        (!activeConversation.admins?.length && activeConversation.participants?.some(p => (p._id || p).toString() === mongoUserId))
                                     ) && (
                                         <IconButton desktopOnly onClick={() => setIsAddMembersModalOpen(true)} title="Add Members">
                                             <UserPlus size={20} />
@@ -8070,7 +8114,34 @@ export default function Dashboard() {
 
                         {activeConversation.type === 'group' ? (
                             <div style={{ padding: '16px', backgroundColor: 'var(--colors-surface)' }}>
-                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem', marginBottom: '16px' }}>{activeConversation.participants?.length || 0} participants</div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                    <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>{activeConversation.participants?.length || 0} participants</div>
+                                    {(activeConversation.admins?.some(a => (a._id || a).toString() === mongoUserId) ||
+                                      activeConversation.allowAnyMemberToAdd ||
+                                      (!activeConversation.admins?.length && activeConversation.participants?.some(p => (p._id || p).toString() === mongoUserId))
+                                    ) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsAddMembersModalOpen(true)}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '4px 10px',
+                                                borderRadius: '8px',
+                                                backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                                                border: '1px solid var(--colors-accent)',
+                                                color: 'var(--colors-accent)',
+                                                fontSize: '0.8rem',
+                                                fontWeight: '600',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <UserPlus size={14} />
+                                            <span>Add Member</span>
+                                        </button>
+                                    )}
+                                </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     {activeConversation?.participants?.map(participant => (
                                         <div key={participant._id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -8874,12 +8945,12 @@ export default function Dashboard() {
                                 
                                 const candidateMap = new Map();
                                 (allUsers || []).forEach(u => {
-                                    if (u?._id && String(u._id) !== String(mongoUserId) && !existingMemberIds.includes(String(u._id))) {
+                                    if (u?._id && String(u._id) !== String(mongoUserId)) {
                                         candidateMap.set(String(u._id), u);
                                     }
                                 });
                                 (addMembersSearchResults || []).forEach(u => {
-                                    if (u?._id && String(u._id) !== String(mongoUserId) && !existingMemberIds.includes(String(u._id))) {
+                                    if (u?._id && String(u._id) !== String(mongoUserId)) {
                                         candidateMap.set(String(u._id), u);
                                     }
                                 });
@@ -8891,7 +8962,8 @@ export default function Dashboard() {
                                     candidates = candidates.filter(u => {
                                         const uName = (u.username || '').toLowerCase();
                                         const dName = (u.displayName || '').toLowerCase();
-                                        return dName.includes(rawQ) || (cleanQ && uName.includes(cleanQ)) || uName.includes(rawQ);
+                                        const email = (u.email || '').toLowerCase();
+                                        return dName.includes(rawQ) || (cleanQ && uName.includes(cleanQ)) || uName.includes(rawQ) || email.includes(rawQ);
                                     });
                                 }
 
@@ -8912,69 +8984,98 @@ export default function Dashboard() {
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                                                 <div style={{ color: 'var(--colors-textMain)', fontSize: '1.05rem', fontWeight: 'bold' }}>No users found</div>
                                                 <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center' }}>
-                                                    {addMembersSearchQuery ? `No user matching "${addMembersSearchQuery}"` : 'All available users are already in this group'}
+                                                    {addMembersSearchQuery ? `No user matching "${addMembersSearchQuery}"` : 'Type a name or @username to find members'}
                                                 </div>
                                             </div>
                                         </div>
                                     );
                                 }
 
-                                return candidates.map(u => (
-                                    <div
-                                        key={u._id}
-                                        onClick={() => {
-                                            setSelectedMembersToAdd(prev => 
-                                                prev.includes(u._id) ? prev.filter(id => id !== u._id) : [...prev, u._id]
-                                            );
-                                        }}
-                                        style={{ 
-                                            padding: '12px 16px', 
-                                            margin: '4px 12px',
-                                            borderRadius: '12px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '14px',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s ease',
-                                            backgroundColor: selectedMembersToAdd.includes(u._id) ? 'rgba(6, 182, 212, 0.12)' : 'transparent',
-                                            border: '1px solid ' + (selectedMembersToAdd.includes(u._id) ? 'var(--colors-accent)' : 'transparent')
-                                        }}
-                                        onMouseEnter={(e) => { if (!selectedMembersToAdd.includes(u._id)) { e.currentTarget.style.backgroundColor = 'var(--colors-surface)'; e.currentTarget.style.borderColor = 'var(--colors-border)'; } }}
-                                        onMouseLeave={(e) => { if (!selectedMembersToAdd.includes(u._id)) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; } }}
-                                    >
-                                        <AvatarWrapper>
-                                            <Avatar src={getAvatarUrl(u.avatarUrl)} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: selectedMembersToAdd.includes(u._id) ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
-                                            {activeUsers.includes(u._id) && <OnlineDot style={{ width: '12px', height: '12px', bottom: '-2px', right: '-2px', border: '2.5px solid var(--colors-bg)' }} />}
-                                        </AvatarWrapper>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                                            <span style={{ color: 'var(--colors-textMain)', fontSize: '0.95rem', fontWeight: '600', transition: 'color 0.2s ease' }}>{u.displayName}</span>
-                                            <span style={{ color: selectedMembersToAdd.includes(u._id) ? 'var(--colors-accent)' : 'var(--colors-textMuted)', fontSize: '0.75rem', transition: 'color 0.2s ease' }}>
-                                                {u.username ? `@${u.username}` : (u.techDiscipline || 'Fullstack')}
-                                            </span>
-                                        </div>
-                                        
-                                        {/* DevSup Premium Checkbox */}
-                                        <div style={{ 
-                                            width: '22px', 
-                                            height: '22px', 
-                                            borderRadius: '6px', 
-                                            border: selectedMembersToAdd.includes(u._id) ? 'none' : '2px solid var(--colors-border)',
-                                            backgroundColor: selectedMembersToAdd.includes(u._id) ? 'var(--colors-accent)' : 'var(--colors-surface)',
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            justifyContent: 'center',
-                                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                            boxShadow: selectedMembersToAdd.includes(u._id) ? '0 0 10px rgba(6, 182, 212, 0.5)' : 'none',
-                                            transform: selectedMembersToAdd.includes(u._id) ? 'scale(1.05)' : 'scale(1)'
-                                        }}>
-                                            {selectedMembersToAdd.includes(u._id) && (
-                                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'popIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards' }}>
-                                                    <polyline points="20 6 9 17 4 12" />
-                                                </svg>
+                                return candidates.map(u => {
+                                    const isAlreadyMember = existingMemberIds.includes(String(u._id));
+                                    const isSelected = selectedMembersToAdd.includes(u._id);
+
+                                    return (
+                                        <div
+                                            key={u._id}
+                                            onClick={() => {
+                                                if (isAlreadyMember) return;
+                                                setSelectedMembersToAdd(prev => 
+                                                    prev.includes(u._id) ? prev.filter(id => id !== u._id) : [...prev, u._id]
+                                                );
+                                            }}
+                                            style={{ 
+                                                padding: '12px 16px', 
+                                                margin: '4px 12px',
+                                                borderRadius: '12px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '14px',
+                                                cursor: isAlreadyMember ? 'default' : 'pointer',
+                                                opacity: isAlreadyMember ? 0.65 : 1,
+                                                transition: 'all 0.2s ease',
+                                                backgroundColor: isSelected ? 'rgba(6, 182, 212, 0.12)' : 'transparent',
+                                                border: '1px solid ' + (isSelected ? 'var(--colors-accent)' : 'transparent')
+                                            }}
+                                            onMouseEnter={(e) => { 
+                                                if (!isAlreadyMember && !isSelected) { 
+                                                    e.currentTarget.style.backgroundColor = 'var(--colors-surface)'; 
+                                                    e.currentTarget.style.borderColor = 'var(--colors-border)'; 
+                                                } 
+                                            }}
+                                            onMouseLeave={(e) => { 
+                                                if (!isAlreadyMember && !isSelected) { 
+                                                    e.currentTarget.style.backgroundColor = 'transparent'; 
+                                                    e.currentTarget.style.borderColor = 'transparent'; 
+                                                } 
+                                            }}
+                                        >
+                                            <AvatarWrapper>
+                                                <Avatar src={getAvatarUrl(u.avatarUrl)} onError={(e) => { e.currentTarget.src = '/default-avatar.svg'; }} style={{ width: '40px', height: '40px', border: isSelected ? '2px solid var(--colors-accent)' : '2px solid var(--colors-surface)' }} />
+                                                {activeUsers.includes(u._id) && <OnlineDot style={{ width: '12px', height: '12px', bottom: '-2px', right: '-2px', border: '2.5px solid var(--colors-bg)' }} />}
+                                            </AvatarWrapper>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+                                                <span style={{ color: 'var(--colors-textMain)', fontSize: '0.95rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.displayName}</span>
+                                                <span style={{ color: isSelected ? 'var(--colors-accent)' : 'var(--colors-textMuted)', fontSize: '0.75rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {u.username ? `@${u.username}` : (u.techDiscipline || u.email || 'Member')}
+                                                </span>
+                                            </div>
+                                            
+                                            {isAlreadyMember ? (
+                                                <span style={{ 
+                                                    fontSize: '0.72rem', 
+                                                    fontWeight: '600', 
+                                                    padding: '3px 8px', 
+                                                    borderRadius: '8px', 
+                                                    backgroundColor: 'rgba(255, 255, 255, 0.08)', 
+                                                    color: 'var(--colors-textMuted)' 
+                                                }}>
+                                                    In group
+                                                </span>
+                                            ) : (
+                                                <div style={{ 
+                                                    width: '22px', 
+                                                    height: '22px', 
+                                                    borderRadius: '6px', 
+                                                    border: isSelected ? 'none' : '2px solid var(--colors-border)',
+                                                    backgroundColor: isSelected ? 'var(--colors-accent)' : 'var(--colors-surface)',
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                    boxShadow: isSelected ? '0 0 10px rgba(6, 182, 212, 0.5)' : 'none',
+                                                    transform: isSelected ? 'scale(1.05)' : 'scale(1)'
+                                                }}>
+                                                    {isSelected && (
+                                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'popIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards' }}>
+                                                            <polyline points="20 6 9 17 4 12" />
+                                                        </svg>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
-                                    </div>
-                                ));
+                                    );
+                                });
                             })()}
                         </UserList>
 
