@@ -145,9 +145,88 @@ export default function AudioHuddleBar({
     useEffect(() => {
         if (!socket) return;
 
+        // Helper to construct or retrieve peer connection for a socket peer
+        const createPeerConnection = (targetSocketId) => {
+            let pc = peerConnectionsRef.current.get(targetSocketId);
+            if (pc) return pc;
+
+            pc = new RTCPeerConnection(ICE_SERVERS);
+            peerConnectionsRef.current.set(targetSocketId, pc);
+            pc._iceQueue = [];
+
+            if (localStreamRef.current) {
+                localStreamRef.current.getAudioTracks().forEach(track => {
+                    pc.addTrack(track, localStreamRef.current);
+                });
+            }
+
+            pc.onicecandidate = (e) => {
+                if (e.candidate) {
+                    socket.emit('huddle:signal', {
+                        toSocketId: targetSocketId,
+                        signal: { type: 'candidate', candidate: e.candidate },
+                        fromUser: currentUser,
+                        conversationId
+                    });
+                }
+            };
+
+            pc.ontrack = (e) => {
+                let audio = remoteAudioElementsRef.current.get(targetSocketId);
+                if (!audio) {
+                    audio = new Audio();
+                    audio.autoplay = true;
+                    audio.setAttribute('playsinline', 'true');
+                    remoteAudioElementsRef.current.set(targetSocketId, audio);
+                }
+                const stream = e.streams[0] || new MediaStream([e.track]);
+                audio.srcObject = stream;
+                audio.muted = isDeafened;
+                audio.play().catch(playErr => {
+                    console.warn('Autoplay audio blocked for peer, waiting for user gesture:', playErr);
+                });
+            };
+
+            pc.onconnectionstatechange = () => {
+                if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+                    try { pc.close(); } catch (e) {}
+                    peerConnectionsRef.current.delete(targetSocketId);
+                    const el = remoteAudioElementsRef.current.get(targetSocketId);
+                    if (el) {
+                        el.pause();
+                        el.srcObject = null;
+                        remoteAudioElementsRef.current.delete(targetSocketId);
+                    }
+                }
+            };
+
+            return pc;
+        };
+
         const handleHuddleUpdated = (data) => {
             if (data?.members) {
                 setMembers(data.members);
+
+                // Deterministically initiate WebRTC offer to other members:
+                // Peer with smaller socketId initiates offer to peer with larger socketId
+                data.members.forEach(async (member) => {
+                    if (!member.socketId || member.socketId === socket.id) return;
+                    if (!peerConnectionsRef.current.has(member.socketId) && socket.id < member.socketId) {
+                        try {
+                            const pc = createPeerConnection(member.socketId);
+                            const offer = await pc.createOffer({ offerToReceiveAudio: true });
+                            await pc.setLocalDescription(offer);
+                            socket.emit('huddle:signal', {
+                                toSocketId: member.socketId,
+                                signal: { type: 'offer', sdp: offer },
+                                fromUser: currentUser,
+                                conversationId
+                            });
+                        } catch (err) {
+                            console.error('Failed to initiate huddle offer to peer:', err);
+                        }
+                    }
+                });
             }
         };
 
@@ -166,58 +245,55 @@ export default function AudioHuddleBar({
 
         // WebRTC Signaling
         const handleHuddleSignal = async ({ signal, fromSocketId, fromUser }) => {
+            if (!fromSocketId || fromSocketId === socket.id) return;
+
             let pc = peerConnectionsRef.current.get(fromSocketId);
-
             if (!pc) {
-                pc = new RTCPeerConnection(ICE_SERVERS);
-                peerConnectionsRef.current.set(fromSocketId, pc);
-
-                if (localStreamRef.current) {
-                    localStreamRef.current.getTracks().forEach(track => {
-                        pc.addTrack(track, localStreamRef.current);
-                    });
-                }
-
-                pc.onicecandidate = (e) => {
-                    if (e.candidate) {
-                        socket.emit('huddle:signal', {
-                            toSocketId: fromSocketId,
-                            signal: { type: 'candidate', candidate: e.candidate },
-                            fromUser: currentUser,
-                            conversationId
-                        });
-                    }
-                };
-
-                pc.ontrack = (e) => {
-                    let audio = remoteAudioElementsRef.current.get(fromSocketId);
-                    if (!audio) {
-                        audio = new Audio();
-                        audio.autoplay = true;
-                        remoteAudioElementsRef.current.set(fromSocketId, audio);
-                    }
-                    audio.srcObject = e.streams[0];
-                    audio.muted = isDeafened;
-                };
+                pc = createPeerConnection(fromSocketId);
             }
 
             if (signal.type === 'offer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                socket.emit('huddle:signal', {
-                    toSocketId: fromSocketId,
-                    signal: { type: 'answer', sdp: answer },
-                    fromUser: currentUser,
-                    conversationId
-                });
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                    if (pc._iceQueue?.length) {
+                        for (const cand of pc._iceQueue) {
+                            await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+                        }
+                        pc._iceQueue = [];
+                    }
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    socket.emit('huddle:signal', {
+                        toSocketId: fromSocketId,
+                        signal: { type: 'answer', sdp: answer },
+                        fromUser: currentUser,
+                        conversationId
+                    });
+                } catch (err) {
+                    console.error('Failed to answer huddle offer:', err);
+                }
             } else if (signal.type === 'answer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                    if (pc._iceQueue?.length) {
+                        for (const cand of pc._iceQueue) {
+                            await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+                        }
+                        pc._iceQueue = [];
+                    }
+                } catch (err) {
+                    console.error('Failed to process huddle answer:', err);
+                }
             } else if (signal.type === 'candidate' && signal.candidate) {
                 try {
-                    await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                    if (pc.remoteDescription && pc.remoteDescription.type) {
+                        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                    } else {
+                        pc._iceQueue = pc._iceQueue || [];
+                        pc._iceQueue.push(signal.candidate);
+                    }
                 } catch (candErr) {
-                    // Ignore transient ICE candidates
+                    console.warn('Ignored transient ICE candidate:', candErr);
                 }
             }
         };

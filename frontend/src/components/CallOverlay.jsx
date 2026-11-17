@@ -248,6 +248,8 @@ const CallOverlay = ({
     const [toastMsg, setToastMsg] = useState(null);
     const [isAnswering, setIsAnswering] = useState(false);
     const [callDialog, setCallDialog] = useState(null);
+    const [groupParticipants, setGroupParticipants] = useState([]);
+    const groupPeersRef = useRef(new Map()); // socketId -> { pc, queue, user }
 
     const callSessionIdRef = useRef(callConfig?.callSessionId || callConfig?.callerData?.callSessionId || `${mongoUserId}-${Date.now()}`);
     const hasLoggedCallRef = useRef(false);
@@ -422,6 +424,62 @@ const CallOverlay = ({
         pendingCandidates.current = [];
     };
 
+    const buildGroupPeerConnection = useCallback((targetSocketId, targetUser, iceServers) => {
+        let entry = groupPeersRef.current.get(targetSocketId);
+        if (entry?.pc) return entry.pc;
+
+        const pc = new RTCPeerConnection(iceServers ? { iceServers } : ICE_SERVERS);
+        const queue = [];
+        entry = { pc, queue, user: targetUser };
+        groupPeersRef.current.set(targetSocketId, entry);
+
+        if (localStream.current) {
+            localStream.current.getTracks().forEach(track => {
+                pc.addTrack(track, localStream.current);
+            });
+        }
+
+        pc.onicecandidate = (e) => {
+            if (e.candidate) {
+                socket.emit('group_call:signal', {
+                    toSocketId: targetSocketId,
+                    signal: { type: 'candidate', candidate: e.candidate },
+                    fromUser: currentUserData,
+                    conversationId: activeConversation?._id || callConfig?.conversationId
+                });
+            }
+        };
+
+        pc.ontrack = (e) => {
+            const stream = e.streams[0] || new MediaStream([e.track]);
+            setGroupParticipants(prev => {
+                const existing = prev.find(p => p.socketId === targetSocketId);
+                const isVideo = stream.getVideoTracks().some(t => t.enabled && t.readyState === 'live');
+                if (existing) {
+                    return prev.map(p => p.socketId === targetSocketId ? { ...p, stream, isVideo } : p);
+                }
+                return [...prev, {
+                    socketId: targetSocketId,
+                    userId: targetUser?._id || targetUser?.userId,
+                    name: targetUser?.displayName || targetUser?.name || 'Member',
+                    avatarUrl: targetUser?.avatarUrl || '',
+                    stream,
+                    isVideo
+                }];
+            });
+        };
+
+        pc.onconnectionstatechange = () => {
+            if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+                try { pc.close(); } catch (e) {}
+                groupPeersRef.current.delete(targetSocketId);
+                setGroupParticipants(prev => prev.filter(p => p.socketId !== targetSocketId));
+            }
+        };
+
+        return pc;
+    }, [socket, currentUserData, activeConversation, callConfig]);
+
     const getOtherParticipant = useCallback(() => {
         if (callConfig?.targetUser && typeof callConfig.targetUser === 'object') {
             return callConfig.targetUser;
@@ -446,9 +504,17 @@ const CallOverlay = ({
         clearInterval(timerRef.current);
         if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
         if (socket && callConfig) {
-            const isGroup = activeConversation?.type === 'group';
-            const otherUserId = isGroup ? null : (getOtherParticipantId() || callConfig.targetUserId);
+            const isGroup = !!(callConfig.isGroupCall || callConfig.callerData?.isGroupCall || activeConversation?.type === 'group');
             const convId = activeConversation?._id || callConfig.conversationId || callConfig.callerData?.conversationId;
+            if (isGroup) {
+                socket.emit('leave_group_call', { conversationId: convId });
+                groupPeersRef.current.forEach(peerEntry => {
+                    try { peerEntry.pc?.close(); } catch (e) {}
+                });
+                groupPeersRef.current.clear();
+                setGroupParticipants([]);
+            }
+            const otherUserId = isGroup ? null : (getOtherParticipantId() || callConfig.targetUserId);
             const callerId = callConfig.isReceiving ? (callConfig.callerData?.from || otherUserId) : mongoUserId;
             const receiverId = callConfig.isReceiving ? mongoUserId : otherUserId;
             
@@ -533,6 +599,55 @@ const CallOverlay = ({
     };
 
     const initiateCall = async () => {
+        const isGroup = !!(callConfig?.isGroupCall || callConfig?.callerData?.isGroupCall || activeConversation?.type === 'group');
+        if (isGroup) {
+            const convId = activeConversation?._id || callConfig?.conversationId || callConfig?.callerData?.conversationId;
+            const callerInfo = {
+                _id: mongoUserId,
+                displayName: currentUserData?.displayName || 'Someone',
+                avatarUrl: currentUserData?.avatarUrl || ''
+            };
+            setCallAccepted(true);
+            callAcceptedRef.current = true;
+            ringtoneRef.current?.stop?.();
+            ringtoneRef.current?.pause?.();
+            ringtoneRef.current = null;
+
+            socket.emit('start_group_call', {
+                conversationId: convId,
+                callType: (callConfig.callType === 'video') ? 'video' : 'audio',
+                callerInfo,
+                callSessionId: callSessionIdRef.current
+            }, async (res) => {
+                if (!res?.ok) {
+                    console.warn('start_group_call ack error:', res?.error);
+                    return;
+                }
+                if (Array.isArray(res.participants)) {
+                    const iceServers = await getIceServers();
+                    res.participants.forEach(async (p) => {
+                        if (!p.socketId || p.socketId === socket.id) return;
+                        if (socket.id < p.socketId) {
+                            try {
+                                const pc = buildGroupPeerConnection(p.socketId, p.user, iceServers);
+                                const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: (res.callType || callConfig.callType) === 'video' });
+                                await pc.setLocalDescription(offer);
+                                socket.emit('group_call:signal', {
+                                    toSocketId: p.socketId,
+                                    signal: { type: 'offer', sdp: offer },
+                                    fromUser: currentUserData,
+                                    conversationId: convId
+                                });
+                            } catch (e) {
+                                console.error('Error offering to existing group peer in initiateCall:', e);
+                            }
+                        }
+                    });
+                }
+            });
+            return;
+        }
+
         const otherId = getOtherParticipantId();
         if (!otherId) {
             console.error('initiateCall: could not find other participant in', activeConversation?.participants);
@@ -582,6 +697,53 @@ const CallOverlay = ({
         setIsAnswering(true);
         try {
             await getMedia();
+            const isGroup = !!(callConfig?.isGroupCall || callConfig?.callerData?.isGroupCall || activeConversation?.type === 'group');
+            if (isGroup) {
+                const convId = callConfig?.conversationId || callConfig?.callerData?.conversationId || activeConversation?._id;
+                const sessionId = callConfig?.callSessionId || callConfig?.callerData?.callSessionId || callSessionIdRef.current;
+                
+                setCallAccepted(true);
+                callAcceptedRef.current = true;
+                if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current);
+                ringtoneRef.current?.stop?.();
+                ringtoneRef.current?.pause?.();
+                ringtoneRef.current = null;
+
+                socket.emit('join_group_call', {
+                    conversationId: convId,
+                    callSessionId: sessionId,
+                    user: {
+                        _id: mongoUserId,
+                        displayName: currentUserData?.displayName || 'Someone',
+                        avatarUrl: currentUserData?.avatarUrl || ''
+                    }
+                }, async (res) => {
+                    setIsAnswering(false);
+                    if (res?.ok && Array.isArray(res.participants)) {
+                        const iceServers = await getIceServers();
+                        res.participants.forEach(async (p) => {
+                            if (!p.socketId || p.socketId === socket.id) return;
+                            if (socket.id < p.socketId) {
+                                try {
+                                    const pc = buildGroupPeerConnection(p.socketId, p.user, iceServers);
+                                    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: callConfig.callType === 'video' });
+                                    await pc.setLocalDescription(offer);
+                                    socket.emit('group_call:signal', {
+                                        toSocketId: p.socketId,
+                                        signal: { type: 'offer', sdp: offer },
+                                        fromUser: currentUserData,
+                                        conversationId: convId
+                                    });
+                                } catch (e) {
+                                    console.error('Error offering to existing group peer:', e);
+                                }
+                            }
+                        });
+                    }
+                });
+                return;
+            }
+
             const iceServers = await getIceServers();
             const pc = buildPeerConnection(String(callConfig.callerData.from), iceServers);
             peerConnection.current = pc;
@@ -720,15 +882,102 @@ const CallOverlay = ({
         const onCallEnded = () => handleEndCall(false);
         const onCallRejected = () => { if (ringTimeoutRef.current) clearTimeout(ringTimeoutRef.current); handleEndCall(false); };
 
+        const onGroupPeerJoined = async ({ socketId, user, conversationId }) => {
+            if (!socketId || socketId === socket.id) return;
+            if (socket.id < socketId) {
+                try {
+                    const iceServers = await getIceServers();
+                    const pc = buildGroupPeerConnection(socketId, user, iceServers);
+                    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: callConfig?.callType === 'video' });
+                    await pc.setLocalDescription(offer);
+                    socket.emit('group_call:signal', {
+                        toSocketId: socketId,
+                        signal: { type: 'offer', sdp: offer },
+                        fromUser: currentUserData,
+                        conversationId
+                    });
+                } catch (err) {
+                    console.error('Error offering to newcomer peer in group call:', err);
+                }
+            }
+        };
+
+        const onGroupPeerLeft = ({ socketId }) => {
+            const entry = groupPeersRef.current.get(socketId);
+            if (entry?.pc) {
+                try { entry.pc.close(); } catch (e) {}
+                groupPeersRef.current.delete(socketId);
+            }
+            setGroupParticipants(prev => prev.filter(p => p.socketId !== socketId));
+        };
+
+        const onGroupCallSignal = async ({ signal, fromSocketId, fromUser, conversationId }) => {
+            if (!fromSocketId || fromSocketId === socket.id) return;
+            const iceServers = await getIceServers();
+            const pc = buildGroupPeerConnection(fromSocketId, fromUser, iceServers);
+            const entry = groupPeersRef.current.get(fromSocketId);
+
+            if (signal.type === 'offer') {
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                    if (entry?.queue?.length) {
+                        for (const c of entry.queue) {
+                            await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+                        }
+                        entry.queue = [];
+                    }
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    socket.emit('group_call:signal', {
+                        toSocketId: fromSocketId,
+                        signal: { type: 'answer', sdp: answer },
+                        fromUser: currentUserData,
+                        conversationId
+                    });
+                } catch (err) {
+                    console.error('Error answering group call offer:', err);
+                }
+            } else if (signal.type === 'answer') {
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                    if (entry?.queue?.length) {
+                        for (const c of entry.queue) {
+                            await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+                        }
+                        entry.queue = [];
+                    }
+                } catch (err) {
+                    console.error('Error applying group call answer:', err);
+                }
+            } else if (signal.type === 'candidate' && signal.candidate) {
+                try {
+                    if (pc.remoteDescription && pc.remoteDescription.type) {
+                        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                    } else {
+                        entry.queue = entry.queue || [];
+                        entry.queue.push(signal.candidate);
+                    }
+                } catch (candErr) {
+                    console.warn('Ignored transient group ICE candidate:', candErr);
+                }
+            }
+        };
+
         socket.on('call_accepted', onCallAccepted);
         socket.on('webrtc_ice_candidate', onIceCandidate);
         socket.on('call_ended', onCallEnded);
         socket.on('call_rejected', onCallRejected);
+        socket.on('group_call:peer_joined', onGroupPeerJoined);
+        socket.on('group_call:peer_left', onGroupPeerLeft);
+        socket.on('group_call:signal', onGroupCallSignal);
         return () => {
             socket.off('call_accepted', onCallAccepted);
             socket.off('webrtc_ice_candidate', onIceCandidate);
             socket.off('call_ended', onCallEnded);
             socket.off('call_rejected', onCallRejected);
+            socket.off('group_call:peer_joined', onGroupPeerJoined);
+            socket.off('group_call:peer_left', onGroupPeerLeft);
+            socket.off('group_call:signal', onGroupCallSignal);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [socket]);
@@ -749,16 +998,23 @@ const CallOverlay = ({
     const otherDisplayName = otherParticipant?.displayName || otherParticipant?.name || otherParticipant?.username || callConfig?.targetUser?.displayName || 'Contact';
     const otherAvatarUrl = otherParticipant?.avatarUrl || callConfig?.targetUser?.avatarUrl;
 
-    const callerName = callConfig.isReceiving
-        ? (callConfig.callerData?.callerInfo?.name || otherDisplayName || 'Someone')
-        : otherDisplayName;
+    const isGroupCall = !!(callConfig?.isGroupCall || callConfig?.callerData?.isGroupCall || activeConversation?.type === 'group');
+    const groupName = callConfig?.groupName || callConfig?.callerData?.groupName || activeConversation?.name || 'Group';
+    const groupAvatar = callConfig?.groupAvatarUrl || callConfig?.callerData?.groupAvatarUrl || activeConversation?.avatarUrl;
 
-    const callerAvatar = callConfig.isReceiving
-        ? (callConfig.callerData?.callerInfo?.avatarUrl
-            || otherAvatarUrl
-            || '/default-avatar.svg')
-        : (otherAvatarUrl
-            || '/default-avatar.svg');
+    const callerName = isGroupCall
+        ? (callConfig.isReceiving
+            ? `${groupName} (from ${callConfig.callerData?.callerInfo?.name || callConfig.callerData?.callerInfo?.displayName || 'Member'})`
+            : `${groupName} (Group Call)`)
+        : (callConfig.isReceiving
+            ? (callConfig.callerData?.callerInfo?.name || otherDisplayName || 'Someone')
+            : otherDisplayName);
+
+    const callerAvatar = isGroupCall
+        ? (groupAvatar || '/default-avatar.svg')
+        : (callConfig.isReceiving
+            ? (callConfig.callerData?.callerInfo?.avatarUrl || otherAvatarUrl || '/default-avatar.svg')
+            : (otherAvatarUrl || '/default-avatar.svg'));
 
     const myName = currentUserData?.displayName || 'You';
     const myAvatar = currentUserData?.avatarUrl || user?.picture || '/default-avatar.svg';
@@ -791,7 +1047,7 @@ const CallOverlay = ({
                         userSelect: 'none'
                     }}>
                         {isVideoCall ? <Video size={16} color="#00e5ff" /> : <Phone size={16} color="#00e5ff" />}
-                        <span>{isVideoCall ? 'DevSup Video Call' : 'DevSup Voice Call'}</span>
+                        <span>{isGroupCall ? (isVideoCall ? 'DevSup Group Video Call' : 'DevSup Group Voice Call') : (isVideoCall ? 'DevSup Video Call' : 'DevSup Voice Call')}</span>
                     </div>
 
                     <CallingAnimation>
@@ -813,7 +1069,9 @@ const CallOverlay = ({
                         {callerName}
                     </CallerNameText>
                     <CallStatusText>
-                        {callConfig.isReceiving ? 'Incoming call…' : 'Ringing…'}
+                        {callConfig.isReceiving 
+                            ? (isGroupCall ? `Incoming group call from ${callConfig.callerData?.callerInfo?.name || 'a member'}…` : 'Incoming call…') 
+                            : (isGroupCall ? 'Calling group members…' : 'Ringing…')}
                     </CallStatusText>
 
                     {callConfig.isReceiving ? (
@@ -982,71 +1240,187 @@ const CallOverlay = ({
                         </div>
                     </div>
 
-                    {/* Main Fullscreen Video (Remote participant fills 100% of the screen) */}
+                    {/* Main Video Area */}
                     <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
-                        <video
-                            ref={remoteVideoCallbackRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            onPlaying={() => setRemoteVideoActive(true)}
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                display: remoteVideoActive ? 'block' : 'none'
-                            }}
-                        />
-
-                        {!remoteVideoActive && (
-                            <div style={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '16px',
-                                backgroundColor: '#080f15'
-                            }}>
-                                <img
-                                    src={callerAvatar}
-                                    alt={callerName}
-                                    onError={e => { e.currentTarget.src = avatarFallback(callerName); }}
+                        {isGroupCall ? (
+                            groupParticipants.length === 0 ? (
+                                <div style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '16px',
+                                    backgroundColor: '#080f15',
+                                    padding: '24px'
+                                }}>
+                                    <CallingAnimation>
+                                        <AvatarImg 
+                                            src={callerAvatar} 
+                                            alt={callerName} 
+                                            onError={e => { e.currentTarget.src = avatarFallback(callerName); }} 
+                                            style={{
+                                                width: '110px',
+                                                height: '110px',
+                                                borderRadius: '50%',
+                                                border: '3px solid #00e5ff',
+                                                boxShadow: '0 0 35px rgba(0, 229, 255, 0.35)',
+                                                objectFit: 'cover'
+                                            }}
+                                        />
+                                    </CallingAnimation>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: '1.4rem', fontWeight: '700', color: '#ffffff' }}>{callerName}</span>
+                                        <span style={{ color: '#00e5ff', fontSize: '0.92rem', fontWeight: '500' }}>Waiting for group members to join…</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    padding: '70px 16px 110px',
+                                    display: 'grid',
+                                    gridTemplateColumns: groupParticipants.length === 1 ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))',
+                                    gap: '14px',
+                                    overflowY: 'auto'
+                                }}>
+                                    {groupParticipants.map(peer => (
+                                        <div
+                                            key={peer.socketId}
+                                            style={{
+                                                position: 'relative',
+                                                backgroundColor: '#0c1622',
+                                                borderRadius: '16px',
+                                                overflow: 'hidden',
+                                                border: '1.5px solid rgba(0, 229, 255, 0.25)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                minHeight: '200px'
+                                            }}
+                                        >
+                                            <video
+                                                autoPlay
+                                                playsInline
+                                                ref={el => {
+                                                    if (el && peer.stream && el.srcObject !== peer.stream) {
+                                                        el.srcObject = peer.stream;
+                                                        el.play().catch(() => {});
+                                                    }
+                                                }}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    display: peer.isVideo ? 'block' : 'none'
+                                                }}
+                                            />
+                                            {!peer.isVideo && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                                    <img
+                                                        src={peer.avatarUrl || '/default-avatar.svg'}
+                                                        alt={peer.name}
+                                                        onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
+                                                        style={{ width: '70px', height: '70px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #00e5ff' }}
+                                                    />
+                                                    <span style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.9rem' }}>{peer.name}</span>
+                                                </div>
+                                            )}
+                                            <audio
+                                                autoPlay
+                                                playsInline
+                                                ref={el => {
+                                                    if (el && peer.stream && el.srcObject !== peer.stream) {
+                                                        el.srcObject = peer.stream;
+                                                        el.play().catch(() => {});
+                                                    }
+                                                }}
+                                            />
+                                            <div style={{
+                                                position: 'absolute',
+                                                bottom: '8px',
+                                                left: '8px',
+                                                backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                                                padding: '3px 8px',
+                                                borderRadius: '8px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 600,
+                                                color: '#ffffff'
+                                            }}>
+                                                {peer.name}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        ) : (
+                            <>
+                                <video
+                                    ref={remoteVideoCallbackRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    onPlaying={() => setRemoteVideoActive(true)}
                                     style={{
-                                        width: '110px',
-                                        height: '110px',
-                                        borderRadius: '50%',
-                                        border: '3px solid #00e5ff',
-                                        boxShadow: '0 0 35px rgba(0, 229, 255, 0.35)',
-                                        objectFit: 'cover'
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        display: remoteVideoActive ? 'block' : 'none'
                                     }}
                                 />
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                                    <span style={{ fontSize: '1.4rem', fontWeight: '700', color: '#ffffff' }}>{callerName}</span>
-                                    <span style={{ color: '#00e5ff', fontSize: '0.92rem', fontWeight: '500' }}>Connecting…</span>
-                                </div>
-                            </div>
-                        )}
 
-                        {/* Remote User label pill in bottom-left */}
-                        {remoteVideoActive && (
-                            <div style={{
-                                position: 'absolute',
-                                bottom: '115px',
-                                left: '20px',
-                                backgroundColor: 'rgba(0, 0, 0, 0.55)',
-                                backdropFilter: 'blur(8px)',
-                                borderRadius: '12px',
-                                padding: '6px 14px',
-                                fontSize: '0.85rem',
-                                fontWeight: '600',
-                                color: '#ffffff',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                zIndex: 10
-                            }}>
-                                {callerName}
-                            </div>
+                                {!remoteVideoActive && (
+                                    <div style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '16px',
+                                        backgroundColor: '#080f15'
+                                    }}>
+                                        <img
+                                            src={callerAvatar}
+                                            alt={callerName}
+                                            onError={e => { e.currentTarget.src = avatarFallback(callerName); }}
+                                            style={{
+                                                width: '110px',
+                                                height: '110px',
+                                                borderRadius: '50%',
+                                                border: '3px solid #00e5ff',
+                                                boxShadow: '0 0 35px rgba(0, 229, 255, 0.35)',
+                                                objectFit: 'cover'
+                                            }}
+                                        />
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ fontSize: '1.4rem', fontWeight: '700', color: '#ffffff' }}>{callerName}</span>
+                                            <span style={{ color: '#00e5ff', fontSize: '0.92rem', fontWeight: '500' }}>Connecting…</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Remote User label pill in bottom-left */}
+                                {remoteVideoActive && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: '115px',
+                                        left: '20px',
+                                        backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                        backdropFilter: 'blur(8px)',
+                                        borderRadius: '12px',
+                                        padding: '6px 14px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: '600',
+                                        color: '#ffffff',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        zIndex: 10
+                                    }}>
+                                        {callerName}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 

@@ -2015,6 +2015,8 @@ export default function Dashboard() {
     const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
     const [activeHuddle, setActiveHuddle] = useState(null); // { conversationId, channelName }
     const [huddleSummary, setHuddleSummary] = useState({}); // { [convId]: [members...] }
+    const [groupCallsSummary, setGroupCallsSummary] = useState({}); // { [convId]: callObj }
+    const [communityCategoryFilter, setCommunityCategoryFilter] = useState('all'); // 'all' | 'communities' | 'groups'
     const [isHackathonOpen, setIsHackathonOpen] = useState(false);
     const [mediaViewer, setMediaViewer] = useState(null);
     const [documentViewer, setDocumentViewer] = useState(null);
@@ -2270,6 +2272,9 @@ export default function Dashboard() {
     const [isAddMembersModalOpen, setIsAddMembersModalOpen] = useState(false);
     const [addMembersSearchQuery, setAddMembersSearchQuery] = useState('');
     const [selectedMembersToAdd, setSelectedMembersToAdd] = useState([]);
+    const [addMembersSearchResults, setAddMembersSearchResults] = useState([]);
+    const [isSearchingMembers, setIsSearchingMembers] = useState(false);
+    const addMembersSearchTimerRef = useRef(null);
     const [userSearchQuery, setUserSearchQuery] = useState('');
     const [userSearchResults, setUserSearchResults] = useState([]);
     const [isSearchingUsers, setIsSearchingUsers] = useState(false);
@@ -2844,6 +2849,25 @@ export default function Dashboard() {
                     if (summary) setHuddleSummary(summary);
                 });
 
+                newSocket.on('group_calls:presence_updated', (summary) => {
+                    if (summary) setGroupCallsSummary(summary);
+                });
+
+                newSocket.emit('get_group_call_summary', (summary) => {
+                    if (summary) setGroupCallsSummary(summary);
+                });
+
+                newSocket.on('conversation_updated', (updatedConv) => {
+                    if (!updatedConv?._id) return;
+                    setConversations(prev => prev.map(c => c._id === updatedConv._id ? { ...c, ...updatedConv } : c));
+                    setActiveConversation(prev => prev?._id === updatedConv._id ? { ...prev, ...updatedConv } : prev);
+                });
+
+                newSocket.on('conversation_created', (newConv) => {
+                    if (!newConv?._id) return;
+                    setConversations(prev => prev.some(c => c._id === newConv._id) ? prev : [newConv, ...prev]);
+                });
+
                 newSocket.on('messages_deleted_for_me', (deletedMsgIds) => {
                     const deletedIds = new Set(deletedMsgIds.map(String));
                     setMessages(prev => prev.filter(msg =>
@@ -2868,17 +2892,19 @@ export default function Dashboard() {
                 });
 
                 newSocket.on('call_user', (data) => {
-                    // When receiving a call
+                    // When receiving a call (1-on-1 or Group Call)
                     setCallConfig({
                         active: true,
                         isReceiving: true,
                         callerData: data,
                         callType: (data.callType === 'video') ? 'video' : 'audio',
+                        isGroupCall: !!data.isGroupCall,
+                        groupName: data.groupName,
                         conversationId: data.conversationId,
                         targetUserId: data.from,
                         targetUser: {
                             _id: data.from,
-                            displayName: data.callerInfo?.name,
+                            displayName: data.callerInfo?.name || data.callerInfo?.displayName,
                             avatarUrl: data.callerInfo?.avatarUrl
                         }
                     });
@@ -3151,6 +3177,7 @@ export default function Dashboard() {
 
         try {
             const token = await getAccessTokenSilently();
+            const isCommunity = activeTab === 'communities';
             const res = await fetch(`${BACKEND_URL}/api/conversations`, {
                 method: 'POST',
                 headers: {
@@ -3159,6 +3186,8 @@ export default function Dashboard() {
                 },
                 body: JSON.stringify({
                     type: convType,
+                    isPublic: isCommunity,
+                    groupType: isCommunity ? 'community' : 'group',
                     name: convType === 'group' ? convName : undefined,
                     description: convType === 'group' ? convDescription : undefined,
                     avatarUrl: convType === 'group' ? convAvatarUrl : undefined,
@@ -3174,6 +3203,8 @@ export default function Dashboard() {
             });
 
             setActiveConversationId(newConv._id);
+            setActiveConversation(newConv);
+            showToast(isCommunity ? 'Community created and published!' : (convType === 'group' ? 'Group created successfully!' : 'Conversation started!'));
             setIsModalOpen(false);
             setConvName('');
             setConvDescription('');
@@ -3183,7 +3214,40 @@ export default function Dashboard() {
             setUserSearchQuery('');
         } catch (error) {
             console.error('Failed to create conversation:', error);
+            showToast('Failed to create conversation. Please try again.');
         }
+    };
+
+    const handleAddMemberSearchChange = (query) => {
+        setAddMembersSearchQuery(query);
+        if (addMembersSearchTimerRef.current) clearTimeout(addMembersSearchTimerRef.current);
+        const q = (query || '').trim();
+        if (!q) {
+            setAddMembersSearchResults([]);
+            setIsSearchingMembers(false);
+            return;
+        }
+
+        setIsSearchingMembers(true);
+        addMembersSearchTimerRef.current = setTimeout(async () => {
+            try {
+                const token = await getAccessTokenSilently();
+                const res = await fetch(`${BACKEND_URL}/api/users/search?q=${encodeURIComponent(q)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const found = await res.json();
+                    setAddMembersSearchResults(Array.isArray(found) ? found : (found ? [found] : []));
+                } else {
+                    setAddMembersSearchResults([]);
+                }
+            } catch (err) {
+                console.error('Error searching users to add:', err);
+                setAddMembersSearchResults([]);
+            } finally {
+                setIsSearchingMembers(false);
+            }
+        }, 300);
     };
 
     const handleAddMembersToGroup = async () => {
@@ -3205,12 +3269,19 @@ export default function Dashboard() {
             if (res.ok) {
                 const updatedConv = await res.json();
                 setConversations(prev => prev.map(c => c._id === updatedConv._id ? updatedConv : c));
+                setActiveConversation(updatedConv);
+                showToast(`Added ${selectedMembersToAdd.length} member${selectedMembersToAdd.length > 1 ? 's' : ''} to group!`);
                 setIsAddMembersModalOpen(false);
                 setSelectedMembersToAdd([]);
                 setAddMembersSearchQuery('');
+                setAddMembersSearchResults([]);
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                showToast(errData.error || 'Failed to add members');
             }
         } catch (error) {
             console.error('Failed to add members:', error);
+            showToast('Failed to add members');
         }
     };
 
@@ -5010,6 +5081,9 @@ export default function Dashboard() {
                                         </IconButton>
                                     </div>
                                 ) : <div style={{ display: 'flex', gap: '8px' }}>
+                                    <IconButton title="Explore Public Communities" onClick={() => setIsCommunityDirectoryOpen(true)} style={{ backgroundColor: 'var(--colors-surface)', color: '#06B6D4' }}>
+                                        <Compass size={19} />
+                                    </IconButton>
                                     <IconButton title="New Community" onClick={() => { setConvType('group'); setIsModalOpen(true); }} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
                                         <Plus size={20} />
                                     </IconButton>
@@ -5024,6 +5098,10 @@ export default function Dashboard() {
                                                     onClick={() => setIsChatsMenuOpen(false)}
                                                 />
                                                 <ContextMenuContainer style={{ top: '100%', right: 0, marginTop: '12px', zIndex: 2000 }}>
+                                                    <ContextMenuItem onClick={() => { setIsCommunityDirectoryOpen(true); setIsChatsMenuOpen(false); }}>
+                                                        <Compass size={18} color="#06B6D4" style={{ opacity: 0.9 }} />
+                                                        Explore public communities
+                                                    </ContextMenuItem>
                                                     <ContextMenuItem onClick={() => { setIsChatsSelectionMode(true); setSelectedChats([]); setIsChatsMenuOpen(false); }}>
                                                         <CheckSquare size={18} style={{ opacity: 0.8 }} />
                                                         Select communities
@@ -5049,12 +5127,12 @@ export default function Dashboard() {
                                 padding: '8px 12px', 
                                 borderRadius: '8px', 
                                 gap: '12px',
-                                marginBottom: '16px'
+                                marginBottom: '12px'
                             }}>
                                 <Search size={18} color="var(--colors-textMuted)" />
                                 <input 
                                     type="text" 
-                                    placeholder="Search communities"
+                                    placeholder="Search communities & groups..."
                                     value={chatSearchQuery}
                                     onChange={(e) => setChatSearchQuery(e.target.value)}
                                     style={{ 
@@ -5067,43 +5145,117 @@ export default function Dashboard() {
                                     }}
                                 />
                             </div>
+
+                            {/* Sub-filter tabs: All | Communities | Groups */}
+                            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                                {[
+                                    { key: 'all', label: 'All', count: conversations.filter(c => c.type === 'group').length },
+                                    { key: 'communities', label: 'Communities', count: conversations.filter(c => c.type === 'group' && (c.groupType === 'community' || c.isPublic)).length },
+                                    { key: 'groups', label: 'Groups', count: conversations.filter(c => c.type === 'group' && c.groupType !== 'community' && !c.isPublic).length }
+                                ].map(tab => {
+                                    const active = communityCategoryFilter === tab.key;
+                                    return (
+                                        <button
+                                            key={tab.key}
+                                            type="button"
+                                            onClick={() => setCommunityCategoryFilter(tab.key)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '6px 8px',
+                                                borderRadius: '8px',
+                                                border: active ? '1px solid var(--colors-accent)' : '1px solid var(--colors-border)',
+                                                backgroundColor: active ? 'rgba(6, 182, 212, 0.12)' : 'transparent',
+                                                color: active ? 'var(--colors-accent)' : 'var(--colors-textMuted)',
+                                                fontSize: '0.78rem',
+                                                fontWeight: active ? '700' : '500',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s ease',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '5px'
+                                            }}
+                                        >
+                                            <span>{tab.label}</span>
+                                            <span style={{
+                                                fontSize: '0.7rem',
+                                                padding: '1px 5px',
+                                                borderRadius: '10px',
+                                                backgroundColor: active ? 'var(--colors-accent)' : 'rgba(255,255,255,0.06)',
+                                                color: active ? '#fff' : 'inherit'
+                                            }}>
+                                                {tab.count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
-                        {conversations.filter(c => {
-                            if (c.type !== 'group') return false;
-                            if (!chatSearchQuery) return true;
-                            return c.name.toLowerCase().includes(chatSearchQuery.toLowerCase());
-                        }).length === 0 ? (
-                            chatSearchQuery.trim() ? (
-                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', padding: '16px 20px', textAlign: 'center' }}>
-                                    Group not found.
-                                </div>
-                            ) : (
-                                <div 
-                                    onClick={() => { setConvType('group'); setIsModalOpen(true); }}
-                                    style={{ 
-                                        color: 'var(--colors-accent)', 
-                                        fontSize: '0.9rem', 
-                                        padding: '16px 20px', 
-                                        textAlign: 'center', 
-                                        cursor: 'pointer',
-                                        fontWeight: '500',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '8px'
-                                    }}
-                                >
-                                    <Plus size={16} />
-                                    <span>Start community</span>
-                                </div>
-                            )
-                        ) : (
-                            [...conversations].filter(c => {
+                        {(() => {
+                            const isCommunityConv = (c) => c.groupType === 'community' || c.isPublic;
+                            const filteredList = [...conversations].filter(c => {
                                 if (c.type !== 'group') return false;
+                                if (communityCategoryFilter === 'communities' && !isCommunityConv(c)) return false;
+                                if (communityCategoryFilter === 'groups' && isCommunityConv(c)) return false;
                                 if (!chatSearchQuery) return true;
-                                return c.name.toLowerCase().includes(chatSearchQuery.toLowerCase());
-                            }).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(conv => (
+                                const q = chatSearchQuery.toLowerCase();
+                                return (c.name || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q);
+                            });
+
+                            if (filteredList.length === 0) {
+                                return chatSearchQuery.trim() ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px', gap: '12px', textAlign: 'center' }}>
+                                        <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
+                                            No joined community or group found matching "{chatSearchQuery}".
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCommunityDirectoryOpen(true)}
+                                            style={{
+                                                padding: '8px 16px',
+                                                borderRadius: '20px',
+                                                backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                                                border: '1px solid #06B6D4',
+                                                color: '#06B6D4',
+                                                fontSize: '0.85rem',
+                                                fontWeight: '600',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            <Compass size={16} />
+                                            <span>Search Public Communities</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div 
+                                        onClick={() => { setConvType('group'); setIsModalOpen(true); }}
+                                        style={{ 
+                                            color: 'var(--colors-accent)', 
+                                            fontSize: '0.9rem', 
+                                            padding: '16px 20px', 
+                                            textAlign: 'center', 
+                                            cursor: 'pointer',
+                                            fontWeight: '500',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px'
+                                        }}
+                                    >
+                                        <Plus size={16} />
+                                        <span>Start a community or group</span>
+                                    </div>
+                                );
+                            }
+
+                            return filteredList.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(conv => {
+                                const isComm = isCommunityConv(conv);
+                                const hasLiveCall = !!groupCallsSummary[conv._id];
+                                return (
                                 <ChannelItem
                                     key={conv._id}
                                     active={activeConversationId === conv._id || selectedChats.includes(conv._id)}
@@ -5164,9 +5316,42 @@ export default function Dashboard() {
 
                                     <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', alignSelf: 'center', gap: '4px', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
-                                            <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
-                                                {conv.name}
-                                            </span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                                <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '600' : '500', color: 'var(--colors-textMain, #ffffff)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                                                    {conv.name}
+                                                </span>
+                                                <span style={{
+                                                    fontSize: '0.65rem',
+                                                    fontWeight: '700',
+                                                    color: isComm ? '#06b6d4' : '#a855f7',
+                                                    backgroundColor: isComm ? 'rgba(6, 182, 212, 0.15)' : 'rgba(168, 85, 247, 0.15)',
+                                                    border: isComm ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid rgba(168, 85, 247, 0.3)',
+                                                    borderRadius: '4px',
+                                                    padding: '1px 5px',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.5px',
+                                                    flexShrink: 0
+                                                }}>
+                                                    {isComm ? '# Community' : '👥 Group'}
+                                                </span>
+                                                {hasLiveCall && (
+                                                    <span style={{
+                                                        fontSize: '0.65rem',
+                                                        fontWeight: '700',
+                                                        color: '#10b981',
+                                                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                                                        border: '1px solid #10b981',
+                                                        borderRadius: '10px',
+                                                        padding: '1px 6px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '3px',
+                                                        flexShrink: 0
+                                                    }}>
+                                                        ● Call
+                                                    </span>
+                                                )}
+                                            </div>
                                             {conv.lastMessage && (
                                                 <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '600' : 'normal', lineHeight: 1.2 }}>
                                                     {formatMessageTime(conv.lastMessage.createdAt, false)}
@@ -5209,8 +5394,9 @@ export default function Dashboard() {
                                         </div>
                                     </div>
                                 </ChannelItem>
-                            ))
-                        )}
+                                );
+                            });
+                        })()}
                     </>
                 )}
 
@@ -5493,11 +5679,14 @@ export default function Dashboard() {
                                                 showToast('Cannot call a blocked contact. Unblock them first.');
                                                 return;
                                             }
+                                            const isGroup = activeConversation.type === 'group';
                                             setCallConfig({
                                                 active: true,
                                                 isReceiving: false,
                                                 callerData: null,
                                                 callType: 'video',
+                                                isGroupCall: isGroup,
+                                                groupName: isGroup ? activeConversation.name : undefined,
                                                 targetUserId: directChatPartner ? String(directChatPartner._id || directChatPartner) : null,
                                                 targetUser: directChatPartner || null,
                                                 conversationId: activeConversation?._id
@@ -5513,11 +5702,14 @@ export default function Dashboard() {
                                                 showToast('Cannot call a blocked contact. Unblock them first.');
                                                 return;
                                             }
+                                            const isGroup = activeConversation.type === 'group';
                                             setCallConfig({
                                                 active: true,
                                                 isReceiving: false,
                                                 callerData: null,
                                                 callType: 'audio',
+                                                isGroupCall: isGroup,
+                                                groupName: isGroup ? activeConversation.name : undefined,
                                                 targetUserId: directChatPartner ? String(directChatPartner._id || directChatPartner) : null,
                                                 targetUser: directChatPartner || null,
                                                 conversationId: activeConversation?._id
@@ -5698,11 +5890,14 @@ export default function Dashboard() {
                                                         Whiteboard
                                                     </ContextMenuItem>}
                                                     <ContextMenuItem onClick={() => { 
+                                                        const isGroup = activeConversation.type === 'group';
                                                         setCallConfig({
                                                             active: true,
                                                             isReceiving: false,
                                                             callerData: null,
                                                             callType: 'video',
+                                                            isGroupCall: isGroup,
+                                                            groupName: isGroup ? activeConversation.name : undefined,
                                                             targetUserId: directChatPartner ? String(directChatPartner._id || directChatPartner) : null,
                                                             targetUser: directChatPartner || null,
                                                             conversationId: activeConversation?._id
@@ -5817,6 +6012,103 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             </ChatHeader>
+
+                            {/* WhatsApp-Style Ongoing Group Call Banner */}
+                            {(() => {
+                                const convId = String(activeConversation?._id || '');
+                                const activeCall = groupCallsSummary[convId];
+                                if (!activeCall || activeConversation.type !== 'group') return null;
+
+                                const isAlreadyInOverlay = callConfig.active && (callConfig.conversationId === convId || callConfig.callerData?.conversationId === convId);
+                                if (isAlreadyInOverlay) return null;
+
+                                const participantCount = activeCall.participants?.length || 0;
+                                const isVideo = activeCall.callType === 'video';
+
+                                return (
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '10px 20px',
+                                        backgroundColor: 'rgba(16, 185, 129, 0.16)',
+                                        borderBottom: '1px solid rgba(16, 185, 129, 0.35)',
+                                        backdropFilter: 'blur(8px)',
+                                        flexShrink: 0,
+                                        zIndex: 10
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{
+                                                width: '38px',
+                                                height: '38px',
+                                                borderRadius: '50%',
+                                                backgroundColor: '#10b981',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#ffffff',
+                                                boxShadow: '0 0 12px rgba(16, 185, 129, 0.45)',
+                                                flexShrink: 0
+                                            }}>
+                                                {isVideo ? <Video size={20} /> : <Phone size={20} />}
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ fontSize: '0.94rem', fontWeight: '700', color: 'var(--colors-textMain)' }}>
+                                                        Ongoing {isVideo ? 'Video' : 'Voice'} Call
+                                                    </span>
+                                                    <span style={{
+                                                        width: '8px',
+                                                        height: '8px',
+                                                        borderRadius: '50%',
+                                                        backgroundColor: '#10b981',
+                                                        display: 'inline-block',
+                                                        boxShadow: '0 0 6px #10b981'
+                                                    }} />
+                                                </div>
+                                                <span style={{ fontSize: '0.78rem', color: 'var(--colors-textMuted)' }}>
+                                                    {participantCount > 0 ? `${participantCount} participant${participantCount > 1 ? 's' : ''} in call` : 'Active call in progress'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setCallConfig({
+                                                    active: true,
+                                                    isReceiving: false,
+                                                    callerData: null,
+                                                    callType: activeCall.callType || 'audio',
+                                                    isGroupCall: true,
+                                                    groupName: activeCall.groupName || activeConversation.name,
+                                                    conversationId: convId,
+                                                    callSessionId: activeCall.callSessionId
+                                                });
+                                            }}
+                                            style={{
+                                                backgroundColor: '#10b981',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                borderRadius: '20px',
+                                                padding: '8px 18px',
+                                                fontSize: '0.85rem',
+                                                fontWeight: '700',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#059669'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#10b981'; }}
+                                        >
+                                            {isVideo ? <Video size={15} /> : <Phone size={15} />}
+                                            <span>Join Call</span>
+                                        </button>
+                                    </div>
+                                );
+                            })()}
 
                             {!isMobileViewport && activeTab === 'communities' && activeConversation.type === 'group' && (
                                 <div style={{ display: 'flex', gap: '24px', padding: '0 24px', borderBottom: '1px solid var(--colors-border)', backgroundColor: 'var(--colors-surface)', flexShrink: 0 }}>
@@ -7740,19 +8032,31 @@ export default function Dashboard() {
                                         <div 
                                             style={{ width: '40px', height: '24px', borderRadius: '12px', backgroundColor: activeConversation.allowAnyMemberToAdd ? 'var(--colors-accent)' : 'var(--colors-border)', position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s' }}
                                             onClick={async () => {
+                                                const nextVal = !activeConversation.allowAnyMemberToAdd;
+                                                setActiveConversation(prev => ({ ...prev, allowAnyMemberToAdd: nextVal }));
+                                                setConversations(prev => prev.map(c => c._id === activeConversation._id ? { ...c, allowAnyMemberToAdd: nextVal } : c));
                                                 try {
                                                     const token = await getAccessTokenSilently();
                                                     const res = await fetch(`${BACKEND_URL}/api/conversations/${activeConversation._id}`, {
                                                         method: 'PUT',
                                                         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({ allowAnyMemberToAdd: !activeConversation.allowAnyMemberToAdd })
+                                                        body: JSON.stringify({ allowAnyMemberToAdd: nextVal })
                                                     });
                                                     if (res.ok) {
                                                         const updated = await res.json();
-                                                        setConversations(prev => prev.map(c => c._id === updated._id ? updated : c));
+                                                        setActiveConversation(prev => ({ ...prev, ...updated }));
+                                                        setConversations(prev => prev.map(c => c._id === updated._id ? { ...c, ...updated } : c));
+                                                        showToast(nextVal ? 'Members can now add others to this group' : 'Only admins can add members to this group');
+                                                    } else {
+                                                        setActiveConversation(prev => ({ ...prev, allowAnyMemberToAdd: !nextVal }));
+                                                        setConversations(prev => prev.map(c => c._id === activeConversation._id ? { ...c, allowAnyMemberToAdd: !nextVal } : c));
+                                                        showToast('Failed to update group setting. Ensure you are an admin.');
                                                     }
                                                 } catch (e) {
                                                     console.error('Failed to update group settings', e);
+                                                    setActiveConversation(prev => ({ ...prev, allowAnyMemberToAdd: !nextVal }));
+                                                    setConversations(prev => prev.map(c => c._id === activeConversation._id ? { ...c, allowAnyMemberToAdd: !nextVal } : c));
+                                                    showToast('Network error updating group settings');
                                                 }
                                             }}
                                         >
@@ -8530,9 +8834,9 @@ export default function Dashboard() {
                                 <Search size={18} />
                             </div>
                             <ModalInput
-                                placeholder="Search by name..."
+                                placeholder="Search by name or @username..."
                                 value={addMembersSearchQuery}
-                                onChange={e => setAddMembersSearchQuery(e.target.value)}
+                                onChange={e => handleAddMemberSearchChange(e.target.value)}
                                 style={{ 
                                     padding: '16px 16px 16px 44px', 
                                     borderRadius: '16px', 
@@ -8566,31 +8870,56 @@ export default function Dashboard() {
                             padding: '8px 0',
                         }}>
                             {(() => {
-                                const contactIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants?.map(p => p._id) || []))];
-                                const existingMemberIds = activeConversation.participants?.map(p => p._id) || [];
+                                const existingMemberIds = (activeConversation.participants || []).map(p => String(p._id || p));
                                 
-                                const availableContacts = allUsers.filter(u => contactIds.includes(u._id) && !existingMemberIds.includes(u._id));
+                                const candidateMap = new Map();
+                                (allUsers || []).forEach(u => {
+                                    if (u?._id && String(u._id) !== String(mongoUserId) && !existingMemberIds.includes(String(u._id))) {
+                                        candidateMap.set(String(u._id), u);
+                                    }
+                                });
+                                (addMembersSearchResults || []).forEach(u => {
+                                    if (u?._id && String(u._id) !== String(mongoUserId) && !existingMemberIds.includes(String(u._id))) {
+                                        candidateMap.set(String(u._id), u);
+                                    }
+                                });
+
+                                let candidates = Array.from(candidateMap.values());
                                 const cleanQ = normalizeUsername(addMembersSearchQuery);
-                                const filtered = availableContacts.filter(u => 
-                                    u.displayName?.toLowerCase().includes(addMembersSearchQuery.toLowerCase()) || 
-                                    (cleanQ && u.username?.toLowerCase().includes(cleanQ))
-                                );
-                                
-                                if (filtered.length === 0) {
+                                const rawQ = (addMembersSearchQuery || '').trim().toLowerCase();
+                                if (rawQ) {
+                                    candidates = candidates.filter(u => {
+                                        const uName = (u.username || '').toLowerCase();
+                                        const dName = (u.displayName || '').toLowerCase();
+                                        return dName.includes(rawQ) || (cleanQ && uName.includes(cleanQ)) || uName.includes(rawQ);
+                                    });
+                                }
+
+                                if (isSearchingMembers) {
+                                    return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '220px', padding: '40px 20px', gap: '12px' }}>
+                                            <div style={{ color: 'var(--colors-accent)', fontSize: '0.95rem', fontWeight: '600' }}>Searching users...</div>
+                                        </div>
+                                    );
+                                }
+
+                                if (candidates.length === 0) {
                                     return (
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '220px', padding: '40px 20px', gap: '16px' }}>
                                             <div style={{ padding: '16px', borderRadius: '50%', backgroundColor: 'var(--colors-surface)', border: '1px solid var(--colors-border)' }}>
                                                 <Users size={36} color="var(--colors-textMuted)" strokeWidth={1.5} />
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                                <div style={{ color: 'var(--colors-textMain)', fontSize: '1.05rem', fontWeight: 'bold' }}>No contacts found</div>
-                                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center' }}>Try searching for a different name</div>
+                                                <div style={{ color: 'var(--colors-textMain)', fontSize: '1.05rem', fontWeight: 'bold' }}>No users found</div>
+                                                <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center' }}>
+                                                    {addMembersSearchQuery ? `No user matching "${addMembersSearchQuery}"` : 'All available users are already in this group'}
+                                                </div>
                                             </div>
                                         </div>
                                     );
                                 }
-                                
-                                return filtered.map(u => (
+
+                                return candidates.map(u => (
                                     <div
                                         key={u._id}
                                         onClick={() => {

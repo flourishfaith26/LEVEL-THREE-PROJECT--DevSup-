@@ -9,10 +9,37 @@ import { sendPushNotificationToUser } from '../routers/pushRoutes.js';
 const onlineUsers = new Map();
 // Memory store for active audio huddles: conversationId -> Map(userId -> { user, socketId, isMuted, isSpeaking })
 const activeHuddles = new Map();
+// Memory store for active group calls: conversationId -> { callSessionId, callerId, callerInfo, callType, groupName, groupAvatarUrl, startedAt, participants: Map(userId -> { userId, socketId, user, isVideoOff, isMuted }) }
+const activeGroupCalls = new Map();
 // Memory store for collaborative whiteboard: conversationId -> { elements: [], bgColor: '#080C16' }
 const whiteboardRooms = new Map();
 // Memory store for technical interviews: conversationId -> roomState
 const interviewRooms = new Map();
+
+const getGroupCallSummary = () => {
+    const summary = {};
+    activeGroupCalls.forEach((callData, convId) => {
+        if (callData.participants && callData.participants.size > 0) {
+            summary[convId] = {
+                conversationId: convId,
+                callSessionId: callData.callSessionId,
+                callType: callData.callType,
+                callerInfo: callData.callerInfo,
+                groupName: callData.groupName,
+                groupAvatarUrl: callData.groupAvatarUrl,
+                participantCount: callData.participants.size,
+                startedAt: callData.startedAt,
+                participants: Array.from(callData.participants.values()).map(p => ({
+                    userId: p.userId,
+                    name: p.user?.displayName || p.user?.name || 'Member',
+                    avatarUrl: p.user?.avatarUrl || '',
+                    socketId: p.socketId
+                }))
+            };
+        }
+    });
+    return summary;
+};
 
 const getHuddleSummary = () => {
     const summary = {};
@@ -61,6 +88,8 @@ export const setupSocket = (io) => {
             socket.join(getUserRoom(normalizedUserId));
             // Broadcast the array of active User IDs to all connected clients
             io.emit('presence_update', Array.from(onlineUsers.keys()));
+            socket.emit('group_calls:presence_updated', getGroupCallSummary());
+            socket.emit('huddle:presence_updated', getHuddleSummary());
 
             // Auto-mark undelivered messages in conversations for this user as delivered
             try {
@@ -908,8 +937,223 @@ export const setupSocket = (io) => {
             }
         });
 
-        // 8. Track User Going Offline
+        // 9. Group Audio & Video Calling
+        socket.on('get_group_call_summary', (callback) => {
+            if (typeof callback === 'function') callback(getGroupCallSummary());
+        });
+
+        socket.on('start_group_call', async ({ conversationId, callType, callerInfo, callSessionId }, acknowledge) => {
+            try {
+                const convIdStr = String(conversationId);
+                const conv = await Conversation.findById(conversationId).populate('participants', 'displayName avatarUrl username');
+                if (!conv) {
+                    acknowledge?.({ ok: false, error: 'Group conversation not found.' });
+                    return;
+                }
+
+                let call = activeGroupCalls.get(convIdStr);
+                const isNewCall = !call || call.participants.size === 0;
+                const sessionId = isNewCall ? (callSessionId || `${socket.data.userId}-${Date.now()}`) : call.callSessionId;
+                const resolvedCallType = isNewCall ? ((callType === 'video') ? 'video' : 'audio') : call.callType;
+
+                if (isNewCall) {
+                    call = {
+                        conversationId: convIdStr,
+                        callSessionId: sessionId,
+                        callerId: String(socket.data.userId),
+                        callerInfo: callerInfo || { name: 'Someone' },
+                        callType: resolvedCallType,
+                        groupName: conv.name || 'Group Call',
+                        groupAvatarUrl: conv.avatarUrl || '',
+                        startedAt: Date.now(),
+                        participants: new Map()
+                    };
+                    activeGroupCalls.set(convIdStr, call);
+                }
+
+                call.participants.set(String(socket.data.userId), {
+                    userId: String(socket.data.userId),
+                    socketId: socket.id,
+                    user: callerInfo || { name: 'Someone' },
+                    isVideoOff: call.callType === 'audio',
+                    isMuted: false
+                });
+
+                socket.data.groupCallConvId = convIdStr;
+                socket.join(`group_call:${convIdStr}`);
+
+                // 1. Ring all other participants in the group if new call
+                if (isNewCall) {
+                    const ringPayload = {
+                        isGroupCall: true,
+                        conversationId: convIdStr,
+                        groupName: conv.name || 'Group Call',
+                        groupAvatarUrl: conv.avatarUrl || '',
+                        callSessionId: sessionId,
+                        callType: resolvedCallType,
+                        callerInfo: callerInfo || { name: 'Someone' },
+                        from: String(socket.data.userId)
+                    };
+
+                    conv.participants.forEach(p => {
+                        const pId = String(p._id || p);
+                        if (pId !== String(socket.data.userId)) {
+                            io.to(getUserRoom(pId)).emit('call_user', ringPayload);
+                        }
+                    });
+                } else {
+                    // Notify ongoing call members
+                    socket.to(`group_call:${convIdStr}`).emit('group_call:peer_joined', {
+                        conversationId: convIdStr,
+                        userId: String(socket.data.userId),
+                        socketId: socket.id,
+                        user: callerInfo || { name: 'Someone' },
+                        participants: Array.from(call.participants.values())
+                    });
+                }
+
+                // 2. Broadcast active group call summary
+                io.emit('group_calls:presence_updated', getGroupCallSummary());
+
+                acknowledge?.({ 
+                    ok: true, 
+                    callSessionId: sessionId,
+                    callType: call.callType,
+                    groupName: conv.name || 'Group Call',
+                    participants: Array.from(call.participants.values())
+                });
+            } catch (err) {
+                console.error('Error starting group call:', err);
+                acknowledge?.({ ok: false, error: err.message });
+            }
+        });
+
+        socket.on('join_group_call', async ({ conversationId, callSessionId, user }, acknowledge) => {
+            try {
+                const convIdStr = String(conversationId);
+                const userId = String(socket.data.userId || user?._id || user?.id);
+                let call = activeGroupCalls.get(convIdStr);
+
+                if (!call) {
+                    const conv = await Conversation.findById(conversationId);
+                    call = {
+                        conversationId: convIdStr,
+                        callSessionId: callSessionId || `${userId}-${Date.now()}`,
+                        callerId: userId,
+                        callerInfo: user,
+                        callType: 'video',
+                        groupName: conv?.name || 'Group Call',
+                        groupAvatarUrl: conv?.avatarUrl || '',
+                        startedAt: Date.now(),
+                        participants: new Map()
+                    };
+                    activeGroupCalls.set(convIdStr, call);
+                }
+
+                call.participants.set(userId, {
+                    userId,
+                    socketId: socket.id,
+                    user,
+                    isMuted: false,
+                    isVideoOff: false
+                });
+
+                socket.data.groupCallConvId = convIdStr;
+                socket.join(`group_call:${convIdStr}`);
+
+                // Inform existing call participants that a new peer joined
+                socket.to(`group_call:${convIdStr}`).emit('group_call:peer_joined', {
+                    conversationId: convIdStr,
+                    userId,
+                    socketId: socket.id,
+                    user,
+                    participants: Array.from(call.participants.values())
+                });
+
+                io.emit('group_calls:presence_updated', getGroupCallSummary());
+
+                acknowledge?.({
+                    ok: true,
+                    callSessionId: call.callSessionId,
+                    callType: call.callType,
+                    groupName: call.groupName,
+                    participants: Array.from(call.participants.values())
+                });
+            } catch (err) {
+                console.error('Error joining group call:', err);
+                acknowledge?.({ ok: false, error: err.message });
+            }
+        });
+
+        socket.on('leave_group_call', async ({ conversationId }) => {
+            const convIdStr = String(conversationId || socket.data.groupCallConvId || '');
+            const userId = String(socket.data.userId || '');
+
+            if (convIdStr && activeGroupCalls.has(convIdStr)) {
+                const call = activeGroupCalls.get(convIdStr);
+                call.participants.delete(userId);
+                socket.leave(`group_call:${convIdStr}`);
+                socket.data.groupCallConvId = null;
+
+                socket.to(`group_call:${convIdStr}`).emit('group_call:peer_left', {
+                    conversationId: convIdStr,
+                    userId,
+                    socketId: socket.id
+                });
+
+                if (call.participants.size === 0) {
+                    const duration = Math.max(1, Math.round((Date.now() - call.startedAt) / 1000));
+                    activeGroupCalls.delete(convIdStr);
+
+                    // Auto-log group call
+                    try {
+                        const callMessage = new Message({
+                            conversationId: convIdStr,
+                            sender: call.callerId,
+                            content: `$CALL_LOG$|${call.callType}|completed|${duration}`
+                        });
+                        await callMessage.save();
+                        await callMessage.populate('sender', 'displayName avatarUrl username');
+                        io.to(convIdStr).emit('receive_message', callMessage);
+                    } catch (logErr) {
+                        console.error('Failed to log group call end:', logErr);
+                    }
+                }
+
+                io.emit('group_calls:presence_updated', getGroupCallSummary());
+            }
+        });
+
+        socket.on('group_call:signal', ({ toSocketId, signal, fromUser, conversationId }) => {
+            if (toSocketId) {
+                io.to(toSocketId).emit('group_call:signal', {
+                    signal,
+                    fromSocketId: socket.id,
+                    fromUser,
+                    conversationId
+                });
+            }
+        });
+
+        // 10. Track User Going Offline
         socket.on('disconnect', () => {
+            // Clean up group call membership if user was in a group call
+            const groupCallConvId = socket.data.groupCallConvId;
+            if (groupCallConvId && activeGroupCalls.has(groupCallConvId)) {
+                const call = activeGroupCalls.get(groupCallConvId);
+                const uid = String(socket.data.userId || '');
+                call.participants.delete(uid);
+                socket.to(`group_call:${groupCallConvId}`).emit('group_call:peer_left', {
+                    conversationId: groupCallConvId,
+                    userId: uid,
+                    socketId: socket.id
+                });
+                if (call.participants.size === 0) {
+                    activeGroupCalls.delete(groupCallConvId);
+                }
+                io.emit('group_calls:presence_updated', getGroupCallSummary());
+            }
+
             // Clean up huddle membership if user was in a huddle
             const huddleConvId = socket.data.huddleConvId;
             const huddleUserId = socket.data.huddleUserId;

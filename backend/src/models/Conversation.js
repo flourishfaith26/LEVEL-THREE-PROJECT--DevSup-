@@ -54,6 +54,11 @@ const conversationSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  groupType: {
+    type: String,
+    enum: ['group', 'community'],
+    default: 'group'
+  },
   tags: [{
     type: String,
     trim: true

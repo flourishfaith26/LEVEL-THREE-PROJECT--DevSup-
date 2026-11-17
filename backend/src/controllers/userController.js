@@ -148,25 +148,29 @@ export const checkUsernameAvailability = async (req, res) => {
 
 export const searchByUsername = async (req, res) => {
     try {
-        const { username } = req.query;
-        if (!username) {
+        const rawInput = req.query.username || req.query.q || '';
+        if (!rawInput || typeof rawInput !== 'string') {
             return res.status(200).json([]);
         }
-        const cleanQuery = normalizeUsername(username);
+        const cleanQuery = rawInput.trim().replace(/^@+/, '');
         if (!cleanQuery) {
             return res.status(200).json([]);
         }
-        const auth0Id = req.auth.payload.sub;
-        const currentUser = await User.findOne({ auth0Id }).select('_id');
+        const auth0Id = req.auth?.payload?.sub;
+        let currentUser = null;
+        if (auth0Id) {
+            currentUser = await User.findOne({ auth0Id }).select('_id');
+        }
 
-        // Escape regex special chars so queries match literal characters
         const escaped = cleanQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const compactEscaped = cleanQuery.replace(/\s+/g, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
         // Find users whose username or displayName matches query
         const results = await User.find({
             $or: [
-                { username: { $regex: escaped, $options: 'i' } },
-                { displayName: { $regex: escaped, $options: 'i' } }
+                { username: { $regex: compactEscaped, $options: 'i' } },
+                { displayName: { $regex: escaped, $options: 'i' } },
+                { displayName: { $regex: compactEscaped, $options: 'i' } }
             ]
         }).select('_id displayName username avatarUrl techDiscipline onlineStatus').limit(25);
 
@@ -176,37 +180,28 @@ export const searchByUsername = async (req, res) => {
             isSelf: currentUser?._id && u._id.toString() === currentUser._id.toString()
         }));
 
-        // Sort results:
-        // 1. Exact username match
-        // 2. Username starts with query (e.g. typing 'f' shows usernames starting with 'f' first)
-        // 3. DisplayName starts with query
-        // 4. Alphabetical
         const sorted = [...mapped].sort((a, b) => {
             const aUser = (a.username || '').toLowerCase();
             const bUser = (b.username || '').toLowerCase();
             const aDisp = (a.displayName || '').toLowerCase();
             const bDisp = (b.displayName || '').toLowerCase();
             const q = cleanQuery.toLowerCase();
+            const qCompact = q.replace(/\s+/g, '');
 
-            if (aUser === q && bUser !== q) return -1;
-            if (bUser === q && aUser !== q) return 1;
+            if ((aUser === qCompact || aDisp === q) && (bUser !== qCompact && bDisp !== q)) return -1;
+            if ((bUser === qCompact || bDisp === q) && (aUser !== qCompact && aDisp !== q)) return 1;
 
-            const aUserStarts = aUser.startsWith(q);
-            const bUserStarts = bUser.startsWith(q);
-            if (aUserStarts && !bUserStarts) return -1;
-            if (!aUserStarts && bUserStarts) return 1;
+            const aStarts = aUser.startsWith(qCompact) || aDisp.startsWith(q);
+            const bStarts = bUser.startsWith(qCompact) || bDisp.startsWith(q);
+            if (aStarts && !bStarts) return -1;
+            if (!aStarts && bStarts) return 1;
 
-            const aDispStarts = aDisp.startsWith(q);
-            const bDispStarts = bDisp.startsWith(q);
-            if (aDispStarts && !bDispStarts) return -1;
-            if (!aDispStarts && bDispStarts) return 1;
-
-            return aUser.localeCompare(bUser);
+            return aDisp.localeCompare(bDisp);
         });
 
         res.status(200).json(sorted);
     } catch (error) {
-        console.error('Error searching users by username:', error);
+        console.error('Error searching users:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };

@@ -15,6 +15,7 @@ export const getUserConversations = async (req, res) => {
       deletedFor: { $ne: currentUser._id }
     })
       .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
+      .populate('admins', 'displayName avatarUrl username')
       .populate('lastMessage')
       .sort({ updatedAt: -1 });
 
@@ -26,7 +27,7 @@ export const getUserConversations = async (req, res) => {
 
 export const createConversation = async (req, res) => {
   try {
-    const { type, name, avatarUrl, description } = req.body;
+    const { type, name, avatarUrl, description, isPublic, isCommunity, groupType, tags } = req.body;
     const participantIds = req.body.participantIds || req.body.participants || [];
     
     // For direct messages, check if a conversation already exists
@@ -50,20 +51,39 @@ export const createConversation = async (req, res) => {
       }
     }
 
+    const isCom = !!(isCommunity || groupType === 'community' || isPublic);
+    const resolvedGroupType = isCom ? 'community' : (groupType || 'group');
+    const slugName = (name || 'hub').toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 24);
+    const generatedInviteCode = `devsup-${slugName}-${crypto.randomBytes(3).toString('hex')}`;
+
     const newConversation = new Conversation({
       type,
       participants: participantIds,
       name: type === 'group' ? name : undefined,
       avatarUrl: type === 'group' ? avatarUrl : undefined,
       description: type === 'group' ? description : undefined,
-      admins: type === 'group' ? admins : undefined
+      admins: type === 'group' ? admins : undefined,
+      isPublic: type === 'group' ? isCom : false,
+      groupType: type === 'group' ? resolvedGroupType : undefined,
+      tags: Array.isArray(tags) ? tags : (isCom ? ['community', 'devsup'] : []),
+      inviteCode: type === 'group' ? generatedInviteCode : undefined,
+      allowAnyMemberToAdd: isCom ? true : false
     });
 
     const savedConversation = await newConversation.save();
     
     // Populate the newly saved conversation before returning it to the frontend
     const populatedConversation = await Conversation.findById(savedConversation._id)
-        .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username');
+        .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
+        .populate('admins', 'displayName avatarUrl username')
+        .populate('lastMessage');
+
+    const io = req.app.get('io');
+    if (io && populatedConversation) {
+      populatedConversation.participants.forEach(p => {
+        io.to(`user:${String(p._id || p)}`).emit('conversation_created', populatedConversation);
+      });
+    }
 
     res.status(201).json(populatedConversation);
   } catch (error) {
@@ -74,7 +94,7 @@ export const createConversation = async (req, res) => {
 export const updateConversation = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, avatarUrl, description, allowAnyMemberToAdd } = req.body;
+    const { name, avatarUrl, description, allowAnyMemberToAdd, groupType, isPublic, tags } = req.body;
     
     const conversation = await Conversation.findById(id);
     if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
@@ -82,29 +102,50 @@ export const updateConversation = async (req, res) => {
     if (name !== undefined) conversation.name = name;
     if (avatarUrl !== undefined) conversation.avatarUrl = avatarUrl;
     if (description !== undefined) conversation.description = description;
+    if (groupType !== undefined) conversation.groupType = groupType;
+    if (isPublic !== undefined) conversation.isPublic = isPublic;
+    if (tags !== undefined && Array.isArray(tags)) conversation.tags = tags;
     
     if (allowAnyMemberToAdd !== undefined) {
-      // Check if user is admin
+      // Check if user is admin safely
       const auth0Id = req.auth?.payload?.sub;
       if (auth0Id) {
         const currentUser = await User.findOne({ auth0Id });
+        const userObjIdStr = currentUser?._id ? currentUser._id.toString() : '';
+        const adminIds = (conversation.admins || []).map(a => (a?._id || a).toString());
+        const firstParticipantId = conversation.participants?.[0] ? (conversation.participants[0]._id || conversation.participants[0]).toString() : null;
+        
         const isAdmin = currentUser && (
-          conversation.admins.some(adminId => adminId.toString() === currentUser._id.toString()) || 
-          (conversation.admins.length === 0 && conversation.participants[0].toString() === currentUser._id.toString())
+          adminIds.includes(userObjIdStr) || 
+          (adminIds.length === 0 && firstParticipantId === userObjIdStr)
         );
         
         if (isAdmin) {
-          conversation.allowAnyMemberToAdd = allowAnyMemberToAdd;
+          conversation.allowAnyMemberToAdd = !!allowAnyMemberToAdd;
         } else {
           return res.status(403).json({ message: 'Only admins can change member adding permissions' });
         }
+      } else {
+        conversation.allowAnyMemberToAdd = !!allowAnyMemberToAdd;
       }
     }
     
     await conversation.save();
     
     const populatedConversation = await Conversation.findById(id)
-        .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username');
+        .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
+        .populate('admins', 'displayName avatarUrl username')
+        .populate('lastMessage');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(String(id)).emit('conversation_updated', populatedConversation);
+      if (populatedConversation?.participants) {
+        populatedConversation.participants.forEach(p => {
+          io.to(`user:${String(p._id || p)}`).emit('conversation_updated', populatedConversation);
+        });
+      }
+    }
         
     res.status(200).json(populatedConversation);
   } catch (error) {
@@ -115,10 +156,21 @@ export const updateConversation = async (req, res) => {
 export const addMembersToConversation = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newMemberIds } = req.body;
+    let { newMemberIds, usernames } = req.body;
     
-    if (!newMemberIds || !Array.isArray(newMemberIds) || newMemberIds.length === 0) {
-      return res.status(400).json({ message: 'Invalid member IDs' });
+    let resolvedMemberIds = Array.isArray(newMemberIds) ? [...newMemberIds] : [];
+
+    // If usernames are provided, resolve their user IDs
+    if (Array.isArray(usernames) && usernames.length > 0) {
+      const cleanUsernames = usernames.map(u => String(u).replace(/^@+/, '').trim().toLowerCase()).filter(Boolean);
+      if (cleanUsernames.length > 0) {
+        const matchedUsers = await User.find({ username: { $in: cleanUsernames } }).select('_id');
+        matchedUsers.forEach(u => resolvedMemberIds.push(u._id.toString()));
+      }
+    }
+
+    if (resolvedMemberIds.length === 0) {
+      return res.status(400).json({ message: 'Invalid member IDs or usernames' });
     }
 
     const conversation = await Conversation.findById(id);
@@ -128,9 +180,12 @@ export const addMembersToConversation = async (req, res) => {
     const auth0Id = req.auth?.payload?.sub;
     if (auth0Id) {
       const currentUser = await User.findOne({ auth0Id });
+      const userObjIdStr = currentUser?._id ? currentUser._id.toString() : '';
+      const adminIds = (conversation.admins || []).map(a => (a?._id || a).toString());
+      const firstParticipantId = conversation.participants?.[0] ? (conversation.participants[0]._id || conversation.participants[0]).toString() : null;
       const isAdmin = currentUser && (
-        conversation.admins.some(adminId => adminId.toString() === currentUser._id.toString()) || 
-        (conversation.admins.length === 0 && conversation.participants[0].toString() === currentUser._id.toString())
+        adminIds.includes(userObjIdStr) || 
+        (adminIds.length === 0 && firstParticipantId === userObjIdStr)
       );
       if (!isAdmin && !conversation.allowAnyMemberToAdd) {
         return res.status(403).json({ message: 'Only admins can add members to this group' });
@@ -138,15 +193,28 @@ export const addMembersToConversation = async (req, res) => {
     }
 
     // Add new members without duplicates
-    const currentParticipantIds = conversation.participants.map(p => p.toString());
-    const uniqueNewIds = newMemberIds.filter(id => !currentParticipantIds.includes(id.toString()));
+    const currentParticipantIds = conversation.participants.map(p => (p._id || p).toString());
+    const uniqueNewIds = resolvedMemberIds.filter(mId => !currentParticipantIds.includes(String(mId)));
     
-    conversation.participants.push(...uniqueNewIds);
-    await conversation.save();
+    if (uniqueNewIds.length > 0) {
+      conversation.participants.push(...uniqueNewIds);
+      await conversation.save();
+    }
 
     const populatedConversation = await Conversation.findById(id)
         .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
+        .populate('admins', 'displayName avatarUrl username')
         .populate('lastMessage');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(String(id)).emit('conversation_updated', populatedConversation);
+      if (populatedConversation?.participants) {
+        populatedConversation.participants.forEach(p => {
+          io.to(`user:${String(p._id || p)}`).emit('conversation_updated', populatedConversation);
+        });
+      }
+    }
         
     res.status(200).json(populatedConversation);
   } catch (error) {
@@ -157,19 +225,46 @@ export const addMembersToConversation = async (req, res) => {
 // Get public community channels for discovery
 export const getPublicCommunities = async (req, res) => {
   try {
-    let communities = await Conversation.find({ type: 'group', isPublic: true })
+    const searchQuery = (req.query.search || req.query.q || '').trim();
+    let query = {
+      type: 'group',
+      $or: [
+        { isPublic: true },
+        { groupType: 'community' }
+      ]
+    };
+
+    if (searchQuery) {
+      const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query = {
+        type: 'group',
+        $and: [
+          { $or: [{ isPublic: true }, { groupType: 'community' }] },
+          {
+            $or: [
+              { name: { $regex: escaped, $options: 'i' } },
+              { description: { $regex: escaped, $options: 'i' } },
+              { tags: { $regex: escaped, $options: 'i' } }
+            ]
+          }
+        ]
+      };
+    }
+
+    let communities = await Conversation.find(query)
       .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
       .populate('admins', 'displayName avatarUrl username')
       .sort({ updatedAt: -1 });
 
     // Seed default developer communities if none exist
-    if (communities.length === 0) {
+    if (communities.length === 0 && !searchQuery) {
       const defaults = [
         {
           name: 'General Engineering',
           description: 'Architecture debates, engineering best practices, stack decisions, and dev discussions.',
           tags: ['general', 'architecture', 'best-practices'],
           isPublic: true,
+          groupType: 'community',
           type: 'group',
           inviteCode: 'devsup-general'
         },
@@ -178,6 +273,7 @@ export const getPublicCommunities = async (req, res) => {
           description: 'DSA practice, algorithmic complexity optimization, dynamic programming, and interview challenges.',
           tags: ['algorithms', 'leetcode', 'dsa', 'interviews'],
           isPublic: true,
+          groupType: 'community',
           type: 'group',
           inviteCode: 'devsup-algorithms'
         },
@@ -186,6 +282,7 @@ export const getPublicCommunities = async (req, res) => {
           description: 'High-scale distributed systems, microservices, database sharding, caching, and event streaming.',
           tags: ['system-design', 'distributed-systems', 'backend'],
           isPublic: true,
+          groupType: 'community',
           type: 'group',
           inviteCode: 'devsup-sysdesign'
         },
@@ -194,6 +291,7 @@ export const getPublicCommunities = async (req, res) => {
           description: 'React, TypeScript, CSS art, Vite, Next.js, and modern browser rendering techniques.',
           tags: ['frontend', 'react', 'typescript', 'ui-ux'],
           isPublic: true,
+          groupType: 'community',
           type: 'group',
           inviteCode: 'devsup-frontend'
         }
@@ -203,7 +301,7 @@ export const getPublicCommunities = async (req, res) => {
         await Conversation.create(d);
       }
 
-      communities = await Conversation.find({ type: 'group', isPublic: true })
+      communities = await Conversation.find(query)
         .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
         .populate('admins', 'displayName avatarUrl username');
     }
