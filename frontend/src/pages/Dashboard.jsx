@@ -34,6 +34,7 @@ const StatusUploadModal = lazy(() => import('../components/StatusUploadModal'));
 const EventsView = lazy(() => import('../components/EventsView'));
 const LiveCodingWorkspace = lazy(() => import('../components/LiveCodingWorkspace'));
 import CodeReviewBlock from '../components/CodeReviewBlock.jsx';
+import MarkdownRenderer from '../components/MarkdownRenderer.jsx';
 import DevOpsAlertCard from '../components/DevOpsAlertCard.jsx';
 import WebhookManagerModal from '../components/WebhookManagerModal.jsx';
 import AudioHuddleBar from '../components/AudioHuddleBar.jsx';
@@ -4440,32 +4441,13 @@ export default function Dashboard() {
         const myUsername = (currentUserData?.username || '').toLowerCase();
         const myName = (currentUserData?.displayName || user?.name || '').toLowerCase().replace(/\s+/g, '');
 
-        const parts = text.split(/(@[a-zA-Z0-9_.-]+)/g);
-        if (parts.length === 1) return text;
-
-        return parts.map((part, i) => {
-            if (part.startsWith('@')) {
-                const handle = part.slice(1).toLowerCase();
-                const isMe = (myUsername && handle === myUsername) || (myName && handle === myName) || handle === 'everyone' || handle === 'all';
-                return (
-                    <span
-                        key={i}
-                        style={{
-                            color: isMe ? '#ffffff' : 'var(--colors-accent, #06b6d4)',
-                            backgroundColor: isMe ? 'rgba(6, 182, 212, 0.35)' : 'rgba(6, 182, 212, 0.12)',
-                            padding: '1px 5px',
-                            borderRadius: '4px',
-                            fontWeight: '600',
-                            display: 'inline-block',
-                            margin: '0 1px'
-                        }}
-                    >
-                        {part}
-                    </span>
-                );
-            }
-            return part;
-        });
+        return (
+            <MarkdownRenderer
+                content={text}
+                isOwn={isOwn}
+                options={{ myUsername, myName }}
+            />
+        );
     };
 
     const isVoiceNote = (urlOrMsg) => {

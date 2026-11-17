@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import MarkdownRenderer from './MarkdownRenderer.jsx';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
@@ -497,13 +498,13 @@ export default function CodeReviewBlock({
                     ) : (
                         <div style={{
                             color: '#e6edf3',
-                            fontSize: '0.82rem',
+                            fontSize: '0.84rem',
                             lineHeight: '1.5',
-                            whiteSpace: 'pre-wrap',
-                            maxHeight: '220px',
-                            overflowY: 'auto'
+                            maxHeight: '300px',
+                            overflowY: 'auto',
+                            paddingRight: '4px'
                         }}>
-                            {aiReviewContent}
+                            <MarkdownRenderer content={aiReviewContent} />
                         </div>
                     )}
                 </div>
