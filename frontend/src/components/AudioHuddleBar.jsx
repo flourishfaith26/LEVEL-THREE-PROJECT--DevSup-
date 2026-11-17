@@ -375,7 +375,7 @@ export default function AudioHuddleBar({
                     }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f0f6fc', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>🔊 #{channelName}</span>
+                            <span>🔊 {(channelName || 'Voice Huddle').replace(/^#+/, '').trim()}</span>
                         </span>
                         <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 500 }}>
                             Voice Huddle ({members.length || 1})

@@ -5273,7 +5273,7 @@ export default function Dashboard() {
                                         <div className="chat-item-text" style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, justifyContent: 'center', alignSelf: 'center', gap: '4px', padding: 0, margin: 0, boxSizing: 'border-box', borderBottom: 'none' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', lineHeight: 1.2, margin: 0, padding: 0 }}>
                                                 <span style={{ fontSize: '0.94rem', fontWeight: conv.unreadCount > 0 ? '700' : '500', color: conv.unreadCount > 0 ? '#ffffff' : 'var(--colors-textMain, #e2e8f0)', textShadow: conv.unreadCount > 0 ? '0 0 10px rgba(255, 255, 255, 0.35)' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
-                                                    {isGroup ? conv.name : (otherParticipant?.displayName || 'Unknown User')}
+                                                    {isGroup ? conv.name : ((otherParticipant?.displayName || 'Unknown User').replace(/^#+/, ''))}
                                                 </span>
                                                 {conv.lastMessage && (
                                                     <span style={{ fontSize: '0.72rem', color: conv.unreadCount > 0 ? 'var(--colors-accent)' : 'var(--colors-textMuted)', flexShrink: 0, fontWeight: conv.unreadCount > 0 ? '700' : 'normal', lineHeight: 1.2 }}>
@@ -5876,7 +5876,7 @@ export default function Dashboard() {
                                                     {(() => {
                                                         const name = activeConversation.type === 'group'
                                                             ? activeConversation.name
-                                                            : (activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName || 'Direct Message');
+                                                            : ((activeConversation.participants?.find(p => p._id !== mongoUserId)?.displayName || 'Direct Message').replace(/^#+/, ''));
                                                         return (
                                                             <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{name}</span>
                                                         );
@@ -8211,7 +8211,7 @@ export default function Dashboard() {
                                 return (
                                     <>
                                         <h2 style={{ margin: '0 0 4px 0', fontSize: '1.4rem', color: 'var(--colors-textMain)' }}>
-                                            {activeConversation.type === 'group' ? activeConversation.name : (other?.displayName || 'User')}
+                                            {activeConversation.type === 'group' ? activeConversation.name : ((other?.displayName || 'User').replace(/^#+/, ''))}
                                         </h2>
                                         {(!activeConversation.type || activeConversation.type === 'direct') && other?.username && (
                                             <div style={{ color: 'var(--colors-accent)', fontSize: '0.95rem', fontWeight: '600', marginBottom: '8px' }}>
@@ -9572,7 +9572,7 @@ export default function Dashboard() {
                     } else if (activeConversationId) {
                         setActiveHuddle({
                             conversationId: activeConversationId,
-                            channelName: activeConversation?.name || 'Channel Lounge'
+                            channelName: activeConversation?.name || directChatPartner?.displayName || 'Chat'
                         });
                         showToast('Joined audio huddle.');
                     } else {

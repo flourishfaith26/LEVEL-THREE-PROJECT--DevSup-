@@ -150,7 +150,7 @@ export default function WebhookManagerModal({ isOpen, onClose, conversationId, c
                                 DevOps CI/CD Webhooks
                             </div>
                             <div style={{ fontSize: '0.78rem', color: '#8b949e' }}>
-                                Connected to #{conversationName || 'Channel'}
+                                Connected to {(conversationName || 'Channel').replace(/^#+/, '')}
                             </div>
                         </div>
                     </div>
