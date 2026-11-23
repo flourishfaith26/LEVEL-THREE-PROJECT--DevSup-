@@ -3168,32 +3168,30 @@ export default function Dashboard() {
     }, [messages, activeConversationId, socket, mongoUserId, appSettings.readReceipts]);
 
     // 3. Handle Modal and Creating Conversations
-    const openCreateModal = async () => {
+    const openCreateModal = async (forcedType) => {
         setIsModalOpen(true);
         setUserSearchQuery('');
         setUserSearchResults([]);
         setSelectedUsers([]);
-        // For communities tab (which is always group type), show friends-only contacts list
-        if (activeTab === 'communities') {
+        setConvName('');
+        setConvDescription('');
+        setConvAvatarUrl('');
+
+        if (forcedType) {
+            setConvType(forcedType);
+        } else if (activeTab === 'communities') {
             setConvType('group');
-            try {
-                const token = await getAccessTokenSilently();
-                const res = await fetch(`${BACKEND_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+
+        try {
+            const token = await getAccessTokenSilently();
+            const res = await fetch(`${BACKEND_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
+            if (res.ok) {
                 const users = await res.json();
-                // Only keep friends (people we've had direct conversations with)
-                const friendIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
-                setAllUsers(users.filter(u => u._id !== mongoUserId && friendIds.includes(u._id)));
-            } catch (err) { console.error('Failed to fetch users:', err); }
-        } else {
-            // Pre-fetch all users so direct searching is instant and resilient
-            try {
-                const token = await getAccessTokenSilently();
-                const res = await fetch(`${BACKEND_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
-                if (res.ok) {
-                    const users = await res.json();
-                    setAllUsers(users.filter(u => u._id !== mongoUserId));
-                }
-            } catch (err) { console.error('Failed to pre-fetch users:', err); }
+                setAllUsers(users.filter(u => String(u._id) !== String(mongoUserId)));
+            }
+        } catch (err) {
+            console.error('Failed to pre-fetch users:', err);
         }
     };
 
@@ -3213,10 +3211,12 @@ export default function Dashboard() {
             const localMatches = allUsers.filter(u => {
                 const uName = (u.username || '').toLowerCase();
                 const dName = (u.displayName || '').toLowerCase();
+                const email = (u.email || '').toLowerCase();
                 const dCompact = dName.replace(/\s+/g, '');
                 return (
                     (cleanQuery && uName.includes(cleanQuery)) ||
                     (rawQuery && dName.includes(rawQuery)) ||
+                    (rawQuery && email.includes(rawQuery)) ||
                     (cleanQuery && dCompact.includes(cleanQuery))
                 );
             }).map(u => ({
@@ -5072,7 +5072,7 @@ export default function Dashboard() {
                                                         <Compass size={18} color="#06B6D4" style={{ opacity: 0.9 }} />
                                                         Explore communities
                                                     </ContextMenuItem>
-                                                    <ContextMenuItem onClick={() => { setConvType('group'); setIsModalOpen(true); setIsChatsMenuOpen(false); }}>
+                                                    <ContextMenuItem onClick={() => { openCreateModal('group'); setIsChatsMenuOpen(false); }}>
                                                         <Users size={18} style={{ opacity: 0.8 }} />
                                                         New group
                                                     </ContextMenuItem>
@@ -5340,7 +5340,7 @@ export default function Dashboard() {
                                     <IconButton title="Explore Public Communities" onClick={() => setIsCommunityDirectoryOpen(true)} style={{ backgroundColor: 'var(--colors-surface)', color: '#06B6D4' }}>
                                         <Compass size={19} />
                                     </IconButton>
-                                    <IconButton title="New Community" onClick={() => { setConvType('group'); setIsModalOpen(true); }} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
+                                    <IconButton title="New Community" onClick={() => { openCreateModal('group'); }} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
                                         <Plus size={20} />
                                     </IconButton>
                                     <div style={{ position: 'relative' }}>
@@ -5488,7 +5488,7 @@ export default function Dashboard() {
                                     </div>
                                 ) : (
                                     <div 
-                                        onClick={() => { setConvType('group'); setIsModalOpen(true); }}
+                                        onClick={() => { openCreateModal('group'); }}
                                         style={{ 
                                             color: 'var(--colors-accent)', 
                                             fontSize: '0.9rem', 
@@ -8932,14 +8932,14 @@ export default function Dashboard() {
                                         setSelectedUsers([]); 
                                         setUserSearchQuery('');
                                         setUserSearchResults([]);
-                                        // Fetch friends (contacts) for group creation
                                         if (allUsers.length === 0) {
                                             try {
                                                 const token = await getAccessTokenSilently();
                                                 const res = await fetch(`${BACKEND_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
-                                                const users = await res.json();
-                                                const friendIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
-                                                setAllUsers(users.filter(u => u._id !== mongoUserId && friendIds.includes(u._id)));
+                                                if (res.ok) {
+                                                    const users = await res.json();
+                                                    setAllUsers(users.filter(u => String(u._id) !== String(mongoUserId)));
+                                                }
                                             } catch (err) { console.error('Failed to fetch users:', err); }
                                         }
                                     }}
@@ -8999,7 +8999,7 @@ export default function Dashboard() {
                                 <Label style={{ margin: 0, fontSize: '0.9rem', color: 'var(--colors-textMuted)' }}>
                                     {convType === 'direct' ? 'Find by @username' : 'Select Members'}
                                 </Label>
-                                {convType === 'group' && <span style={{fontSize: '0.8rem', color: 'var(--colors-accent)', fontWeight: '600'}}>Your Contacts</span>}
+                                {convType === 'group' && <span style={{fontSize: '0.8rem', color: 'var(--colors-accent)', fontWeight: '600'}}>{userSearchQuery ? 'Search Results' : 'Contacts & Members'}</span>}
                             </div>
                             
                             <div style={{ position: 'relative' }}>
@@ -9007,14 +9007,12 @@ export default function Dashboard() {
                                     {convType === 'direct' ? '@' : <Search size={18} />}
                                 </div>
                                 <ModalInput
-                                    placeholder={convType === 'direct' ? 'Search by username (e.g. blossom123 or @blossom123)...' : 'Filter by name or @username...'}
+                                    placeholder={convType === 'direct' ? 'Search by username (e.g. blossom123 or @blossom123)...' : 'Search by name, @username, or email...'}
                                     value={userSearchQuery}
                                     onChange={e => {
                                         const val = e.target.value;
                                         setUserSearchQuery(val);
-                                        if (convType === 'direct') {
-                                            searchUsersDebounced(val);
-                                        }
+                                        searchUsersDebounced(val);
                                     }}
                                     style={{ 
                                         padding: '16px 16px 16px 44px', 
@@ -9139,26 +9137,78 @@ export default function Dashboard() {
                                         </div>
                                     ));
                                 })() : (() => {
-                                    // Group: use contacts list filtered by name
-                                    const contactIds = [...new Set(conversations.filter(c => c.type === 'direct').flatMap(c => c.participants.map(p => p?._id)).filter(id => id && id !== mongoUserId))];
-                                    const displayedUsers = allUsers.filter(u => contactIds.includes(u._id));
-                                    const filtered = displayedUsers.filter(u => u.displayName?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.username?.toLowerCase().includes(userSearchQuery.toLowerCase()));
-                                    
-                                    if (filtered.length === 0) {
+                                    // Group / Community: allow searching all users by name, @username, or email
+                                    const cleanQuery = normalizeUsername(userSearchQuery);
+                                    const rawQuery = (userSearchQuery || '').trim().toLowerCase();
+
+                                    const candidateMap = new Map();
+                                    (allUsers || []).forEach(u => {
+                                        if (u?._id && String(u._id) !== String(mongoUserId)) {
+                                            candidateMap.set(String(u._id), u);
+                                        }
+                                    });
+                                    (userSearchResults || []).forEach(u => {
+                                        if (u?._id && String(u._id) !== String(mongoUserId)) {
+                                            candidateMap.set(String(u._id), u);
+                                        }
+                                    });
+
+                                    let candidates = Array.from(candidateMap.values());
+                                    if (rawQuery) {
+                                        candidates = candidates.filter(u => {
+                                            const uName = (u.username || '').toLowerCase();
+                                            const dName = (u.displayName || '').toLowerCase();
+                                            const email = (u.email || '').toLowerCase();
+                                            const dCompact = dName.replace(/\s+/g, '');
+                                            return (
+                                                dName.includes(rawQuery) ||
+                                                uName.includes(rawQuery) ||
+                                                (cleanQuery && uName.includes(cleanQuery)) ||
+                                                (cleanQuery && dCompact.includes(cleanQuery)) ||
+                                                email.includes(rawQuery)
+                                            );
+                                        });
+                                    } else {
+                                        // When no search query, show contacts at the top, followed by other members
+                                        const contactIds = new Set(
+                                            conversations.flatMap(c => (c.participants || []).map(p => String(p?._id || p)))
+                                                .filter(id => id && id !== String(mongoUserId))
+                                        );
+                                        candidates.sort((a, b) => {
+                                            const aIsContact = contactIds.has(String(a._id));
+                                            const bIsContact = contactIds.has(String(b._id));
+                                            if (aIsContact && !bIsContact) return -1;
+                                            if (!aIsContact && bIsContact) return 1;
+                                            return (a.displayName || '').localeCompare(b.displayName || '');
+                                        });
+                                    }
+
+                                    if (isSearchingUsers && candidates.length === 0) {
+                                        return (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '180px', gap: '10px', color: 'var(--colors-textMuted)' }}>
+                                                <div style={{ width: '18px', height: '18px', border: '2px solid var(--colors-accent)', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                                                Searching users...
+                                            </div>
+                                        );
+                                    }
+
+                                    if (candidates.length === 0) {
                                         return (
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '180px', padding: '20px', gap: '16px' }}>
                                                 <div style={{ padding: '16px', borderRadius: '50%', backgroundColor: 'var(--colors-surface)', border: '1px solid var(--colors-border)' }}>
                                                     <Users size={32} color="var(--colors-textMuted)" strokeWidth={1.5} />
                                                 </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                                    <div style={{ color: 'var(--colors-textMain)', fontSize: '1rem', fontWeight: 'bold' }}>No contacts found</div>
-                                                    <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem', textAlign: 'center' }}>Start a direct chat with someone first!</div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', textAlign: 'center' }}>
+                                                    <div style={{ color: 'var(--colors-textMain)', fontSize: '1rem', fontWeight: 'bold' }}>No users found</div>
+                                                    <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.85rem' }}>
+                                                        {userSearchQuery ? `No user matching "${userSearchQuery}"` : 'No users available'}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
                                     }
-                                    
-                                    return filtered.map(u => (
+
+                                    return candidates.map(u => (
                                         <div
                                             key={u._id}
                                             onClick={() => toggleUserSelection(u._id)}
