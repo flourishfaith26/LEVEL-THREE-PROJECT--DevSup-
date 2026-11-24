@@ -49,6 +49,7 @@ export const getMessages = async (req, res) => {
       deletedFor: { $ne: currentUser._id }
     })
       .populate('sender', 'displayName avatarUrl username')
+      .populate('reactions.users', 'displayName avatarUrl username')
       .populate({
         path: 'replyTo',
         select: 'content sender isCodeSnippet caption isDeletedForEveryone',
@@ -296,5 +297,73 @@ export const toggleResolveCodeReview = async (req, res) => {
   } catch (error) {
     console.error('Error toggling code review resolve:', error);
     res.status(500).json({ message: 'Error updating code review', error: error.message });
+  }
+};
+
+// React to a message with an emoji (toggle reaction)
+export const reactToMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { emoji } = req.body;
+    const auth0Id = req.auth?.payload?.sub;
+
+    if (!emoji) return res.status(400).json({ message: 'Emoji is required' });
+
+    const currentUser = await User.findOne({ auth0Id });
+    if (!currentUser) return res.status(404).json({ message: 'User not found' });
+
+    const message = await Message.findById(id);
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+
+    if (!Array.isArray(message.reactions)) {
+      message.reactions = [];
+    }
+
+    const userIdStr = String(currentUser._id);
+    let existingReaction = message.reactions.find(r => r.emoji === emoji);
+
+    if (existingReaction) {
+      const userIndex = existingReaction.users.findIndex(u => String(u) === userIdStr);
+      if (userIndex > -1) {
+        // Remove reaction (toggle off)
+        existingReaction.users.splice(userIndex, 1);
+        if (existingReaction.users.length === 0) {
+          message.reactions = message.reactions.filter(r => r.emoji !== emoji);
+        }
+      } else {
+        // Add user to reaction
+        existingReaction.users.push(currentUser._id);
+      }
+    } else {
+      // New reaction emoji
+      message.reactions.push({
+        emoji,
+        users: [currentUser._id]
+      });
+    }
+
+    await message.save();
+
+    const populated = await Message.findById(id)
+      .populate('sender', 'displayName avatarUrl username')
+      .populate('reactions.users', 'displayName avatarUrl username');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(String(message.conversationId)).emit('message_reaction_updated', {
+        messageId: message._id,
+        conversationId: message.conversationId,
+        reactions: populated.reactions
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      messageId: message._id,
+      reactions: populated.reactions
+    });
+  } catch (error) {
+    console.error('Error reacting to message:', error);
+    res.status(500).json({ message: 'Error reacting to message', error: error.message });
   }
 };

@@ -4,7 +4,8 @@ import {
     markMessagesReadHttp, 
     sendMessageHttp,
     addCodeReview,
-    toggleResolveCodeReview
+    toggleResolveCodeReview,
+    reactToMessage
 } from '../controllers/messageController.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -15,5 +16,6 @@ router.post('/', requireAuth, sendMessageHttp);
 router.post('/:conversationId/read', requireAuth, markMessagesReadHttp);
 router.post('/:id/code-review', requireAuth, addCodeReview);
 router.patch('/:id/code-review/:reviewId/resolve', requireAuth, toggleResolveCodeReview);
+router.post('/:id/react', requireAuth, reactToMessage);
 
 export default router;

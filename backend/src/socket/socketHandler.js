@@ -462,6 +462,52 @@ export const setupSocket = (io) => {
             }
         });
 
+        // Toggle message reaction via socket
+        socket.on('react_message', async ({ messageId, emoji, userId }) => {
+            try {
+                if (!messageId || !emoji || !userId) return;
+                const message = await Message.findById(messageId);
+                if (!message) return;
+
+                if (!Array.isArray(message.reactions)) {
+                    message.reactions = [];
+                }
+
+                const userIdStr = String(userId);
+                let existingReaction = message.reactions.find(r => r.emoji === emoji);
+
+                if (existingReaction) {
+                    const userIndex = existingReaction.users.findIndex(u => String(u) === userIdStr);
+                    if (userIndex > -1) {
+                        existingReaction.users.splice(userIndex, 1);
+                        if (existingReaction.users.length === 0) {
+                            message.reactions = message.reactions.filter(r => r.emoji !== emoji);
+                        }
+                    } else {
+                        existingReaction.users.push(userId);
+                    }
+                } else {
+                    message.reactions.push({
+                        emoji,
+                        users: [userId]
+                    });
+                }
+
+                await message.save();
+
+                const populated = await Message.findById(messageId)
+                    .populate('reactions.users', 'displayName avatarUrl username');
+
+                io.to(String(message.conversationId)).emit('message_reaction_updated', {
+                    messageId: message._id,
+                    conversationId: message.conversationId,
+                    reactions: populated.reactions
+                });
+            } catch (error) {
+                console.error('Error handling socket react_message:', error);
+            }
+        });
+
         // 4. Collaborative Whiteboard & Architecture Canvas Handling
         socket.on('whiteboard:init', ({ conversationId }, callback) => {
             if (!conversationId) return;

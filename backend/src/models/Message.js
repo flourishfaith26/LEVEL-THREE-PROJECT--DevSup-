@@ -115,6 +115,14 @@ const messageSchema = new mongoose.Schema({
   },
   sequence: {
     type: Number
+  },
+  reactions: [{
+    emoji: { type: String, required: true },
+    users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+  }],
+  replyCount: {
+    type: Number,
+    default: 0
   }
 }, { timestamps: true });
 
