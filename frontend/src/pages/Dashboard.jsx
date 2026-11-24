@@ -3258,10 +3258,10 @@ export default function Dashboard() {
         setConvDescription('');
         setConvAvatarUrl('');
 
-        if (forcedType === 'community' || activeTab === 'communities') {
-            setConvType('community');
-        } else if (forcedType) {
+        if (forcedType) {
             setConvType(forcedType);
+        } else if (activeTab === 'communities') {
+            setConvType(communitySectionTab === 'groups' ? 'group' : 'community');
         } else {
             setConvType('direct');
         }
@@ -3391,7 +3391,7 @@ export default function Dashboard() {
     };
 
     const handleCreateConversation = async () => {
-        const isCommunity = convType === 'community' || activeTab === 'communities';
+        const isCommunity = convType === 'community';
         if (!isCommunity && selectedUsers.length === 0) return;
         if ((convType === 'group' || isCommunity) && !convName.trim()) return;
 
@@ -3436,6 +3436,13 @@ export default function Dashboard() {
 
             if (isCommunity) {
                 setActiveTab('communities');
+                setCommunitySectionTab('communities');
+            } else if (convType === 'group') {
+                if (activeTab === 'communities') {
+                    setCommunitySectionTab('groups');
+                } else {
+                    setActiveTab('chats');
+                }
             } else {
                 setActiveTab('chats');
             }
@@ -9464,10 +9471,10 @@ export default function Dashboard() {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: '800', color: 'var(--colors-textMain)' }}>
-                                    {convType === 'community' || activeTab === 'communities' ? 'Create Community' : 'New Conversation'}
+                                    {convType === 'community' ? 'Create Community' : (convType === 'group' ? 'Create Group' : 'New Conversation')}
                                 </h2>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--colors-accent)', fontWeight: '600' }}>
-                                    {convType === 'community' || activeTab === 'communities' ? 'Start a public community hub' : (convType === 'direct' ? 'Start a direct chat' : 'Start a group chat')}
+                                    {convType === 'community' ? 'Start a public community hub' : (convType === 'group' ? 'Start a group chat' : 'Start a direct chat')}
                                 </span>
                             </div>
                             <IconButton onClick={() => { setIsModalOpen(false); setUserSearchQuery(''); }} style={{ backgroundColor: 'var(--colors-bg)', border: '1px solid var(--colors-border)', width: '36px', height: '36px', borderRadius: '50%', color: 'var(--colors-textMuted)', transition: 'all 0.2s ease' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--colors-textMain)'; e.currentTarget.style.borderColor = 'var(--colors-textMuted)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--colors-textMuted)'; e.currentTarget.style.borderColor = 'var(--colors-border)'; }}>
@@ -9475,7 +9482,37 @@ export default function Dashboard() {
                             </IconButton>
                         </div>
 
-                        {activeTab !== 'communities' && convType !== 'community' && (
+                        {activeTab === 'communities' ? (
+                            <div style={{ display: 'flex', gap: '8px', padding: '6px', backgroundColor: 'var(--colors-bg)', border: '1px solid var(--colors-border)', borderRadius: '12px' }}>
+                                <div
+                                    onClick={() => { setConvType('community'); setSelectedUsers([]); }}
+                                    style={{ flex: 1, padding: '10px', textAlign: 'center', cursor: 'pointer', borderRadius: '8px', backgroundColor: convType === 'community' ? 'var(--colors-surface)' : 'transparent', color: convType === 'community' ? 'var(--colors-accent)' : 'var(--colors-textMuted)', border: convType === 'community' ? '1px solid var(--colors-border)' : '1px solid transparent', transition: 'all 0.2s ease', fontWeight: convType === 'community' ? '600' : '500', boxShadow: convType === 'community' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none' }}
+                                >
+                                    # Community Channel
+                                </div>
+                                <div
+                                    onClick={async () => { 
+                                        setConvType('group'); 
+                                        setSelectedUsers([]); 
+                                        setUserSearchQuery('');
+                                        setUserSearchResults([]);
+                                        if (allUsers.length === 0) {
+                                            try {
+                                                const token = await getAccessTokenSilently();
+                                                const res = await fetch(`${BACKEND_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
+                                                if (res.ok) {
+                                                    const users = await res.json();
+                                                    setAllUsers(users.filter(u => String(u._id) !== String(mongoUserId)));
+                                                }
+                                            } catch (err) { console.error('Failed to fetch users:', err); }
+                                        }
+                                    }}
+                                    style={{ flex: 1, padding: '10px', textAlign: 'center', cursor: 'pointer', borderRadius: '8px', backgroundColor: convType === 'group' ? 'var(--colors-surface)' : 'transparent', color: convType === 'group' ? 'var(--colors-accent)' : 'var(--colors-textMuted)', border: convType === 'group' ? '1px solid var(--colors-border)' : '1px solid transparent', transition: 'all 0.2s ease', fontWeight: convType === 'group' ? '600' : '500', boxShadow: convType === 'group' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none' }}
+                                >
+                                    👥 Group Chat
+                                </div>
+                            </div>
+                        ) : (
                             <div style={{ display: 'flex', gap: '8px', padding: '6px', backgroundColor: 'var(--colors-bg)', border: '1px solid var(--colors-border)', borderRadius: '12px' }}>
                                 <div
                                     onClick={() => { setConvType('direct'); setSelectedUsers([]); }}
@@ -9507,12 +9544,12 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {(convType === 'group' || convType === 'community' || activeTab === 'communities') && (
+                        {(convType === 'group' || convType === 'community') && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                 <div>
-                                    <Label style={{ marginBottom: '8px', display: 'block', fontSize: '0.9rem', color: 'var(--colors-textMuted)' }}>{convType === 'community' || activeTab === 'communities' ? 'Community Name' : 'Group Name'}</Label>
+                                    <Label style={{ marginBottom: '8px', display: 'block', fontSize: '0.9rem', color: 'var(--colors-textMuted)' }}>{convType === 'community' ? 'Community Name' : 'Group Name'}</Label>
                                     <ModalInput
-                                        placeholder={convType === 'community' || activeTab === 'communities' ? "e.g. Open Source Contributors" : "e.g. Project Alpha"}
+                                        placeholder={convType === 'community' ? "e.g. Open Source Contributors" : "e.g. Project Alpha"}
                                         value={convName}
                                         onChange={e => setConvName(e.target.value)}
                                         style={{ padding: '14px', borderRadius: '12px', border: '1px solid var(--colors-border)', backgroundColor: 'var(--colors-bg)', color: 'var(--colors-textMain)', transition: 'all 0.3s ease' }}
@@ -9523,7 +9560,7 @@ export default function Dashboard() {
                                 <div>
                                     <Label style={{ marginBottom: '8px', display: 'block', fontSize: '0.9rem', color: 'var(--colors-textMuted)' }}>Description <span style={{fontSize: '0.8rem', opacity: 0.7}}>(optional)</span></Label>
                                     <ModalInput
-                                        placeholder={convType === 'community' || activeTab === 'communities' ? "What is this community about? Anyone can join and participate." : "What is this group about?"}
+                                        placeholder={convType === 'community' ? "What is this community about? Anyone can join and participate." : "What is this group about?"}
                                         value={convDescription}
                                         onChange={e => setConvDescription(e.target.value)}
                                         style={{ padding: '14px', borderRadius: '12px', border: '1px solid var(--colors-border)', backgroundColor: 'var(--colors-bg)', color: 'var(--colors-textMain)', transition: 'all 0.3s ease' }}
@@ -9532,7 +9569,7 @@ export default function Dashboard() {
                                     />
                                 </div>
                                 <div>
-                                    <Label style={{ marginBottom: '8px', display: 'block', fontSize: '0.9rem', color: 'var(--colors-textMuted)' }}>{convType === 'community' || activeTab === 'communities' ? 'Community Image' : 'Group Image'} <span style={{fontSize: '0.8rem', opacity: 0.7}}>(optional)</span></Label>
+                                    <Label style={{ marginBottom: '8px', display: 'block', fontSize: '0.9rem', color: 'var(--colors-textMuted)' }}>{convType === 'community' ? 'Community Image' : 'Group Image'} <span style={{fontSize: '0.8rem', opacity: 0.7}}>(optional)</span></Label>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                         {convAvatarUrl && (
                                             <img src={convAvatarUrl} alt="Preview" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--colors-accent)' }} />
@@ -9551,7 +9588,7 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {convType !== 'community' && activeTab !== 'communities' && (
+                        {convType !== 'community' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Label style={{ margin: 0, fontSize: '0.9rem', color: 'var(--colors-textMuted)' }}>
@@ -9825,27 +9862,27 @@ export default function Dashboard() {
                             variant="primary"
                             fullWidth
                             onClick={handleCreateConversation}
-                            disabled={(convType === 'community' || activeTab === 'communities') ? !convName.trim() : (selectedUsers.length === 0 || (convType === 'group' && !convName.trim()))}
+                            disabled={convType === 'community' ? !convName.trim() : (selectedUsers.length === 0 || (convType === 'group' && !convName.trim()))}
                             style={{ 
                                 padding: '16px', 
                                 borderRadius: '16px', 
                                 fontSize: '1.05rem', 
                                 fontWeight: '700', 
                                 marginTop: '4px',
-                                backgroundColor: ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? 'var(--colors-accent)' : 'var(--colors-bg)',
-                                color: ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? '#ffffff' : 'var(--colors-textMuted)',
-                                border: ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? 'none' : '1px solid var(--colors-border)',
-                                cursor: ((convType === 'community' || activeTab === 'communities') ? !convName.trim() : (selectedUsers.length === 0 || (convType === 'group' && !convName.trim()))) ? 'not-allowed' : 'pointer',
+                                backgroundColor: (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? 'var(--colors-accent)' : 'var(--colors-bg)',
+                                color: (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? '#ffffff' : 'var(--colors-textMuted)',
+                                border: (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? 'none' : '1px solid var(--colors-border)',
+                                cursor: (convType === 'community' ? !convName.trim() : (selectedUsers.length === 0 || (convType === 'group' && !convName.trim()))) ? 'not-allowed' : 'pointer',
                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? '0 8px 25px -5px rgba(6, 182, 212, 0.5)' : 'none',
-                                transform: ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? 'translateY(-2px)' : 'none'
+                                boxShadow: (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? '0 8px 25px -5px rgba(6, 182, 212, 0.5)' : 'none',
+                                transform: (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) ? 'translateY(-2px)' : 'none'
                             }}
-                            onMouseEnter={(e) => { if ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) { e.currentTarget.style.backgroundColor = 'var(--colors-accentHover)'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 30px -5px rgba(6, 182, 212, 0.6)'; } }}
-                            onMouseLeave={(e) => { if ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) { e.currentTarget.style.backgroundColor = 'var(--colors-accent)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(6, 182, 212, 0.5)'; } }}
-                            onMouseDown={(e) => { if ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) { e.currentTarget.style.transform = 'translateY(1px)'; e.currentTarget.style.boxShadow = '0 4px 15px -5px rgba(6, 182, 212, 0.4)'; } }}
-                            onMouseUp={(e) => { if ((convType === 'community' || activeTab === 'communities') ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 30px -5px rgba(6, 182, 212, 0.6)'; } }}
+                            onMouseEnter={(e) => { if (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) { e.currentTarget.style.backgroundColor = 'var(--colors-accentHover)'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 30px -5px rgba(6, 182, 212, 0.6)'; } }}
+                            onMouseLeave={(e) => { if (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) { e.currentTarget.style.backgroundColor = 'var(--colors-accent)'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(6, 182, 212, 0.5)'; } }}
+                            onMouseDown={(e) => { if (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) { e.currentTarget.style.transform = 'translateY(1px)'; e.currentTarget.style.boxShadow = '0 4px 15px -5px rgba(6, 182, 212, 0.4)'; } }}
+                            onMouseUp={(e) => { if (convType === 'community' ? convName.trim() : (selectedUsers.length > 0 && (convType === 'direct' || convName.trim()))) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 30px -5px rgba(6, 182, 212, 0.6)'; } }}
                         >
-                            {convType === 'community' || activeTab === 'communities' ? 'Create Community' : (convType === 'group' ? 'Start Group Chat' : 'Start Direct Chat')}
+                            {convType === 'community' ? 'Create Community' : (convType === 'group' ? 'Start Group Chat' : 'Start Direct Chat')}
                         </Button>
                     </ModalContent>
                 </ModalOverlay>
