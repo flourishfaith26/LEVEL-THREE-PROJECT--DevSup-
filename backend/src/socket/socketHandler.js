@@ -174,6 +174,19 @@ export const setupSocket = (io) => {
                     }
                 }
 
+                // In communities (WhatsApp channels model), only community creator/admins can post updates
+                if (conv.groupType === 'community') {
+                    const senderStr = String(messageData.senderId);
+                    const isAdmin = (Array.isArray(conv.admins) && conv.admins.some(a => String(a._id || a) === senderStr)) ||
+                        (Array.isArray(conv.participants) && conv.participants.length > 0 && String(conv.participants[0]?._id || conv.participants[0]) === senderStr);
+                    if (!isAdmin) {
+                        if (typeof acknowledge === 'function') {
+                            acknowledge({ ok: false, error: 'Only the creator of this community can post updates.' });
+                        }
+                        return;
+                    }
+                }
+
                 const sequence = await getNextMessageSequence(messageData.conversationId);
                 const newMessage = new Message({
                     conversationId: messageData.conversationId,

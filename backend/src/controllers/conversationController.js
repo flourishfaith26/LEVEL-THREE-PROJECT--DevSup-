@@ -80,8 +80,8 @@ export const createConversation = async (req, res) => {
       }
     }
 
-    const isCom = !!(isCommunity || groupType === 'community' || isPublic);
-    const resolvedGroupType = isCom ? 'community' : (groupType || 'group');
+    const isCom = (groupType === 'community' || isCommunity === true);
+    const resolvedGroupType = isCom ? 'community' : 'group';
     const slugName = (name || 'hub').toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 24);
     const generatedInviteCode = `devsup-${slugName}-${crypto.randomBytes(3).toString('hex')}`;
 
@@ -265,28 +265,29 @@ export const addMembersToConversation = async (req, res) => {
 // Get public community channels for discovery
 export const getPublicCommunities = async (req, res) => {
   try {
+    const dummyNames = [
+      'General Engineering',
+      'Algorithms & LeetCode',
+      'System Design Hub',
+      'Frontend Wizards'
+    ];
     const searchQuery = (req.query.search || req.query.q || '').trim();
     let query = {
       type: 'group',
-      $or: [
-        { isPublic: true },
-        { groupType: 'community' }
-      ]
+      groupType: 'community',
+      name: { $nin: dummyNames }
     };
 
     if (searchQuery) {
       const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query = {
         type: 'group',
-        $and: [
-          { $or: [{ isPublic: true }, { groupType: 'community' }] },
-          {
-            $or: [
-              { name: { $regex: escaped, $options: 'i' } },
-              { description: { $regex: escaped, $options: 'i' } },
-              { tags: { $regex: escaped, $options: 'i' } }
-            ]
-          }
+        groupType: 'community',
+        name: { $nin: dummyNames },
+        $or: [
+          { name: { $regex: escaped, $options: 'i' } },
+          { description: { $regex: escaped, $options: 'i' } },
+          { tags: { $regex: escaped, $options: 'i' } }
         ]
       };
     }

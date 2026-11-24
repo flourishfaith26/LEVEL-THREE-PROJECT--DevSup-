@@ -94,10 +94,16 @@ export const runStartupMigrations = async () => {
     await Conversation.deleteMany({
       $or: [
         { inviteCode: { $in: dummyInviteCodes } },
-        { name: { $in: dummyNames }, inviteCode: { $regex: /^devsup-/i } },
-        { name: { $in: dummyNames }, $or: [{ admins: { $size: 0 } }, { admins: { $exists: false } }] }
+        { name: { $in: dummyNames } }
       ]
     });
+
+    // 4. Ensure existing user-created groups are not confused for communities
+    // As confirmed: No community has been created yet. All existing conversations are direct chats or groups.
+    await Conversation.updateMany(
+      { type: 'group', name: { $nin: dummyNames } },
+      { $set: { groupType: 'group', isPublic: false } }
+    );
   } catch (err) {
     console.error('Error during startup migrations:', err);
   }

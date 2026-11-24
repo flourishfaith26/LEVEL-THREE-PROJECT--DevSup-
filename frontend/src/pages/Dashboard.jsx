@@ -3422,7 +3422,7 @@ export default function Dashboard() {
                     name: (convType === 'group' || isCommunity) ? convName.trim() : undefined,
                     description: (convType === 'group' || isCommunity) ? convDescription.trim() : undefined,
                     avatarUrl: (convType === 'group' || isCommunity) ? convAvatarUrl : undefined,
-                    participantIds: isCommunity ? [mongoUserId, ...selectedUsers] : [mongoUserId, ...selectedUsers]
+                    participantIds: isCommunity ? [mongoUserId] : [mongoUserId, ...selectedUsers]
                 })
             });
 
@@ -3781,6 +3781,10 @@ export default function Dashboard() {
     const handleSendMessage = (e) => {
         if (e && e.preventDefault) e.preventDefault();
         if (isSendingMessageRef.current) return;
+        if (isChannelSubscriberOnly) {
+            showToast('Only the community creator can post updates in this channel.');
+            return;
+        }
         const text = messageInput.trim();
         if (!text || !mongoUserId || !activeConversationId) return;
 
@@ -4618,6 +4622,12 @@ export default function Dashboard() {
         directChatPartner &&
         currentUserData?.blockedUsers?.some(u => String(u._id || u) === String(directChatPartner._id || directChatPartner))
     );
+    const isCommunityChannel = activeConversation?.type === 'group' && activeConversation?.groupType === 'community';
+    const isCommunityAdmin = isCommunityChannel && (
+        (Array.isArray(activeConversation?.admins) && activeConversation.admins.some(a => String(a?._id || a) === String(mongoUserId))) ||
+        (Array.isArray(activeConversation?.participants) && activeConversation.participants.length > 0 && String(activeConversation.participants[0]?._id || activeConversation.participants[0]) === String(mongoUserId))
+    );
+    const isChannelSubscriberOnly = isCommunityChannel && !isCommunityAdmin;
     const isSelectingCurrentMessages = isSelectingMessages && messageSelectionConversationId === activeConversationId;
     const showChatArea = !!activeConversationId || (activeTab === 'settings' && !!activeSettingTab) || isLiveCodingOpen;
 
@@ -5328,7 +5338,7 @@ export default function Dashboard() {
                         </div>
 
                         {conversations.filter(c => {
-                            if (c.type === 'group' && (c.groupType === 'community' || c.isPublic)) return false;
+                            if (c.type === 'group' && c.groupType === 'community') return false;
                             if (!chatSearchQuery) return true;
                             const isGroup = c.type === 'group';
                             const otherParticipant = !isGroup ? c.participants?.find(p => p._id !== mongoUserId) : null;
@@ -5361,7 +5371,7 @@ export default function Dashboard() {
                             )
                         ) : (
                             [...conversations].filter(c => {
-                                if (c.type === 'group' && (c.groupType === 'community' || c.isPublic)) return false;
+                                if (c.type === 'group' && c.groupType === 'community') return false;
                                 if (!chatSearchQuery) return true;
                                 const isGroup = c.type === 'group';
                                 const otherParticipant = !isGroup ? c.participants?.find(p => p._id !== mongoUserId) : null;
@@ -5595,9 +5605,8 @@ export default function Dashboard() {
                         </div>
 
                         {(() => {
-                            const isCommunityConv = (c) => c.groupType === 'community' || c.isPublic;
                             const filteredList = [...conversations].filter(c => {
-                                if (c.type !== 'group' || !isCommunityConv(c)) return false;
+                                if (c.type !== 'group' || c.groupType !== 'community') return false;
                                 if (!chatSearchQuery) return true;
                                 const q = chatSearchQuery.toLowerCase();
                                 return (c.name || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q);
@@ -5682,7 +5691,7 @@ export default function Dashboard() {
                             }
 
                             return filteredList.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(conv => {
-                                const isComm = isCommunityConv(conv);
+                                const isComm = true;
                                 const hasLiveCall = !!groupCallsSummary[conv._id];
                                 return (
                                 <ChannelItem
@@ -6095,7 +6104,7 @@ export default function Dashboard() {
                                             }}
                                         />
                                     )}
-                                    {activeConversation.type === 'group' && (
+                                    {activeConversation.type === 'group' && activeConversation.groupType !== 'community' && (
                                         activeConversation.admins?.some(a => (a._id || a).toString() === mongoUserId) || 
                                         activeConversation.allowAnyMemberToAdd || 
                                         (!activeConversation.admins?.length && activeConversation.participants?.some(p => (p._id || p).toString() === mongoUserId))
@@ -7888,6 +7897,23 @@ export default function Dashboard() {
                                                         Unblock
                                                     </button>
                                                 </div>
+                                            ) : isChannelSubscriberOnly ? (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '10px',
+                                                    padding: '16px 24px',
+                                                    backgroundColor: 'var(--colors-surface)',
+                                                    borderTop: '1px solid var(--colors-border)',
+                                                    color: 'var(--colors-textMuted)',
+                                                    fontSize: '0.92rem',
+                                                    fontWeight: '500',
+                                                    textAlign: 'center'
+                                                }}>
+                                                    <Lock size={18} color="var(--colors-accent)" />
+                                                    <span>Only the creator of this community can post updates. You can react and share posts.</span>
+                                                </div>
                                             ) : (
                                                 <>
                                                     {messageInput.includes('@devsup-ai') && (
@@ -8559,7 +8585,7 @@ export default function Dashboard() {
                                         <X size={20} />
                                     </IconButton>
                                     <span style={{ fontSize: '1.1rem', color: 'var(--colors-textMain)', fontWeight: '500' }}>
-                                        {activeConversation.type === 'group' ? 'Group Info' : 'Contact Info'}
+                                        {activeConversation.type === 'group' ? (activeConversation.groupType === 'community' ? 'Community Info' : 'Group Info') : 'Contact Info'}
                                     </span>
                                 </div>
 
@@ -8597,7 +8623,11 @@ export default function Dashboard() {
                                                 @{other.username}
                                             </div>
                                         )}
-                                        {activeConversation.type === 'group' && <span style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', marginBottom: '16px' }}>Group • {activeConversation.participants?.length || 0} participants</span>}
+                                        {activeConversation.type === 'group' && (
+                                            <span style={{ color: 'var(--colors-textMuted)', fontSize: '1rem', marginBottom: '16px' }}>
+                                                {activeConversation.groupType === 'community' ? 'Community Channel' : 'Group'} • {activeConversation.participants?.length || 0} {activeConversation.groupType === 'community' ? (activeConversation.participants?.length === 1 ? 'member' : 'members') : 'participants'}
+                                            </span>
+                                        )}
                                         {(!activeConversation.type || activeConversation.type === 'direct') ? <span style={{ color: 'var(--colors-textMuted)', fontSize: '0.95rem', marginBottom: '16px' }}>{other?.techDiscipline || 'Available'}</span> : null}
                                     </>
                                 );
@@ -10075,7 +10105,7 @@ export default function Dashboard() {
                 getAccessTokenSilently={getAccessTokenSilently}
                 currentUserConversations={conversations}
                 onOpenConversation={(convId) => {
-                    setActiveTab('chats');
+                    setActiveTab('communities');
                     setActiveConversationId(convId);
                 }}
                 showToast={showToast}
