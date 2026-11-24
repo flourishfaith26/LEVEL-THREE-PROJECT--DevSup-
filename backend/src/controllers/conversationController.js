@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Conversation from '../models/Conversation.js';
 import User from '../models/User.js';
 import Message from '../models/Message.js';
@@ -230,11 +231,13 @@ export const addMembersToConversation = async (req, res) => {
     }
 
     // Add new members without duplicates
-    const currentParticipantIds = conversation.participants.map(p => (p._id || p).toString());
-    const uniqueNewIds = resolvedMemberIds.filter(mId => !currentParticipantIds.includes(String(mId)));
+    const currentParticipantIds = conversation.participants.map(p => (p?._id || p).toString());
+    const validUniqueNewObjectIds = resolvedMemberIds
+      .filter(mId => mongoose.isValidObjectId(mId) && !currentParticipantIds.includes(String(mId)))
+      .map(mId => new mongoose.Types.ObjectId(mId));
     
-    if (uniqueNewIds.length > 0) {
-      conversation.participants.push(...uniqueNewIds);
+    if (validUniqueNewObjectIds.length > 0) {
+      conversation.participants.push(...validUniqueNewObjectIds);
       await conversation.save();
     }
 
