@@ -86,12 +86,14 @@ const AppContainer = styled('div', {
     right: 0,
     bottom: 0,
     width: '100%',
+    height: '100%',
     overflowX: 'hidden',
     backgroundColor: '$surface',
     '@media (max-width: 768px)': {
         flexDirection: 'column-reverse',
+        height: '100dvh',
         paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        paddingBottom: '0px',
     }
 });
 
@@ -109,12 +111,16 @@ const NavRail = styled('nav', {
     },
     '@media (max-width: 768px)': {
         width: '100%',
-        height: 'calc(60px + env(safe-area-inset-bottom, 0px))',
+        height: 'calc(58px + env(safe-area-inset-bottom, 0px))',
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        padding: '0 $2 env(safe-area-inset-bottom, 0px) $2',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        padding: '0 8px env(safe-area-inset-bottom, 0px) 8px',
         borderRight: 'none',
         borderTop: '1px solid $border',
+        boxSizing: 'border-box',
+        flexShrink: 0,
+        backgroundColor: '$surface',
     }
 });
 
@@ -171,6 +177,12 @@ const NavRailItem = styled('button', {
     height: '40px',
     borderRadius: '12px',
     transition: 'all 0.2s',
+    WebkitTapHighlightColor: 'transparent',
+    '@media (max-width: 768px)': {
+        width: '44px',
+        height: '44px',
+        borderRadius: '14px',
+    },
     '&:hover': {
         backgroundColor: '$surface',
         color: '$textMain',
@@ -430,8 +442,10 @@ const ChatArea = styled('main', {
     backgroundColor: '$bg',
     minWidth: 0,
     minHeight: 0,
+    height: '100%',
     '@media (max-width: 768px)': {
         width: '100%',
+        height: '100%',
     }
 });
 
@@ -447,6 +461,10 @@ const ChatHeader = styled('div', {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    '@media (max-width: 768px)': {
+        padding: '8px 12px',
+        gap: '6px',
+    }
 });
 
 const MobileBackButton = styled('button', {
@@ -455,11 +473,14 @@ const MobileBackButton = styled('button', {
     border: 'none',
     color: '$textMain',
     cursor: 'pointer',
-    padding: '4px',
-    marginRight: '8px',
+    padding: '6px',
+    marginRight: '4px',
+    borderRadius: '50%',
+    flexShrink: 0,
     '@media (max-width: 768px)': {
         display: 'inline-flex',
         alignItems: 'center',
+        justifyContent: 'center',
     }
 });
 
@@ -539,8 +560,12 @@ const MessageList = styled('div', {
     backgroundRepeat: 'no-repeat, repeat',
     backgroundBlendMode: 'normal, luminosity',
     backgroundAttachment: 'fixed, scroll',
+    WebkitOverflowScrolling: 'touch',
+    '@media (max-width: 768px)': {
+        padding: '10px 8px',
+    },
     '@media (max-width: 576px)': {
-        padding: '6px 4px',
+        padding: '8px 6px',
     },
 });
 
@@ -570,10 +595,15 @@ const ChatBubble = styled('div', {
     '@media (max-width: 992px)': {
         maxWidth: '75%',
     },
+    '@media (max-width: 768px)': {
+        maxWidth: '85%',
+        padding: '6px 10px 8px 10px',
+        fontSize: '0.9rem',
+    },
     '@media (max-width: 576px)': {
-        maxWidth: '82%',
-        padding: '4px 8px 8px 8px',
-        fontSize: '0.86rem',
+        maxWidth: '88%',
+        padding: '6px 10px 8px 10px',
+        fontSize: '0.88rem',
         borderRadius: '8px',
     },
     variants: {
@@ -703,10 +733,20 @@ const ModalOverlay = styled('div', {
 const ModalContent = styled('div', {
     backgroundColor: '$surface',
     padding: '$4',
-    borderRadius: '8px',
+    borderRadius: '16px',
     width: '400px',
-    maxWidth: '90%',
+    maxWidth: '92%',
+    maxHeight: 'calc(100dvh - 32px)',
+    overflowY: 'auto',
+    boxSizing: 'border-box',
     border: '1px solid $border',
+    WebkitOverflowScrolling: 'touch',
+    '@media (max-width: 768px)': {
+        maxWidth: '94%',
+        padding: '20px 16px',
+        borderRadius: '16px',
+        maxHeight: 'calc(100dvh - 24px)',
+    }
 });
 
 const ModalTitle = styled('h3', {
@@ -748,8 +788,11 @@ const InputArea = styled('form', {
     display: 'flex',
     alignItems: 'flex-end',
     gap: '$2',
+    boxSizing: 'border-box',
+    flexShrink: 0,
     '@media (max-width: 768px)': {
-        paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+        padding: '8px 8px calc(8px + env(safe-area-inset-bottom, 0px)) 8px',
+        gap: '6px',
     }
 });
 
@@ -767,6 +810,11 @@ const AttachButton = styled('button', {
     flexShrink: 0,
     marginBottom: '3px',
     transition: 'all 0.2s',
+    '@media (max-width: 768px)': {
+        width: '36px',
+        height: '36px',
+        marginBottom: '2px',
+    },
     '&:hover': {
         backgroundColor: '$bg',
         color: '$textMain',
@@ -797,6 +845,7 @@ const Spinner = styled('div', {
 
 const Input = styled('textarea', {
     flex: 1,
+    minWidth: 0,
     padding: '12px 20px',
     borderRadius: '24px',
     backgroundColor: '$bg',
@@ -806,10 +855,15 @@ const Input = styled('textarea', {
     resize: 'none',
     fontFamily: 'inherit',
     lineHeight: '1.5',
-    minHeight: '48px',
+    minHeight: '44px',
     maxHeight: '150px',
     overflowY: 'auto',
     transition: 'border-color 0.2s',
+    '@media (max-width: 768px)': {
+        padding: '10px 14px',
+        minHeight: '40px',
+        fontSize: '0.92rem',
+    },
     '&:focus': { borderColor: '$accent' },
     '&::-webkit-scrollbar': { width: '6px' },
     '&::-webkit-scrollbar-thumb': { backgroundColor: '$border', borderRadius: '10px' },
@@ -829,6 +883,10 @@ const SendButton = styled('button', {
     cursor: 'pointer',
     flexShrink: 0,
     transition: 'all 0.2s',
+    '@media (max-width: 768px)': {
+        width: '40px',
+        height: '40px',
+    },
     '&:hover': { backgroundColor: '$accentHover', transform: 'scale(1.05)' },
 });
 
@@ -1468,6 +1526,14 @@ const RightDrawer = styled('aside', {
     '@media (max-width: 768px)': {
         width: '100%',
         borderLeft: 'none',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: '100dvh',
+        zIndex: 2000,
+        padding: 0,
     },
     variants: {
         isOpen: {
@@ -1476,10 +1542,11 @@ const RightDrawer = styled('aside', {
                 padding: '0px',
                 borderLeft: 'none',
                 opacity: 0,
+                pointerEvents: 'none',
                 '@media (min-width: 1400px)': { width: '0px' },
                 '@media (max-width: 1200px)': { width: '0px' },
                 '@media (max-width: 992px)': { width: '0px', padding: '0px' },
-                '@media (max-width: 768px)': { width: '0px', padding: '0px' },
+                '@media (max-width: 768px)': { width: '0px', padding: '0px', display: 'none' },
             }
         }
     }
@@ -2172,23 +2239,27 @@ export default function Dashboard() {
                     setIsStatusModalOpen(false);
                 } else if (storyViewerInitialUserIndex !== null) {
                     setStoryViewerInitialUserIndex(null);
+                } else if (activeSettingTab !== null) {
+                    setActiveSettingTab(null);
                 } else if (activeConversationId !== null) {
                     setActiveConversationId(null);
+                    setIsLiveCodingOpen(false);
+                    setIsHackathonOpen(false);
                 }
             }
         };
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [isDrawerOpen, isStatusModalOpen, storyViewerInitialUserIndex, activeConversationId, mobileWhiteboardDesign]);
+    }, [isDrawerOpen, isStatusModalOpen, storyViewerInitialUserIndex, activeConversationId, mobileWhiteboardDesign, activeSettingTab]);
 
     // Push state for mobile when opening views
     useEffect(() => {
         if (window.innerWidth <= 768) {
-            if (activeConversationId !== null || storyViewerInitialUserIndex !== null || isStatusModalOpen || mobileWhiteboardDesign) {
+            if (activeConversationId !== null || storyViewerInitialUserIndex !== null || isStatusModalOpen || mobileWhiteboardDesign || activeSettingTab !== null) {
                 window.history.pushState({ opened: true }, '');
             }
         }
-    }, [activeConversationId, storyViewerInitialUserIndex, isStatusModalOpen, mobileWhiteboardDesign]);
+    }, [activeConversationId, storyViewerInitialUserIndex, isStatusModalOpen, mobileWhiteboardDesign, activeSettingTab]);
 
     // Call and Search State
     const [callConfig, setCallConfig] = useState({ active: false, isReceiving: false, callerData: null, callType: 'video' });
@@ -5841,7 +5912,7 @@ export default function Dashboard() {
                             <ChatHeader style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', gap: '8px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
                                     <>
-                                        <MobileBackButton onClick={() => setActiveConversationId(null)}>
+                                        <MobileBackButton onClick={() => { setActiveConversationId(null); setIsLiveCodingOpen(false); setIsHackathonOpen(false); setCommunityTab('chat'); }}>
                                             <ArrowLeft size={24} />
                                         </MobileBackButton>
                                         <div
@@ -5987,6 +6058,7 @@ export default function Dashboard() {
                                         return (
                                             <button
                                                 type="button"
+                                                className="desktop-only"
                                                 onClick={() => {
                                                     if (isInThisHuddle) {
                                                         setActiveHuddle(null);
@@ -6033,6 +6105,7 @@ export default function Dashboard() {
                                     {/* Technical Interview & Mentorship Mode Button */}
                                     <button
                                         type="button"
+                                        className="desktop-only"
                                         onClick={() => setIsInterviewOpen(true)}
                                         title="Technical Interview & Mentorship Mode"
                                         style={{
@@ -6058,6 +6131,7 @@ export default function Dashboard() {
                                     {activeConversation?.type === 'group' && (
                                         <button
                                             type="button"
+                                            className="desktop-only"
                                             onClick={async () => {
                                                 try {
                                                     const token = await getAccessTokenSilently();
@@ -6132,11 +6206,58 @@ export default function Dashboard() {
                                                         <Info size={18} style={{ opacity: 0.8 }} />
                                                         {activeConversation.type === 'group' ? 'Group info' : 'Contact info'}
                                                     </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => {
+                                                        const convId = String(activeConversation?._id || '');
+                                                        if (activeHuddle && String(activeHuddle.conversationId) === convId) {
+                                                            setActiveHuddle(null);
+                                                        } else {
+                                                            setActiveHuddle({
+                                                                conversationId: convId,
+                                                                channelName: activeConversation?.name || directChatPartner?.displayName || 'Chat'
+                                                            });
+                                                        }
+                                                        setIsHeaderMenuOpen(false);
+                                                    }}>
+                                                        <Headphones size={18} style={{ opacity: 0.8 }} />
+                                                        {activeHuddle && String(activeHuddle.conversationId) === String(activeConversation?._id || '') ? 'Leave voice huddle' : 'Drop-in voice huddle'}
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { setIsInterviewOpen(true); setIsHeaderMenuOpen(false); }}>
+                                                        <Award size={18} style={{ opacity: 0.8 }} />
+                                                        Technical interview
+                                                    </ContextMenuItem>
+                                                    {activeConversation?.type === 'group' && (
+                                                        <ContextMenuItem onClick={async () => {
+                                                            setIsHeaderMenuOpen(false);
+                                                            try {
+                                                                const token = await getAccessTokenSilently();
+                                                                const res = await fetch(`${BACKEND_URL}/api/conversations/${activeConversation._id}/invite-link`, {
+                                                                    method: 'POST',
+                                                                    headers: {
+                                                                        'Content-Type': 'application/json',
+                                                                        Authorization: `Bearer ${token}`
+                                                                    }
+                                                                });
+                                                                if (res.ok) {
+                                                                    const data = await res.json();
+                                                                    const inviteUrl = data.inviteUrl || `${window.location.origin}/join/${data.inviteCode}`;
+                                                                    navigator.clipboard.writeText(inviteUrl);
+                                                                    showToast('Shareable invite link copied to clipboard!');
+                                                                } else {
+                                                                    showToast('Failed to generate invite link.');
+                                                                }
+                                                            } catch (err) {
+                                                                showToast('Error generating invite link.');
+                                                            }
+                                                        }}>
+                                                            <Share2 size={18} style={{ opacity: 0.8 }} />
+                                                            Share invite link
+                                                        </ContextMenuItem>
+                                                    )}
                                                     <ContextMenuItem onClick={() => { setIsSearchOpen(!isSearchOpen); setIsHeaderMenuOpen(false); }}>
                                                         <Search size={18} style={{ opacity: 0.8 }} />
                                                         Search
                                                     </ContextMenuItem>
-                                                    {!isMobileViewport && <ContextMenuItem onClick={() => {
+                                                    <ContextMenuItem onClick={() => {
                                                         if (activeTab === 'communities') {
                                                             setCommunityTab('live coding');
                                                         } else {
@@ -6146,7 +6267,7 @@ export default function Dashboard() {
                                                     }}>
                                                         <Brush size={18} style={{ opacity: 0.8 }} />
                                                         Whiteboard
-                                                    </ContextMenuItem>}
+                                                    </ContextMenuItem>
                                                     <ContextMenuItem onClick={() => { 
                                                         const isGroup = activeConversation.type === 'group';
                                                         setCallConfig({
@@ -6165,41 +6286,37 @@ export default function Dashboard() {
                                                         <Video size={18} style={{ opacity: 0.8 }} />
                                                         {activeConversation.type === 'group' ? 'Group calls' : 'Calls'}
                                                     </ContextMenuItem>
-                                                    {!isMobileViewport && (
-                                                        <>
-                                                            <ContextMenuItem onClick={() => { 
-                                                                if (activeTab === 'communities') {
-                                                                    setCommunityTab('live coding');
-                                                                } else {
-                                                                    setIsLiveCodingOpen(true);
-                                                                    setIsHackathonOpen(false);
-                                                                }
-                                                                setIsHeaderMenuOpen(false); 
-                                                            }}>
-                                                                <Code2 size={18} style={{ opacity: 0.8 }} />
-                                                                Live coding features
-                                                            </ContextMenuItem>
-                                                            <ContextMenuItem onClick={() => { 
-                                                                if (activeTab === 'communities') {
-                                                                    setCommunityTab('hackathons');
-                                                                } else {
-                                                                    setIsHackathonOpen(true);
-                                                                    setIsLiveCodingOpen(false);
-                                                                }
-                                                                setIsHeaderMenuOpen(false); 
-                                                            }}>
-                                                                <Rocket size={18} style={{ opacity: 0.8 }} />
-                                                                Hackathon
-                                                            </ContextMenuItem>
-                                                            <ContextMenuItem onClick={() => { 
-                                                                setIsWebhookModalOpen(true);
-                                                                setIsHeaderMenuOpen(false); 
-                                                            }}>
-                                                                <Webhook size={18} style={{ opacity: 0.8 }} />
-                                                                DevOps CI/CD Webhooks
-                                                            </ContextMenuItem>
-                                                        </>
-                                                    )}
+                                                    <ContextMenuItem onClick={() => { 
+                                                        if (activeTab === 'communities') {
+                                                            setCommunityTab('live coding');
+                                                        } else {
+                                                            setIsLiveCodingOpen(true);
+                                                            setIsHackathonOpen(false);
+                                                        }
+                                                        setIsHeaderMenuOpen(false); 
+                                                    }}>
+                                                        <Code2 size={18} style={{ opacity: 0.8 }} />
+                                                        Live coding features
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { 
+                                                        if (activeTab === 'communities') {
+                                                            setCommunityTab('hackathons');
+                                                        } else {
+                                                            setIsHackathonOpen(true);
+                                                            setIsLiveCodingOpen(false);
+                                                        }
+                                                        setIsHeaderMenuOpen(false); 
+                                                    }}>
+                                                        <Rocket size={18} style={{ opacity: 0.8 }} />
+                                                        Hackathon
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { 
+                                                        setIsWebhookModalOpen(true);
+                                                        setIsHeaderMenuOpen(false); 
+                                                    }}>
+                                                        <Webhook size={18} style={{ opacity: 0.8 }} />
+                                                        DevOps CI/CD Webhooks
+                                                    </ContextMenuItem>
                                                     <ContextMenuItem onClick={() => { 
                                                         if (isSelectingCurrentMessages) {
                                                             cancelMessageSelection();
@@ -8896,9 +9013,12 @@ export default function Dashboard() {
             {isModalOpen && (
                 <ModalOverlay onClick={() => setIsModalOpen(false)}>
                     <ModalContent onClick={e => e.stopPropagation()} style={{ 
-                        gap: '24px', 
-                        padding: '32px', 
-                        maxWidth: '440px', 
+                        gap: isMobileViewport ? '16px' : '24px', 
+                        padding: isMobileViewport ? '20px 16px' : '32px', 
+                        maxWidth: 'min(440px, 94vw)', 
+                        maxHeight: 'calc(100dvh - 32px)',
+                        overflowY: 'auto',
+                        boxSizing: 'border-box',
                         borderRadius: '24px', 
                         backgroundColor: 'var(--colors-surface)',
                         border: '1px solid var(--colors-border)',
@@ -9296,9 +9416,12 @@ export default function Dashboard() {
             {isAddMembersModalOpen && activeConversation?.type === 'group' && (
                 <ModalOverlay onClick={() => setIsAddMembersModalOpen(false)}>
                     <ModalContent onClick={e => e.stopPropagation()} style={{ 
-                        gap: '24px', 
-                        padding: '32px', 
-                        maxWidth: '440px', 
+                        gap: isMobileViewport ? '16px' : '24px', 
+                        padding: isMobileViewport ? '20px 16px' : '32px', 
+                        maxWidth: 'min(440px, 94vw)', 
+                        maxHeight: 'calc(100dvh - 32px)',
+                        overflowY: 'auto',
+                        boxSizing: 'border-box',
                         borderRadius: '24px', 
                         backgroundColor: 'var(--colors-surface)',
                         border: '1px solid var(--colors-border)',

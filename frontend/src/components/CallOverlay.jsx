@@ -105,6 +105,10 @@ const CallerInfo = styled('div', {
     alignItems: 'center',
     marginBottom: '80px',
     zIndex: 10,
+    '@media (max-width: 768px)': {
+        marginBottom: '40px',
+        padding: '0 16px',
+    }
 });
 
 const CallerNameText = styled('h2', {
@@ -117,6 +121,10 @@ const CallerNameText = styled('h2', {
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     textAlign: 'center',
+    '@media (max-width: 768px)': {
+        fontSize: '1.6rem',
+        margin: '18px 0 6px 0',
+    }
 });
 
 const CallStatusText = styled('p', {
@@ -174,6 +182,12 @@ const ControlsBar = styled('div', {
     border: '1px solid rgba(255, 255, 255, 0.1)',
     boxShadow: '0 20px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
     zIndex: 100,
+    '@media (max-width: 768px)': {
+        bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+        padding: '10px 16px',
+        gap: '12px',
+        maxWidth: '94%',
+    }
 });
 
 const ControlButton = styled('button', {
@@ -191,6 +205,10 @@ const ControlButton = styled('button', {
     backdropFilter: 'blur(10px)',
     boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
     '&:hover': { transform: 'translateY(-2px) scale(1.05)', backgroundColor: 'rgba(255, 255, 255, 0.14)' },
+    '@media (max-width: 768px)': {
+        width: '46px',
+        height: '46px',
+    },
     variants: {
         variant: {
             danger: {
