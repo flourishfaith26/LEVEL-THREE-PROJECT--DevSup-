@@ -267,7 +267,12 @@ export default function CommunityDirectoryModal({
                     ) : filteredCommunities.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '40px 0', color: '#94A3B8' }}>
                             <Hash size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-                            <div>No public communities match &ldquo;{searchQuery}&rdquo;</div>
+                            <div style={{ fontSize: '1rem', fontWeight: 600, color: '#E2E8F0', marginBottom: '6px' }}>
+                                {searchQuery ? `No public communities match "${searchQuery}"` : 'No public communities found'}
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                                {searchQuery ? 'Try searching for another topic or keyword.' : 'Only user-created communities appear here. Create a new community to get started!'}
+                            </div>
                         </div>
                     ) : (
                         filteredCommunities.map(community => {

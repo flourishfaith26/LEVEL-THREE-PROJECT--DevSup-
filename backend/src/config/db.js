@@ -77,6 +77,27 @@ export const runStartupMigrations = async () => {
         }
       }
     }
+
+    // 3. Remove all dummy seeded communities: only user-created communities should exist
+    const dummyInviteCodes = [
+      'devsup-general',
+      'devsup-algorithms',
+      'devsup-sysdesign',
+      'devsup-frontend'
+    ];
+    const dummyNames = [
+      'General Engineering',
+      'Algorithms & LeetCode',
+      'System Design Hub',
+      'Frontend Wizards'
+    ];
+    await Conversation.deleteMany({
+      $or: [
+        { inviteCode: { $in: dummyInviteCodes } },
+        { name: { $in: dummyNames }, inviteCode: { $regex: /^devsup-/i } },
+        { name: { $in: dummyNames }, $or: [{ admins: { $size: 0 } }, { admins: { $exists: false } }] }
+      ]
+    });
   } catch (err) {
     console.error('Error during startup migrations:', err);
   }

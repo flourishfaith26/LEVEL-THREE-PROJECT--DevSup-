@@ -293,56 +293,6 @@ export const getPublicCommunities = async (req, res) => {
       .populate('admins', 'displayName avatarUrl username')
       .sort({ updatedAt: -1 });
 
-    // Seed default developer communities if none exist
-    if (communities.length === 0 && !searchQuery) {
-      const defaults = [
-        {
-          name: 'General Engineering',
-          description: 'Architecture debates, engineering best practices, stack decisions, and dev discussions.',
-          tags: ['general', 'architecture', 'best-practices'],
-          isPublic: true,
-          groupType: 'community',
-          type: 'group',
-          inviteCode: 'devsup-general'
-        },
-        {
-          name: 'Algorithms & LeetCode',
-          description: 'DSA practice, algorithmic complexity optimization, dynamic programming, and interview challenges.',
-          tags: ['algorithms', 'leetcode', 'dsa', 'interviews'],
-          isPublic: true,
-          groupType: 'community',
-          type: 'group',
-          inviteCode: 'devsup-algorithms'
-        },
-        {
-          name: 'System Design Hub',
-          description: 'High-scale distributed systems, microservices, database sharding, caching, and event streaming.',
-          tags: ['system-design', 'distributed-systems', 'backend'],
-          isPublic: true,
-          groupType: 'community',
-          type: 'group',
-          inviteCode: 'devsup-sysdesign'
-        },
-        {
-          name: 'Frontend Wizards',
-          description: 'React, TypeScript, CSS art, Vite, Next.js, and modern browser rendering techniques.',
-          tags: ['frontend', 'react', 'typescript', 'ui-ux'],
-          isPublic: true,
-          groupType: 'community',
-          type: 'group',
-          inviteCode: 'devsup-frontend'
-        }
-      ];
-
-      for (const d of defaults) {
-        await Conversation.create(d);
-      }
-
-      communities = await Conversation.find(query)
-        .populate('participants', 'displayName avatarUrl onlineStatus techDiscipline username')
-        .populate('admins', 'displayName avatarUrl username');
-    }
-
     res.status(200).json(communities);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching public communities', error: error.message });
