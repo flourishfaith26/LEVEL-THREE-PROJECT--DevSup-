@@ -2213,6 +2213,7 @@ export default function Dashboard() {
     }, []);
 
     const [activeTab, setActiveTab] = useState('chats'); // 'chats', 'status', 'settings'
+    const [communitySectionTab, setCommunitySectionTab] = useState('all'); // 'all', 'communities', 'groups'
     const [activeSettingTab, setActiveSettingTab] = useState(null);
     useEffect(() => {
         if (!('serviceWorker' in navigator)) return undefined;
@@ -5522,7 +5523,7 @@ export default function Dashboard() {
                         <div style={{ padding: '8px 20px 12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
                                 <h2 style={{ fontSize: '1.45rem', margin: 0, fontWeight: '700', color: 'var(--colors-textMain)' }}>
-                                    {isChatsSelectionMode ? `${selectedChats.length} selected` : 'Communities'}
+                                    {isChatsSelectionMode ? `${selectedChats.length} selected` : 'Communities & Groups'}
                                 </h2>
                                 {isChatsSelectionMode ? (
                                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -5537,7 +5538,10 @@ export default function Dashboard() {
                                     <IconButton title="Explore Public Communities" onClick={() => setIsCommunityDirectoryOpen(true)} style={{ backgroundColor: 'var(--colors-surface)', color: '#06B6D4' }}>
                                         <Compass size={19} />
                                     </IconButton>
-                                    <IconButton title="Create Community" onClick={() => { openCreateModal('community'); }} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
+                                    <IconButton title="Create Community or Group" onClick={() => { 
+                                        if (communitySectionTab === 'groups') openCreateModal('group');
+                                        else openCreateModal('community'); 
+                                    }} style={{ backgroundColor: 'var(--colors-surface)', color: 'var(--colors-textMain)' }}>
                                         <Plus size={20} />
                                     </IconButton>
                                     <div style={{ position: 'relative' }}>
@@ -5558,6 +5562,10 @@ export default function Dashboard() {
                                                     <ContextMenuItem onClick={() => { openCreateModal('community'); setIsChatsMenuOpen(false); }}>
                                                         <Plus size={18} style={{ opacity: 0.8 }} />
                                                         Create community
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onClick={() => { openCreateModal('group'); setIsChatsMenuOpen(false); }}>
+                                                        <Users size={18} style={{ opacity: 0.8 }} />
+                                                        Create group
                                                     </ContextMenuItem>
                                                     <ContextMenuItem onClick={() => { setIsChatsSelectionMode(true); setSelectedChats([]); setIsChatsMenuOpen(false); }}>
                                                         <CheckSquare size={18} style={{ opacity: 0.8 }} />
@@ -5584,12 +5592,12 @@ export default function Dashboard() {
                                 padding: '8px 12px', 
                                 borderRadius: '8px', 
                                 gap: '12px',
-                                marginBottom: '12px'
+                                marginBottom: '10px'
                             }}>
                                 <Search size={18} color="var(--colors-textMuted)" />
                                 <input 
                                     type="text" 
-                                    placeholder="Search communities..."
+                                    placeholder={communitySectionTab === 'groups' ? "Search groups..." : communitySectionTab === 'communities' ? "Search communities..." : "Search communities & groups..."}
                                     value={chatSearchQuery}
                                     onChange={(e) => setChatSearchQuery(e.target.value)}
                                     style={{ 
@@ -5602,11 +5610,68 @@ export default function Dashboard() {
                                     }}
                                 />
                             </div>
+
+                            {/* Responsive Segmented Tabs: All, Communities, Groups */}
+                            <div style={{
+                                display: 'flex',
+                                gap: '6px',
+                                padding: '4px',
+                                backgroundColor: 'var(--colors-bg)',
+                                borderRadius: '10px',
+                                border: '1px solid var(--colors-border)',
+                                marginBottom: '8px'
+                            }}>
+                                {[
+                                    { id: 'all', label: 'All', count: conversations.filter(c => c.type === 'group').length },
+                                    { id: 'communities', label: 'Communities', count: conversations.filter(c => c.type === 'group' && c.groupType === 'community').length },
+                                    { id: 'groups', label: 'Groups', count: conversations.filter(c => c.type === 'group' && c.groupType !== 'community').length }
+                                ].map(tab => {
+                                    const isActive = communitySectionTab === tab.id;
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setCommunitySectionTab(tab.id)}
+                                            style={{
+                                                flex: 1,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '6px',
+                                                padding: '7px 4px',
+                                                border: isActive ? '1px solid var(--colors-accent)' : '1px solid transparent',
+                                                borderRadius: '8px',
+                                                backgroundColor: isActive ? 'var(--colors-surface)' : 'transparent',
+                                                color: isActive ? 'var(--colors-accent)' : 'var(--colors-textMuted)',
+                                                fontSize: '0.82rem',
+                                                fontWeight: isActive ? '700' : '500',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s ease',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
+                                            <span>{tab.label}</span>
+                                            <span style={{
+                                                fontSize: '0.72rem',
+                                                padding: '1px 6px',
+                                                borderRadius: '10px',
+                                                backgroundColor: isActive ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                                                color: isActive ? 'var(--colors-accent)' : 'var(--colors-textMuted)',
+                                                fontWeight: '700'
+                                            }}>
+                                                {tab.count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
                         {(() => {
                             const filteredList = [...conversations].filter(c => {
-                                if (c.type !== 'group' || c.groupType !== 'community') return false;
+                                if (c.type !== 'group') return false;
+                                if (communitySectionTab === 'communities' && c.groupType !== 'community') return false;
+                                if (communitySectionTab === 'groups' && c.groupType === 'community') return false;
                                 if (!chatSearchQuery) return true;
                                 const q = chatSearchQuery.toLowerCase();
                                 return (c.name || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q);
@@ -5616,17 +5681,45 @@ export default function Dashboard() {
                                 return chatSearchQuery.trim() ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px', gap: '12px', textAlign: 'center' }}>
                                         <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
-                                            No joined community found matching "{chatSearchQuery}".
+                                            No {communitySectionTab === 'communities' ? 'communities' : communitySectionTab === 'groups' ? 'groups' : 'communities or groups'} found matching "{chatSearchQuery}".
+                                        </div>
+                                        {communitySectionTab !== 'groups' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsCommunityDirectoryOpen(true)}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    borderRadius: '20px',
+                                                    backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                                                    border: '1px solid #06B6D4',
+                                                    color: '#06B6D4',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}
+                                            >
+                                                <Compass size={16} />
+                                                <span>Search Public Communities</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : communitySectionTab === 'groups' ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 20px', gap: '16px', textAlign: 'center' }}>
+                                        <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
+                                            You don't have any groups yet.
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => setIsCommunityDirectoryOpen(true)}
+                                            onClick={() => openCreateModal('group')}
                                             style={{
                                                 padding: '8px 16px',
                                                 borderRadius: '20px',
-                                                backgroundColor: 'rgba(6, 182, 212, 0.15)',
-                                                border: '1px solid #06B6D4',
-                                                color: '#06B6D4',
+                                                backgroundColor: 'var(--colors-accent)',
+                                                border: 'none',
+                                                color: '#fff',
                                                 fontSize: '0.85rem',
                                                 fontWeight: '600',
                                                 cursor: 'pointer',
@@ -5635,11 +5728,11 @@ export default function Dashboard() {
                                                 gap: '6px'
                                             }}
                                         >
-                                            <Compass size={16} />
-                                            <span>Search Public Communities</span>
+                                            <Plus size={16} />
+                                            <span>Create Group</span>
                                         </button>
                                     </div>
-                                ) : (
+                                ) : communitySectionTab === 'communities' ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 20px', gap: '16px', textAlign: 'center' }}>
                                         <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
                                             You haven't joined or created any communities yet.
@@ -5687,11 +5780,59 @@ export default function Dashboard() {
                                             </button>
                                         </div>
                                     </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 20px', gap: '16px', textAlign: 'center' }}>
+                                        <div style={{ color: 'var(--colors-textMuted)', fontSize: '0.9rem' }}>
+                                            No communities or groups yet.
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => openCreateModal('community')}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    borderRadius: '20px',
+                                                    backgroundColor: 'var(--colors-accent)',
+                                                    border: 'none',
+                                                    color: '#fff',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}
+                                            >
+                                                <Plus size={16} />
+                                                <span>Create Community</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => openCreateModal('group')}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    borderRadius: '20px',
+                                                    backgroundColor: 'var(--colors-surface)',
+                                                    border: '1px solid var(--colors-border)',
+                                                    color: 'var(--colors-textMain)',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}
+                                            >
+                                                <Users size={16} />
+                                                <span>Create Group</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 );
                             }
 
                             return filteredList.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(conv => {
-                                const isComm = true;
+                                const isComm = conv.groupType === 'community';
                                 const hasLiveCall = !!groupCallsSummary[conv._id];
                                 return (
                                 <ChannelItem
@@ -7588,8 +7729,8 @@ export default function Dashboard() {
                                                                     </form>
                                                                 )}
 
-                                                                {/* Display Message Reactions */}
-                                                                {Array.isArray(msg.reactions) && msg.reactions.length > 0 && (
+                                                                {/* Display Message Reactions - ONLY for communities */}
+                                                                {activeConversation?.groupType === 'community' && Array.isArray(msg.reactions) && msg.reactions.length > 0 && (
                                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
                                                                         {msg.reactions.map(r => {
                                                                             const hasReacted = (r.users || []).some(u => String(u?._id || u) === String(mongoUserId));
@@ -7624,117 +7765,131 @@ export default function Dashboard() {
                                                                     </div>
                                                                 )}
 
-                                                                {/* Community Interactive Action Bar: React, Comment/Reply, Share to Status, External Share */}
-                                                                {!msg.isDeletedForEveryone && !editingMessageId && (
+                                                                {/* Community Interactive Action Bar: React, Comment/Reply, Share to Status, External Share - ONLY for communities */}
+                                                                {activeConversation?.groupType === 'community' && !msg.isDeletedForEveryone && !editingMessageId && (
                                                                     <div 
                                                                         onClick={e => e.stopPropagation()}
                                                                         style={{ 
                                                                             display: 'flex', 
                                                                             alignItems: 'center', 
+                                                                            justifyContent: 'space-between',
+                                                                            flexWrap: 'wrap',
                                                                             gap: '6px', 
-                                                                            marginTop: '6px', 
+                                                                            marginTop: '8px', 
                                                                             paddingTop: '6px', 
                                                                             borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                                                                            opacity: 0.88,
-                                                                            fontSize: '0.75rem'
+                                                                            opacity: 0.9,
+                                                                            fontSize: '0.75rem',
+                                                                            width: '100%',
+                                                                            boxSizing: 'border-box'
                                                                         }}
                                                                     >
                                                                         {/* Emoji reaction buttons */}
-                                                                        {['👍', '❤️', '🔥', '🚀', '💡'].map(emoji => (
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                                                                            {['👍', '❤️', '🔥', '🚀', '💡'].map(emoji => (
+                                                                                <button
+                                                                                    key={emoji}
+                                                                                    type="button"
+                                                                                    onClick={() => handleReactToMessage(msg._id, emoji)}
+                                                                                    title={`React ${emoji}`}
+                                                                                    style={{
+                                                                                        border: 'none',
+                                                                                        background: 'transparent',
+                                                                                        cursor: 'pointer',
+                                                                                        padding: '2px 4px',
+                                                                                        borderRadius: '6px',
+                                                                                        fontSize: '0.9rem',
+                                                                                        lineHeight: 1,
+                                                                                        transition: 'transform 0.15s'
+                                                                                    }}
+                                                                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
+                                                                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                                                >
+                                                                                    {emoji}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+
+                                                                        {/* Action buttons (Reply, Status, Share) */}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
+                                                                            {/* Reply button */}
                                                                             <button
-                                                                                key={emoji}
                                                                                 type="button"
-                                                                                onClick={() => handleReactToMessage(msg._id, emoji)}
-                                                                                title={`React ${emoji}`}
+                                                                                onClick={() => {
+                                                                                    setReplyingToMessage(msg);
+                                                                                    if (inputRef.current) inputRef.current.focus();
+                                                                                }}
+                                                                                title="Reply"
                                                                                 style={{
                                                                                     border: 'none',
-                                                                                    background: 'transparent',
+                                                                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                                                                    color: 'var(--colors-textMuted)',
                                                                                     cursor: 'pointer',
-                                                                                    padding: '2px 4px',
-                                                                                    borderRadius: '6px',
-                                                                                    fontSize: '0.9rem',
-                                                                                    transition: 'transform 0.15s'
+                                                                                    display: 'inline-flex',
+                                                                                    alignItems: 'center',
+                                                                                    gap: '4px',
+                                                                                    padding: '3px 8px',
+                                                                                    borderRadius: '12px',
+                                                                                    fontSize: '0.72rem',
+                                                                                    fontWeight: '500',
+                                                                                    whiteSpace: 'nowrap',
+                                                                                    flexShrink: 0
                                                                                 }}
-                                                                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
-                                                                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                                                                             >
-                                                                                {emoji}
+                                                                                <MessageSquare size={12} />
+                                                                                <span>Reply</span>
                                                                             </button>
-                                                                        ))}
 
-                                                                        <div style={{ flex: 1 }} />
+                                                                            {/* Share to Status */}
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleShareToStatus(msg)}
+                                                                                title="Share to Status"
+                                                                                style={{
+                                                                                    border: 'none',
+                                                                                    backgroundColor: 'rgba(6, 182, 212, 0.12)',
+                                                                                    color: '#06B6D4',
+                                                                                    cursor: 'pointer',
+                                                                                    display: 'inline-flex',
+                                                                                    alignItems: 'center',
+                                                                                    gap: '4px',
+                                                                                    padding: '3px 8px',
+                                                                                    borderRadius: '12px',
+                                                                                    fontSize: '0.72rem',
+                                                                                    fontWeight: '600',
+                                                                                    whiteSpace: 'nowrap',
+                                                                                    flexShrink: 0
+                                                                                }}
+                                                                            >
+                                                                                <Code2 size={12} />
+                                                                                <span>Status</span>
+                                                                            </button>
 
-                                                                        {/* Comment / Reply button */}
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setReplyingToMessage(msg);
-                                                                                if (inputRef.current) inputRef.current.focus();
-                                                                            }}
-                                                                            title="Reply / Comment"
-                                                                            style={{
-                                                                                border: 'none',
-                                                                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                                                                color: 'var(--colors-textMuted)',
-                                                                                cursor: 'pointer',
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '4px',
-                                                                                padding: '3px 8px',
-                                                                                borderRadius: '12px',
-                                                                                fontSize: '0.72rem',
-                                                                                fontWeight: '500'
-                                                                            }}
-                                                                        >
-                                                                            <MessageSquare size={12} />
-                                                                            <span>Reply</span>
-                                                                        </button>
-
-                                                                        {/* Share to Status */}
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleShareToStatus(msg)}
-                                                                            title="Share to Status"
-                                                                            style={{
-                                                                                border: 'none',
-                                                                                backgroundColor: 'rgba(6, 182, 212, 0.12)',
-                                                                                color: '#06B6D4',
-                                                                                cursor: 'pointer',
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '4px',
-                                                                                padding: '3px 8px',
-                                                                                borderRadius: '12px',
-                                                                                fontSize: '0.72rem',
-                                                                                fontWeight: '600'
-                                                                            }}
-                                                                        >
-                                                                            <Code2 size={12} />
-                                                                            <span>Status</span>
-                                                                        </button>
-
-                                                                        {/* Share to Any Platform */}
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleShareMessage(msg)}
-                                                                            title="Share to any platform"
-                                                                            style={{
-                                                                                border: 'none',
-                                                                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                                                                color: 'var(--colors-textMain)',
-                                                                                cursor: 'pointer',
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '4px',
-                                                                                padding: '3px 8px',
-                                                                                borderRadius: '12px',
-                                                                                fontSize: '0.72rem',
-                                                                                fontWeight: '500'
-                                                                            }}
-                                                                        >
-                                                                            <Share2 size={12} />
-                                                                            <span>Share</span>
-                                                                        </button>
+                                                                            {/* Share to Any Platform */}
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleShareMessage(msg)}
+                                                                                title="Share"
+                                                                                style={{
+                                                                                    border: 'none',
+                                                                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                                                                    color: 'var(--colors-textMain)',
+                                                                                    cursor: 'pointer',
+                                                                                    display: 'inline-flex',
+                                                                                    alignItems: 'center',
+                                                                                    gap: '4px',
+                                                                                    padding: '3px 8px',
+                                                                                    borderRadius: '12px',
+                                                                                    fontSize: '0.72rem',
+                                                                                    fontWeight: '500',
+                                                                                    whiteSpace: 'nowrap',
+                                                                                    flexShrink: 0
+                                                                                }}
+                                                                            >
+                                                                                <Share2 size={12} />
+                                                                                <span>Share</span>
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                 )}
                                                             </ChatBubble>
